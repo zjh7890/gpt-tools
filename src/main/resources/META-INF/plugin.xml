@@ -5,14 +5,52 @@
     <vendor>zjh7890</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.zjh7890.gpttools.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+<!--        <toolWindow factoryClass="com.github.zjh7890.gpttools.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>-->
+<!--        <toolWindow id="FileTreeListToolWindow"-->
+<!--                    anchor="right"-->
+<!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.FileTreeListToolWindowFactory"-->
+<!--                    canCloseContent="true"-->
+<!--                    canWorkInDumbMode="true"-->
+<!--            icon="/icons/icon.svg">-->
+<!--        </toolWindow>-->
+
+        <toolWindow id="PlanCode"
+                    anchor="right"
+                    factoryClass="com.github.zjh7890.gpttools.toolWindow.chat.ChatToolWindowFactory"
+                    canCloseContents="true"
+                    icon="/icons/icon.svg">
+            <title>Plan Code</title>
+        </toolWindow>
     </extensions>
 
     <applicationListeners>
-        <listener class="com.github.zjh7890.gpttools.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>
+<!--        <listener class="com.github.zjh7890.gpttools.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>-->
     </applicationListeners>
+
+    <actions>
+        <action id="ClassFinderAction"
+                class="com.github.zjh7890.gpttools.actions.ClassFinderAction"
+                text="Find Class"
+                description="Finds and displays information about the class of the selected method.">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+<!--        <action id="AddFileAction"-->
+<!--                class="com.github.zjh7890.gpttools.actions.AddFileAction"-->
+<!--                text="Add File to ToolWindow"-->
+<!--                description="Adds the selected file to the ToolWindow.">-->
+<!--            <add-to-group group-id="EditorPopupMenu" anchor="last"/>-->
+<!--        </action>-->
+<!--        <action id="AddRecursiveFileAction"-->
+<!--                class="com.github.zjh7890.gpttools.actions.AddRecursiveFileAction"-->
+<!--                text="Recursively Add Files to ToolWindow"-->
+<!--                description="Recursively adds files to the ToolWindow based on dependencies.">-->
+<!--            <add-to-group group-id="EditorPopupMenu" anchor="last"/>-->
+<!--        </action>-->
+    </actions>
 </idea-plugin>
