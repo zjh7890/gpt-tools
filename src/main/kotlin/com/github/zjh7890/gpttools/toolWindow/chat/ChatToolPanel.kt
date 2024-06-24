@@ -198,6 +198,17 @@ class ChatToolPanel(
         inputSection.moveCursorToStart()
     }
 
+    /**
+     * Resets the chat session by clearing the current session and updating the UI.
+     */
+    fun resetChatSession() {
+        progressBar.isVisible = false
+        myList.removeAll()
+        this.hiddenProgressBar()
+        updateUI()
+    }
+
+
     companion object {
         private val objectMapper = jacksonObjectMapper()
     }

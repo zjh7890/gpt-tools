@@ -1,6 +1,9 @@
 package com.github.zjh7890.gpttools.toolWindow.chat
 
 import com.github.zjh7890.gpttools.MyBundle
+import com.github.zjh7890.gpttools.toolWindow.chat.ChatToolWindowFactory.Companion.contentPanel
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -26,7 +29,7 @@ class ChatToolWindowFactory : ToolWindowFactory, DumbAware {
     }
 
     override fun init(toolWindow: ToolWindow) {
-//        toolWindow.setTitleActions(listOfNotNull(ActionUtil.getActionGroup("AutoDev.ToolWindow.Chat.TitleActions")))
+        toolWindow.setTitleActions(listOfNotNull(ClearChatHistoryAction()))
     }
 
     companion object {
@@ -35,5 +38,12 @@ class ChatToolWindowFactory : ToolWindowFactory, DumbAware {
         fun getToolWindow(project: Project): ToolWindow? {
             return ToolWindowManager.getInstance(project).getToolWindow(Util.id)
         }
+    }
+}
+
+class ClearChatHistoryAction : AnAction("Clear Chat History") {
+    override fun actionPerformed(e: AnActionEvent) {
+        // Assuming `ChatToolPanel` has a method `clearHistory()`
+        contentPanel.resetChatSession()
     }
 }
