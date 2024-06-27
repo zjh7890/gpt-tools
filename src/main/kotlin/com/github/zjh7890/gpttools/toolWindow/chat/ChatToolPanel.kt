@@ -3,7 +3,6 @@ package com.github.zjh7890.gpttools.toolWindow.chat
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.observable.util.whenDisposed
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.NullableComponent
@@ -98,10 +97,6 @@ class ChatToolPanel(
         }
 
         setContent(panelContent)
-
-        disposable?.whenDisposed(disposable) {
-            myList.removeAll()
-        }
     }
 
     fun focusInput() {
