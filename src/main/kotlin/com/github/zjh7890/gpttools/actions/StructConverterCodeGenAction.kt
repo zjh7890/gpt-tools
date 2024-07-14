@@ -1,30 +1,25 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
+import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
-import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
-import com.github.zjh7890.gpttools.utils.PsiUtils.generateSignature
+import com.github.zjh7890.gpttools.utils.TemplateUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.psi.*
-import com.intellij.psi.impl.compiled.ClsTypeParameterImpl
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.util.PsiUtil
-import java.awt.Toolkit
-import java.awt.datatransfer.StringSelection
-import java.util.jar.JarFile
 import java.util.stream.Collectors
-import kotlin.collections.HashSet
 
 
-class ClassFinderAction : AnAction() {
+class StructConverterCodeGenAction : AnAction() {
+    private val promptTemplate: PromptTemplate
+        get() = CodeTemplateApplicationSettingsService.getInstance().state.templates[this::class.simpleName]!!
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project? = e.project
         val editor: Editor? = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.EDITOR)
@@ -43,38 +38,44 @@ class ClassFinderAction : AnAction() {
             return;
         }
 
-        val function = PsiTreeUtil.getParentOfType(elementAtCaret, PsiMethod::class.java)
-        val signature = generateSignature(method, false)
-        val completeSignature = generateSignature(method, true)
-
-        val containingClass = function?.containingClass ?: return
-
-        val newClass = containingClass.copy() as PsiClass
-
-        newClass.methods.filter {
-            generateSignature(it, false) != signature
-        }.forEach { newClass.deleteChildRange(it, it) }
-        newClass.fields.filterNotNull().forEach { field ->
-            try {
-                newClass.deleteChildRange(field, field)
-            } catch (ex: Exception) {
-                // 在这里处理异常，例如打印错误日志或显示错误消息
-                println("Error deleting field: ${ex.message}")
-            }
+        val parameters = method.parameterList.parameters
+        if (parameters.isEmpty()) {
+            Messages.showMessageDialog(
+                project,
+                "The method has no parameters.",
+                "Method Details",
+                Messages.getInformationIcon()
+            )
+            return
         }
-
-//        com.yupaopao.platform.common.dto.Response<com.yupaopao.bixin.biggie.api.entity.BiggieInfoDTO> null.queryBiggieInfo(long)
-
-        // Output the result, modify as needed to handle the created class
-        println(newClass.text)
+        val firstParameterType = parameters[0].type
+        val returnType = method.returnType
+        if (returnType == null) {
+            Messages.showMessageDialog(
+                project,
+                "The method has no return type.",
+                "Method Details",
+                Messages.getInformationIcon()
+            )
+            return
+        }
 
         try {
             val classes = findClassesFromMethod(method, project)
             val classInfos =
                 classes.stream().map { x -> x.className }.collect(Collectors.toList()).joinToString("\n")
-            val prefix = "${completeSignature}\n```\n${newClass.text}\n```\n\n"
 
-            val result = prefix + classes.joinToString("\n")
+            val GPT_methodInfo = classes.joinToString("\n")
+            val GPT_firstParamName = firstParameterType.presentableText
+            val GPT_returnParamName = returnType.presentableText
+
+            val map = mapOf(
+                "GPT_methodInfo" to GPT_methodInfo,
+                "GPT_firstParamName" to GPT_firstParamName,
+                "GPT_returnParamName" to GPT_returnParamName
+            )
+
+            val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
             Messages.showMessageDialog(project, classInfos, "Class Finder Results", Messages.getInformationIcon())
             copyToClipboard(result)
         } catch (ex: Exception) {
@@ -84,6 +85,11 @@ class ClassFinderAction : AnAction() {
 
     override fun getActionUpdateThread(): ActionUpdateThread {
         return ActionUpdateThread.BGT
+    }
+
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        e.presentation.text = promptTemplate.desc
     }
 }
 

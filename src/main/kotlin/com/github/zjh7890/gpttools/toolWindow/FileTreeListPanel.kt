@@ -1,5 +1,9 @@
 package com.github.zjh7890.gpttools.toolWindow
 
+import com.github.zjh7890.gpttools.utils.ClipboardUtils
+import com.github.zjh7890.gpttools.utils.PsiUtils.findSourceCode
+import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import javax.swing.JPanel
@@ -8,7 +12,6 @@ import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.PsiElement
 import com.intellij.openapi.roots.ProjectRootManager
@@ -61,7 +64,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         while (queue.isNotEmpty()) {
             val (currentFile, currentNode) = queue.poll()
             val dependencies = getDependencies(currentFile, project)
-            dependencies.filter { it.isValid && it.isInLocalFileSystem }.forEach { dependency ->
+            dependencies.filter { it.isValid }.forEach { dependency ->
                 if (addedFiles.add(dependency)) {
                     val childNode = DefaultMutableTreeNode(dependency.name)
                     currentNode.add(childNode)
@@ -73,28 +76,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         root.add(rootNode)
         (tree.model as DefaultTreeModel).reload(root)
         restoreExpandedPaths(expandedPaths)
-    }
-
-    private fun getDependencies(file: VirtualFile, project: Project): List<VirtualFile> {
-        val psiFile = PsiManager.getInstance(project).findFile(file) ?: return emptyList()
-        val referencedFiles = mutableListOf<PsiFile>()
-
-        PsiTreeUtil.findChildrenOfType(psiFile, PsiElement::class.java).forEach { element ->
-            element.references.forEach { reference ->
-                val resolvedFile = reference.resolve()?.containingFile
-                if (resolvedFile != null && resolvedFile !== psiFile) {
-                    if (isFileInProject(resolvedFile.virtualFile, project)) {
-                        referencedFiles.add(resolvedFile)
-                    }
-                }
-            }
-        }
-
-        return referencedFiles.map { it.virtualFile }.distinct()
-    }
-
-    private fun isFileInProject(file: VirtualFile, project: Project): Boolean {
-        return ProjectRootManager.getInstance(project).fileIndex.isInContent(file)
     }
 
     private fun getExpandedPaths(): Set<TreePath> {
@@ -118,8 +99,37 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         val selectedNode = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
         if (selectedNode != null && selectedNode != root) { // 防止移除根节点
             val model = tree.model as DefaultTreeModel
-            model.removeNodeFromParent(selectedNode)
-            addedFiles.removeIf { it.name == selectedNode.userObject as String }
+            removeNodeAndChildren(selectedNode)
+            model.reload(root)
         }
+    }
+
+    private fun removeNodeAndChildren(node: DefaultMutableTreeNode) {
+        // Create a queue to hold nodes to be removed
+        val nodesToRemove = LinkedList<DefaultMutableTreeNode>()
+        nodesToRemove.add(node)
+
+        while (nodesToRemove.isNotEmpty()) {
+            val currentNode = nodesToRemove.poll()
+            // Add all children to the queue
+            for (i in 0 until currentNode.childCount) {
+                nodesToRemove.add(currentNode.getChildAt(i) as DefaultMutableTreeNode)
+            }
+            // Remove the current node's file reference if it exists
+            addedFiles.removeIf { it.name == currentNode.userObject as String }
+            // Remove the current node from its parent
+            currentNode.removeFromParent()
+        }
+    }
+
+    fun copyAllFiles() {
+        val sb: StringBuilder = StringBuilder()
+        sb.append("下面是提供的信息：\n")
+        for (addedFile in addedFiles) {
+            val documentManager = FileDocumentManager.getInstance()
+            val document = documentManager.getDocument(addedFile)
+            sb.append("```\n"  + document?.text + "\n```\n").append("\n")
+        }
+        ClipboardUtils.copyToClipboard(sb.toString())
     }
 }

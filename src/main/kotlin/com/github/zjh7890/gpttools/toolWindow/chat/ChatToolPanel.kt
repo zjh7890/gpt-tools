@@ -205,7 +205,6 @@ class ChatToolPanel(
 
 
     companion object {
-        private val objectMapper = jacksonObjectMapper()
     }
 }
 

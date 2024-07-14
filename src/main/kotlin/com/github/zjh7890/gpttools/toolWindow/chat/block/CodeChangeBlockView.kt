@@ -19,17 +19,20 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.github.zjh7890.gpttools.toolWindow.chat.fullHeight
 import com.github.zjh7890.gpttools.toolWindow.chat.fullWidth
+import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.ui.MessageType
 import com.intellij.openapi.ui.popup.Balloon
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.wm.WindowManager
+import com.intellij.psi.PsiManager
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.dsl.builder.panel
 import org.apache.commons.text.similarity.LevenshteinDistance
 import java.awt.Color
 import java.awt.Component
+import java.awt.event.ActionEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.IOException
@@ -144,6 +147,31 @@ class CodeChangeBlockView(private val codeChangeBlock: CodeChange,
             foreground = Color.GRAY
             setOpaque(false)    // 背景透明
         }
+
+        // 在 initialize 方法中设置 pathLabel 的 MouseListener
+        pathLabel.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                super.mouseClicked(e)
+                if (e.clickCount == 2) {  // 检查是否为双击事件
+                    val directoryPath = project.basePath + "/" + changeData.dirPath
+                    val virtualFile = LocalFileSystem.getInstance().findFileByPath(directoryPath)
+                    if (virtualFile != null && virtualFile.isDirectory) {
+                        // 选中并展示目录
+                        ApplicationManager.getApplication().invokeLater {
+                            val psiDirectory = PsiManager.getInstance(project).findDirectory(virtualFile)
+                            ProjectView.getInstance(project).select(psiDirectory, virtualFile, false)
+                        }
+                    } else {
+                        // 如果目录不存在，可以选择显示错误信息
+                        JBPopupFactory.getInstance()
+                            .createHtmlTextBalloonBuilder("Directory not found: ${changeData.dirPath}", MessageType.ERROR, null)
+                            .setFadeoutTime(3000)
+                            .createBalloon()
+                            .show(RelativePoint.getSouthWestOf(pathLabel), Balloon.Position.atRight)
+                    }
+                }
+            }
+        })
 
         setupToolbar()
 
@@ -273,22 +301,49 @@ class ShowChangeViewAction(private val project: Project, private val changeData:
         val dialogBuilder = DialogBuilder(this.project).apply {
             setTitle("Diff: ${data.filename}")
             setCenterPanel(diffPanel.component)
-            addOkAction()
-            setOkOperation {
-                WriteCommandAction.runWriteCommandAction(project) {
-                    when (data.changeType) {
-                        "CREATE" -> {
-                            createFileWithParents(project.basePath!!, data.path, content2.document.text)
+
+            if (data.changeType == "UPDATE") {
+                addAction(object : AbstractAction("Accept Left") {
+                    override fun actionPerformed(e: ActionEvent?) {
+                        WriteCommandAction.runWriteCommandAction(project) {
+                            when (data.changeType) {
+                                "UPDATE" -> originalFile?.let {
+                                    FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content1.document.text)
+                                }
+                            }
+                            dialogWrapper.close(0)
+                            data.isMerged = true
                         }
-                        "UPDATE" -> originalFile?.let {
-//                            FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
-                        }
-                        "DELETE" -> originalFile?.delete(this)
                     }
-                    dialogWrapper.close(0)
+                })
+                addAction(object : AbstractAction("Accept Right") {
+                    override fun actionPerformed(e: ActionEvent?) {
+                        WriteCommandAction.runWriteCommandAction(project) {
+                            when (data.changeType) {
+                                "UPDATE" -> originalFile?.let {
+                                    FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
+                                }
+                            }
+                            dialogWrapper.close(0)
+                            data.isMerged = true
+                        }
+                    }
+                })
+            }
+            else {
+                addOkAction()
+                setOkOperation {
+                    WriteCommandAction.runWriteCommandAction(project) {
+                        when (data.changeType) {
+                            "CREATE" -> {
+                                createFileWithParents(project.basePath!!, data.path, content2.document.text)
+                            }
+                            "DELETE" -> originalFile?.delete(this)
+                        }
+                        dialogWrapper.close(0)
+                        data.isMerged = true
+                    }
                 }
-                dialogWrapper.close(0)
-                data.isMerged = true
             }
         }
         dialogBuilder.show()
