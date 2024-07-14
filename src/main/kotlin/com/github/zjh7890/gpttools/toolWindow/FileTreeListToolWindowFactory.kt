@@ -1,13 +1,13 @@
 package com.github.zjh7890.gpttools.toolWindow
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
-import javax.swing.JPanel
 
 class FileTreeListToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
@@ -24,9 +24,28 @@ class FileTreeListToolWindowFactory : ToolWindowFactory {
             override fun update(e: AnActionEvent) {
                 e.presentation.isEnabled = panel.tree.selectionPath != null
             }
+
+            override fun getActionUpdateThread(): ActionUpdateThread {
+                return ActionUpdateThread.BGT
+            }
         }
 
-        toolWindow.setTitleActions(listOf(removeAction))
+        // New Action to copy files
+        val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
+            override fun actionPerformed(e: AnActionEvent) {
+                panel.copyAllFiles()
+            }
+
+            override fun update(e: AnActionEvent) {
+                e.presentation.isEnabled = panel.tree.selectionPath != null
+            }
+
+            override fun getActionUpdateThread(): ActionUpdateThread {
+                return ActionUpdateThread.BGT
+            }
+        }
+
+        toolWindow.setTitleActions(listOf(copyFilesAction, removeAction))
     }
 }
 

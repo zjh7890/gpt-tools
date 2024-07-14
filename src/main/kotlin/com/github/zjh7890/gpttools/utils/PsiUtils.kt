@@ -1,11 +1,14 @@
 package com.github.zjh7890.gpttools.utils
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.*
 import com.intellij.psi.impl.compiled.ClsTypeParameterImpl
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import java.util.jar.JarFile
 
@@ -80,7 +83,7 @@ object PsiUtils {
                         val classSourceCode: String
 
                         if (psiFile.name.endsWith(".class")) {
-                            val findSourceCode = findSourceCode(psiClass, project)
+                            val findSourceCode = findSourceCode(psiClass)
                             if (findSourceCode != null) {
                                 classSourceCode = PsiManager.getInstance(project).findFile(findSourceCode)!!.text  // 获取类的源代码
                             } else {
@@ -121,11 +124,15 @@ object PsiUtils {
         }
     }
 
-    fun findSourceCode(psiClass: PsiClass, project: Project): VirtualFile? {
-        val classFile = psiClass.containingFile.virtualFile ?: return null
+    fun findSourceCode(psiElement: PsiElement): VirtualFile? {
+        val classFile = psiElement.containingFile.virtualFile ?: return null
 
         // 假设 classFile 路径类似于 jar://path/to/your.jar!/com/example/MyClass.class
         val classFilePath = classFile.path
+        if (!classFilePath.contains(".jar!")) {
+            return classFile
+        }
+
         val jarSeparatorIndex = classFilePath.indexOf("!/")
         if (jarSeparatorIndex == -1) {
             return null
@@ -166,6 +173,30 @@ object PsiUtils {
             null
         }
     }
+
+    fun getDependencies(file: VirtualFile, project: Project): List<VirtualFile> {
+        val psiFile = PsiManager.getInstance(project).findFile(file) ?: return emptyList()
+        val referencedFiles = mutableListOf<VirtualFile>()
+
+        PsiTreeUtil.findChildrenOfType(psiFile, PsiElement::class.java).forEach { element ->
+            element.references.forEach { reference ->
+                val resolvedFile = reference.resolve()?.containingFile
+                if (resolvedFile != null && resolvedFile !== psiFile) {
+                    if (isFileInProject(resolvedFile.virtualFile, project) || resolvedFile.virtualFile.path.contains("com/yupaopao")) {
+                        findSourceCode(resolvedFile)?.let { referencedFiles.add(it) }
+                    }
+                }
+            }
+        }
+
+        return referencedFiles.distinct()
+    }
+
+    fun isFileInProject(file: VirtualFile, project: Project): Boolean {
+        return ProjectRootManager.getInstance(project).fileIndex.isInContent(file)
+    }
+
+
 }
 
 data class ClassSourceInfo(val className: String, val sourceCode: String) {
