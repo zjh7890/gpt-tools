@@ -19,9 +19,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import java.util.stream.Collectors
 
 
-class GenJsonAction : AnAction() {
-    private val promptTemplate: PromptTemplate
-        get() = CodeTemplateApplicationSettingsService.getInstance().state.templates[this::class.simpleName]!!
+class GenJsonAction(val promptTemplate: PromptTemplate) : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project? = e.project
         val editor: Editor? = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.EDITOR)

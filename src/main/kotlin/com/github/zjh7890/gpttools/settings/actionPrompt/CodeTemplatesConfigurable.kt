@@ -89,9 +89,7 @@ class MyConfigurableComponent(
 
             private fun updateSettings() {
                 val selectedTemplate = templateList.selectedValue
-                if (selectedTemplate != null) {
-                    appSettingState.templates[selectedTemplate.key]?.value = valueTextArea.text
-                }
+                selectedTemplate.value = valueTextArea.text
             }
         })
 
@@ -193,7 +191,7 @@ class MyConfigurableComponent(
 
     private fun showPromptTemplateDialog(template: PromptTemplate? = null): PromptTemplate? {
         val keyField = JTextField(10).apply { text = template?.key ?: "" }
-        val valueField = JTextField(10).apply { text = template?.value ?: "" }
+        val valueTextArea = JTextArea(5, 20).apply { text = template?.value ?: ""; lineWrap = true; wrapStyleWord = true }
         val descField = JTextField(10).apply { text = template?.desc ?: "" }
 
         val panel = JPanel(GridBagLayout()).apply {
@@ -206,14 +204,14 @@ class MyConfigurableComponent(
             add(JLabel("Key:"), gbc)
             add(keyField, gbc.clone().apply {  })
             add(JLabel("Value:"), gbc)
-            add(valueField, gbc.clone().apply { })
+            add(valueTextArea, gbc.clone().apply { })
             add(JLabel("Description:"), gbc)
             add(descField, gbc.clone().apply {  })
         }
 
         val result = JOptionPane.showConfirmDialog(panel, panel, "Edit Prompt Template", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
         if (result == JOptionPane.OK_OPTION) {
-            return PromptTemplate(keyField.text, valueField.text, descField.text)
+            return PromptTemplate(keyField.text, valueTextArea.text, descField.text)
         }
         return null
     }
@@ -271,21 +269,23 @@ class MyConfigurableComponent(
         val model = templateList.model as DefaultListModel<PromptTemplate>
         val listOptions = model.elements().asSequence().toList()
 
-        // Check if the JSON data in the settings has been modified
-        val isJsonModified = jsonTextArea.text != settings.jsonData
-
-        // Check if the number of options or their content has been modified
+        // Check if the number of options has been modified
         if (listOptions.size != appSetting.templates.size) {
             return true
         }
 
         // Check for changes in each PromptTemplate
-        for (template in listOptions) {
-            val originalTemplate = appSetting.templates[template.key]
-            if (originalTemplate == null || originalTemplate.value != template.value || originalTemplate.desc != template.desc) {
+        for (i in listOptions.indices) {
+            val uiTemplate = listOptions[i]
+            val originalTemplate = appSetting.templates.getOrNull(i)
+
+            if (originalTemplate == null || uiTemplate.key != originalTemplate.key || uiTemplate.value != originalTemplate.value || uiTemplate.desc != originalTemplate.desc) {
                 return true
             }
         }
+
+        // Check if the JSON data in the settings has been modified
+        val isJsonModified = jsonTextArea.text != settings.jsonData
 
         return isJsonModified
     }
@@ -297,9 +297,9 @@ class MyConfigurableComponent(
         SwingUtilities.invokeLater {
             val model = templateList.model as DefaultListModel<PromptTemplate>
             model.clear()
-            appSetting.templates.values.forEach(model::addElement)
+            appSetting.templates.forEach(model::addElement)
 
-            val firstTemplate = appSetting.templates.values.firstOrNull()
+            val firstTemplate = appSetting.templates.firstOrNull()
             keyTextField.text = firstTemplate?.key ?: ""
             jsonTextArea.text = settings.jsonData ?: "{}"
 
@@ -312,9 +312,12 @@ class MyConfigurableComponent(
     ) {
         SwingUtilities.invokeLater {
             val model = templateList.model as DefaultListModel<PromptTemplate>
-            val newOptionsMap = model.elements().toList().associateBy { it.key }
-            appSetting.templates.clear()
-            appSetting.templates.putAll(newOptionsMap)
+            val newTemplatesList = model.elements().toList()
+
+            // 替换旧的列表与新的列表
+            appSetting.templates = newTemplatesList
+
+            // 更新JSON数据
             settings.jsonData = jsonTextArea.text
         }
     }

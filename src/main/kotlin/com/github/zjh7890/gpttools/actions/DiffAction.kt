@@ -33,10 +33,7 @@ import git4idea.history.GitHistoryUtils
 import git4idea.repo.GitRepository
 import java.io.File
 
-class DiffAction : AnAction() {
-    private val promptTemplate: PromptTemplate
-        get() = CodeTemplateApplicationSettingsService.getInstance().state.templates[this::class.simpleName]!!
-
+class DiffAction(val promptTemplate: PromptTemplate) : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project = e.project ?: return
 
