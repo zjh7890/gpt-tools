@@ -10,7 +10,7 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtilBase
 
-class PromptActionsProvider : ActionGroup() {
+class PromptGeneratorGroup : ActionGroup() {
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         if (e == null) {
@@ -23,10 +23,9 @@ class PromptActionsProvider : ActionGroup() {
         }
 
         val settingsService = CodeTemplateApplicationSettingsService.getInstance()
-        return emptyArray()
-//        return settingsService.state.templates.values.map { template ->
-//            createActionForTemplate(template, project, editor)
-//        }.toTypedArray()
+        return settingsService.state.templates.values.map { template ->
+            createActionForTemplate(template, project, editor)
+        }.toTypedArray()
     }
 
     private fun createActionForTemplate(template: PromptTemplate, project: Project, editor: Editor): AnAction {

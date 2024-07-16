@@ -61,48 +61,55 @@
     </applicationListeners>
 
     <actions>
-        <!-- Add this new action group if it doesn't already exist -->
-        <group id="GptToolsPopupMenu" text="Gpt Tools" description="Gpt Tools Popup Menu">
-            <add-to-group group-id="EditorPopupMenu" anchor="last" />
-        </group>
         <action id="ClassFinderAction"
                 class="com.github.zjh7890.gpttools.actions.ClassFinderAction"
                 text="Find Class"
                 description="Finds and displays information about the class of the selected method.">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-
         <action id="GenerateRpcAction"
                 class="com.github.zjh7890.gpttools.actions.GenerateRpcAction"
                 text=""
                 description="Finds and displays information about the class of the selected method.">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-
         <action id="GenerateMethodTestAction"
                 class="com.github.zjh7890.gpttools.actions.GenerateMethodTestAction"
                 text=""
                 description="Gen Method Unit test">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-
         <action id="FileTestAction"
                 class="com.github.zjh7890.gpttools.actions.FileTestAction"
                 text=""
                 description="Gen File Unit test">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-
         <action id="StructConverterCodeGenAction"
                 class="com.github.zjh7890.gpttools.actions.StructConverterCodeGenAction"
                 text=""
                 description="Finds and displays information about the class of the selected method.">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-
-        <action id="GenerateDelegateActions" class="com.github.zjh7890.gpttools.actions.PromptActionsProvider" text="Generate Delegate Methods" description="Generate delegate methods from templates.">
-            <add-to-group group-id="GenerateGroup" anchor="last"/>
+        <action id="DiffAction"
+                class="com.github.zjh7890.gpttools.actions.DiffAction"
+                text=""
+                description="Detect functions changed in the diff">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
+
+
+        <!-- Add your actions here -->
+        <group id="PromptGeneratorGroup"
+               class="com.github.zjh7890.gpttools.actions.PromptGeneratorGroup"
+               text="PromptGenerator"
+               description="Prompt Generator" popup="true">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after"
+                          relative-to-action="ProjectViewPopupMenuRefactoringGroup"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </group>
+
+
         <action id="AddFileAction"
                 class="com.github.zjh7890.gpttools.actions.AddFileAction"
                 text="Add File to ToolWindow"
@@ -113,12 +120,6 @@
                 class="com.github.zjh7890.gpttools.actions.AddRecursiveFileAction"
                 text="Recursively Add Files to ToolWindow"
                 description="Recursively adds files to the ToolWindow based on dependencies.">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <action id="DiffAction"
-                class="com.github.zjh7890.gpttools.actions.DiffAction"
-                text=""
-                description="Detect functions changed in the diff">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
     </actions>
