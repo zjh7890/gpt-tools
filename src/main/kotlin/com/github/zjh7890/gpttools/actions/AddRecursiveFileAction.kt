@@ -1,12 +1,12 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.vfs.VirtualFile
 import com.github.zjh7890.gpttools.toolWindow.FileTreeListPanel
 import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowManager
 
 class AddRecursiveFileAction : AnAction() {
@@ -16,8 +16,12 @@ class AddRecursiveFileAction : AnAction() {
         if (project != null && virtualFile != null) {
             val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("FileTreeListToolWindow")
             toolWindow?.show {
-                val fileTreeListPanel = toolWindow.contentManager.getContent(0)?.component as? FileTreeListPanel
-                fileTreeListPanel?.addFileRecursively(virtualFile, project)
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    ApplicationManager.getApplication().runReadAction {
+                        val fileTreeListPanel = toolWindow.contentManager.getContent(0)?.component as? FileTreeListPanel
+                        fileTreeListPanel?.addFileRecursively(virtualFile, project)
+                    }
+                }
             }
         }
     }

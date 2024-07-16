@@ -7,10 +7,10 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.*
 import com.intellij.psi.impl.compiled.ClsTypeParameterImpl
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import java.util.jar.JarFile
+
 
 object PsiUtils {
     fun generateSignature(method: PsiMethod, appendClassName: Boolean): String {
@@ -181,10 +181,17 @@ object PsiUtils {
         PsiTreeUtil.findChildrenOfType(psiFile, PsiElement::class.java).forEach { element ->
             element.references.forEach { reference ->
                 val resolvedFile = reference.resolve()?.containingFile
-                if (resolvedFile != null && resolvedFile !== psiFile) {
-                    if (isFileInProject(resolvedFile.virtualFile, project) || resolvedFile.virtualFile.path.contains("com/yupaopao")) {
+
+                // 假设 resolvedFile 是 PsiFile 类型
+                if (resolvedFile != null && resolvedFile !== psiFile && resolvedFile.virtualFile != null) {
+                    val virtualFile = resolvedFile.virtualFile
+                    if (isFileInProject(virtualFile, project) || virtualFile.path.contains("com/yupaopao")) {
+                        // 在这里继续处理 virtualFile
                         findSourceCode(resolvedFile)?.let { referencedFiles.add(it) }
                     }
+                } else {
+                    // 处理文件不存在或无法访问的情况
+                    println("文件不存在或无法获取 VirtualFile")
                 }
             }
         }
