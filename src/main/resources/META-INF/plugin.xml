@@ -67,38 +67,6 @@
                 description="Finds and displays information about the class of the selected method.">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </action>
-        <action id="GenerateRpcAction"
-                class="com.github.zjh7890.gpttools.actions.GenerateRpcAction"
-                text=""
-                description="Finds and displays information about the class of the selected method.">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <action id="GenerateMethodTestAction"
-                class="com.github.zjh7890.gpttools.actions.GenerateMethodTestAction"
-                text=""
-                description="Gen Method Unit test">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <action id="FileTestAction"
-                class="com.github.zjh7890.gpttools.actions.FileTestAction"
-                text=""
-                description="Gen File Unit test">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <action id="StructConverterCodeGenAction"
-                class="com.github.zjh7890.gpttools.actions.StructConverterCodeGenAction"
-                text=""
-                description="Finds and displays information about the class of the selected method.">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <action id="DiffAction"
-                class="com.github.zjh7890.gpttools.actions.DiffAction"
-                text=""
-                description="Detect functions changed in the diff">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-
-
         <!-- Add your actions here -->
         <group id="PromptGeneratorGroup"
                class="com.github.zjh7890.gpttools.actions.PromptGeneratorGroup"
