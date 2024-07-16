@@ -61,13 +61,6 @@
     </applicationListeners>
 
     <actions>
-        <action id="ClassFinderAction"
-                class="com.github.zjh7890.gpttools.actions.ClassFinderAction"
-                text="Find Class"
-                description="Finds and displays information about the class of the selected method.">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
-        <!-- Add your actions here -->
         <group id="PromptGeneratorGroup"
                class="com.github.zjh7890.gpttools.actions.PromptGeneratorGroup"
                text="PromptGenerator"
