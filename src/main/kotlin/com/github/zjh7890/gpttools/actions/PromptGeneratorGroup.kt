@@ -2,6 +2,7 @@ package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
 import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
@@ -23,26 +24,36 @@ class PromptGeneratorGroup : ActionGroup() {
         }
 
         val settingsService = CodeTemplateApplicationSettingsService.getInstance()
-        return settingsService.state.templates.values.map { template ->
+        return settingsService.state.templates.map { template ->
             createActionForTemplate(template, project, editor)
         }.toTypedArray()
     }
 
     private fun createActionForTemplate(template: PromptTemplate, project: Project, editor: Editor): AnAction {
-        return object : AnAction(template.desc) {
-            override fun actionPerformed(e: AnActionEvent) {
-                // 这里可以插入具体触发模板内容的逻辑
-                val file: PsiFile? = PsiUtilBase.getPsiFileInEditor(editor, project)
-                val psiClass: PsiClass? = file?.let { PsiTreeUtil.getParentOfType(it.findElementAt(editor.caretModel.offset), PsiClass::class.java) }
-                psiClass?.let {
-                    createDelegateMethodAction(it, template.key, template.value, project, editor)
-                }
-            }
+        if (template.key == "ClassFinderAction") {
+            return ClassFinderAction(template)
         }
-    }
-
-    private fun createDelegateMethodAction(psiClass: PsiClass, templateName: String, templateContent: String, project: Project, editor: Editor) {
-        // 填充原有的方法实现，可能需要根据具体情况调整
+        else if (template.key == "DiffAction") {
+            return DiffAction(template)
+        }
+        else if (template.key == "FileTestAction") {
+            return FileTestAction(template)
+        }
+        else if (template.key == "GenerateMethodTestAction") {
+            return GenerateMethodTestAction(template)
+        }
+        else if (template.key == "GenerateRpcAction") {
+            return GenerateRpcAction(template)
+        }
+        else if (template.key == "GenJsonAction") {
+            return GenJsonAction(template)
+        }
+        else if (template.key == "StructConverterCodeGenAction") {
+            return StructConverterCodeGenAction(template)
+        }
+        else {
+            throw IllegalArgumentException("Unsupported template key: ${template.key}")
+        }
     }
 
     override fun isDumbAware(): Boolean = true

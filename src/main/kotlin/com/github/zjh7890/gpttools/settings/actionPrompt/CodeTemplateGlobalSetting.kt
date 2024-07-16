@@ -4,7 +4,7 @@ import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.components.*
 
 @Service(Service.Level.APP)
-@State(name = "CodeTemplateApplicationSettings3", storages = [Storage("CodeTemplateAppSettings3.xml")])
+@State(name = "CodeTemplateApplicationSettings4", storages = [Storage("CodeTemplateAppSettings4.xml")])
 class CodeTemplateApplicationSettingsService : PersistentStateComponent<CodeTemplateApplicationSettings> {
 
     private var myState = CodeTemplateApplicationSettings()
@@ -20,28 +20,38 @@ class CodeTemplateApplicationSettingsService : PersistentStateComponent<CodeTemp
 }
 
 class CodeTemplateApplicationSettings : BaseState() {
-    val templates: MutableMap<String, PromptTemplate> = mutableMapOf(
-        "DiffAction" to PromptTemplate(
+    var templates: List<PromptTemplate> = listOf(
+        PromptTemplate(
+            key = "ClassFinderAction",
+            value = FileUtil.readResourceFile("prompt/ClassFinderAction.md"),
+            desc = "Find Method Related Class"
+        ),
+        PromptTemplate(
             key = "DiffAction",
             value = FileUtil.readResourceFile("prompt/DiffAction.md"),
             desc = "获取更改代码"
         ),
-        "FileTestAction" to PromptTemplate(
+        PromptTemplate(
             key = "FileTestAction",
             value = FileUtil.readResourceFile("prompt/FileTestAction.md"),
             desc = "生成类单测"
         ),
-        "GenerateMethodTestAction" to PromptTemplate(
+        PromptTemplate(
             key = "GenerateMethodTestAction",
             value = FileUtil.readResourceFile("prompt/GenerateMethodTestAction.md"),
             desc = "生成方法单测"
         ),
-        "GenerateRpcAction" to PromptTemplate(
+        PromptTemplate(
             key = "GenerateRpcAction",
             value = FileUtil.readResourceFile("prompt/GenerateRpcAction.md"),
             desc = "生成RPC代码"
         ),
-        "StructConverterCodeGenAction" to PromptTemplate(
+        PromptTemplate(
+            key = "GenJsonAction",
+            value = FileUtil.readResourceFile("prompt/GenJsonAction.md"),
+            desc = "生成 json 示例"
+        ),
+        PromptTemplate(
             key = "StructConverterCodeGenAction",
             value = FileUtil.readResourceFile("prompt/StructConverterCodeGenAction.md"),
             desc = "生成 converter 代码"
