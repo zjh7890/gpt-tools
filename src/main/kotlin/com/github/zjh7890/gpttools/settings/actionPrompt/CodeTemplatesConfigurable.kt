@@ -1,26 +1,26 @@
 package com.github.zjh7890.gpttools.settings.actionPrompt
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.github.zjh7890.gpttools.components.JsonLanguageField
+import com.github.zjh7890.gpttools.components.LeftRightComponent
+import com.github.zjh7890.gpttools.utils.JsonUtils
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.components.service
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
+import com.intellij.util.ui.FormBuilder
 import java.awt.*
 import java.awt.datatransfer.StringSelection
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
-
-val Project.customAgentSetting: CodeTemplateProjectSetting
-    get() = service<CodeTemplateProjectSetting>()
 
 class PluginConfigurable(private val project: Project) : Configurable {
     private var myComponent: MyConfigurableComponent? = null
@@ -30,7 +30,7 @@ class PluginConfigurable(private val project: Project) : Configurable {
         get() = CodeTemplateProjectSetting.getInstance(project)
 
     override fun createComponent(): JComponent? {
-        myComponent = MyConfigurableComponent(project, appSettings.state, projectSettings.state)
+        myComponent = MyConfigurableComponent(project)
         return myComponent?.panel
     }
 
@@ -44,16 +44,13 @@ class PluginConfigurable(private val project: Project) : Configurable {
 }
 
 class MyConfigurableComponent(
-    project: Project,
-    appSettingState: CodeTemplateApplicationSettings,
-    private val settingsState: CodeTemplateProjectSettings
+    project: Project
 ) {
     val panel = JTabbedPane()
     private val templateList = JBList<PromptTemplate>(DefaultListModel<PromptTemplate>())
-    private val valueTextArea = JTextArea(5, 80)
     val jsonTextArea = JsonLanguageField(project, "", "Context", "projectTreeConfig.json")
-    val keyTextField = JTextField()
-    var selectedItem : PromptTemplate? = null
+//    var selectedItem : PromptTemplate? = null
+    private val combinedPanel = JPanel(BorderLayout())
 
     init {
         templateList.cellRenderer = object : DefaultListCellRenderer() {
@@ -76,22 +73,9 @@ class MyConfigurableComponent(
         templateList.addListSelectionListener {
             if (!it.valueIsAdjusting) {
                 val selectedTemplate = templateList.selectedValue
-                valueTextArea.text = selectedTemplate?.value ?: ""
-                keyTextField.text = selectedTemplate?.key ?: ""
-                selectedItem = selectedTemplate
+                updateCombinedPanelDisplay(project, selectedTemplate)
             }
         }
-
-        valueTextArea.document.addDocumentListener(object : DocumentListener {
-            override fun insertUpdate(e: DocumentEvent) = updateSettings()
-            override fun removeUpdate(e: DocumentEvent) = updateSettings()
-            override fun changedUpdate(e: DocumentEvent) = updateSettings()
-
-            private fun updateSettings() {
-                val selectedTemplate = templateList.selectedValue
-                selectedTemplate.value = valueTextArea.text
-            }
-        })
 
         val optionsDecorator = ToolbarDecorator.createDecorator(templateList)
             .setAddAction { addElement() }
@@ -110,41 +94,83 @@ class MyConfigurableComponent(
                 }
             })
 
-        val openEditorButton = JButton("Open Editor").apply {
-            addActionListener {
-                if (selectedItem == null) {
-                    return@addActionListener
-                }
-                val popup = EnhancedEditorDialog(project, selectedItem)
-//                popup.setLocationRelativeTo(panel)
-                popup.show()
-            }
-        }
-
-        val keyPanel = JPanel(BorderLayout())
-        val keyLabel = JLabel("Key:")
-        keyTextField.preferredSize = Dimension(50, keyTextField.preferredSize.height)
-
-        keyPanel.add(keyLabel, BorderLayout.WEST)
-        keyPanel.add(keyTextField, BorderLayout.CENTER)
-        keyPanel.add(openEditorButton, BorderLayout.EAST)
-
-        val templatePanel = JPanel(BorderLayout())
-        templatePanel.add(optionsDecorator.createPanel(), BorderLayout.CENTER)
-
-        val textScrollPane = JScrollPane(valueTextArea)
-        val combinedPanel = JPanel(BorderLayout())
-        combinedPanel.add(keyPanel, BorderLayout.NORTH)
-
-//        combinedPanel.add(, BorderLayout.CENTER)
-        combinedPanel.add(textScrollPane, BorderLayout.CENTER)
-
-        templatePanel.add(combinedPanel, BorderLayout.EAST)
+        updateCombinedPanelDisplay(project, null)
         val jsonPanel = JPanel(BorderLayout())
         jsonPanel.add(JScrollPane(jsonTextArea), BorderLayout.CENTER)
 
+        val templatePanel = LeftRightComponent(optionsDecorator.createPanel(), combinedPanel).mainPanel
+
         panel.addTab("Options", templatePanel)
         panel.addTab("JSON Data", jsonPanel)
+    }
+
+    private fun updateCombinedPanelDisplay(project: Project, selectedItem: PromptTemplate?) {
+        combinedPanel.removeAll()  // 清除所有当前组件
+        if (selectedItem != null) {
+            val keyTextField = JTextField()
+            val descTextField = JTextField()
+            val valueTextArea = JTextArea(5, 80)
+
+            val formBuilder: FormBuilder = FormBuilder.createFormBuilder()
+            val formPane = formBuilder
+                .addLabeledComponent("Desc:", descTextField)
+                .addLabeledComponent("Key:", keyTextField)
+                .addSeparator()
+                .addComponent(
+                    JButton("Open Editor").apply {
+                        addActionListener {
+                            val popup = EnhancedEditorDialog(project, selectedItem)
+//                popup.setLocationRelativeTo(panel)
+                            popup.show()
+                        }
+                    }
+                )
+                .addComponent(JScrollPane(valueTextArea))
+                .addComponentFillVertically(JPanel(), 0)
+                .panel
+
+
+
+            valueTextArea.text = selectedItem.value ?: ""
+            keyTextField.text = selectedItem.key ?: ""
+            descTextField.text = selectedItem.desc ?: ""
+            keyTextField.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSelectedItem()
+                override fun removeUpdate(e: DocumentEvent) = updateSelectedItem()
+                override fun changedUpdate(e: DocumentEvent) = updateSelectedItem()
+
+                private fun updateSelectedItem() {
+                    selectedItem.key = keyTextField.text
+                }
+            })
+
+            valueTextArea.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.value = valueTextArea.text
+                }
+            })
+            descTextField.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.desc = descTextField.text
+                }
+            })
+
+            combinedPanel.add(formPane, BorderLayout.CENTER)
+        } else {
+            val noSelectionLabel = JLabel("No template selected", SwingConstants.CENTER)
+            noSelectionLabel.setPreferredSize(Dimension(200, 50))  // 设置合适的尺寸以便可见
+            combinedPanel.add(noSelectionLabel, BorderLayout.CENTER)
+        }
+        combinedPanel.revalidate()
+        combinedPanel.repaint()
     }
 
     // 导出模型到剪切板
@@ -191,7 +217,7 @@ class MyConfigurableComponent(
 
     private fun showPromptTemplateDialog(template: PromptTemplate? = null): PromptTemplate? {
         val keyField = JTextField(10).apply { text = template?.key ?: "" }
-        val valueTextArea = JTextArea(5, 20).apply { text = template?.value ?: ""; lineWrap = true; wrapStyleWord = true }
+//        val valueTextArea = JTextArea(5, 20).apply { text = template?.value ?: ""; lineWrap = true; wrapStyleWord = true }
         val descField = JTextField(10).apply { text = template?.desc ?: "" }
 
         val panel = JPanel(GridBagLayout()).apply {
@@ -203,15 +229,15 @@ class MyConfigurableComponent(
             }
             add(JLabel("Key:"), gbc)
             add(keyField, gbc.clone().apply {  })
-            add(JLabel("Value:"), gbc)
-            add(valueTextArea, gbc.clone().apply { })
+//            add(JLabel("Value:"), gbc)
+//            add(valueTextArea, gbc.clone().apply { })
             add(JLabel("Description:"), gbc)
             add(descField, gbc.clone().apply {  })
         }
 
         val result = JOptionPane.showConfirmDialog(panel, panel, "Edit Prompt Template", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
         if (result == JOptionPane.OK_OPTION) {
-            return PromptTemplate(keyField.text, valueTextArea.text, descField.text)
+            return PromptTemplate(key = keyField.text, desc = descField.text)
         }
         return null
     }
@@ -294,16 +320,11 @@ class MyConfigurableComponent(
         appSetting: CodeTemplateApplicationSettings,
         settings: CodeTemplateProjectSettings
     ) {
-        SwingUtilities.invokeLater {
-            val model = templateList.model as DefaultListModel<PromptTemplate>
-            model.clear()
-            appSetting.templates.forEach(model::addElement)
-
-            val firstTemplate = appSetting.templates.firstOrNull()
-            keyTextField.text = firstTemplate?.key ?: ""
-            jsonTextArea.text = settings.jsonData ?: "{}"
-
-        }
+        val model = templateList.model as DefaultListModel<PromptTemplate>
+        model.clear()
+        JsonUtils.parse(JsonUtils.toJson(appSetting.templates), object : TypeReference<List<PromptTemplate>>() {})
+            .forEach(model::addElement)
+        jsonTextArea.text = settings.jsonData ?: "{}"
     }
 
     fun applyTo(
@@ -314,8 +335,10 @@ class MyConfigurableComponent(
             val model = templateList.model as DefaultListModel<PromptTemplate>
             val newTemplatesList = model.elements().toList()
 
+            val templateList1 = JsonUtils.parse(JsonUtils.toJson(newTemplatesList), object : TypeReference<List<PromptTemplate>>() {})
+
             // 替换旧的列表与新的列表
-            appSetting.templates = newTemplatesList
+            appSetting.templates = templateList1
 
             // 更新JSON数据
             settings.jsonData = jsonTextArea.text

@@ -1,5 +1,7 @@
 package com.github.zjh7890.gpttools.utils
 
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -203,7 +205,49 @@ object PsiUtils {
         return ProjectRootManager.getInstance(project).fileIndex.isInContent(file)
     }
 
+    fun getMethodStartAndEndLines(method: PsiMethod): Pair<Int, Int> {
+        val document: Document? = PsiDocumentManager.getInstance(method.project).getDocument(method.containingFile)
+        if (document == null) return Pair(-1, -1)
 
+        val startLine = document.getLineNumber(method.textRange.startOffset)
+        val endLine = document.getLineNumber(method.textRange.endOffset)
+
+        return Pair(startLine, endLine)
+    }
+
+    fun getLineContent(file: PsiFile, lineNumber: Int, project: Project): String {
+        val document: Document? = PsiDocumentManager.getInstance(project).getDocument(file)
+        if (document == null || lineNumber < 0 || lineNumber >= document.lineCount) {
+            return ""
+        }
+
+        val lineStartOffset = document.getLineStartOffset(lineNumber)
+        val lineEndOffset = document.getLineEndOffset(lineNumber)
+
+        return document.getText().substring(lineStartOffset, lineEndOffset)
+    }
+
+    fun getLineStartOffset(file: PsiFile, line: Int): Int {
+        val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
+        try {
+            val lineStartOffset = document.getLineStartOffset(line - 1)
+            return lineStartOffset  // line - 1 because line numbers are 0-based in Document
+        } catch (e: IndexOutOfBoundsException) {
+            e.printStackTrace();
+            throw e
+        }
+    }
+
+    fun getLineEndOffset(file: PsiFile, line: Int): Int {
+        val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
+        try {
+            val lineEndOffset = document.getLineEndOffset(line - 1)
+            return lineEndOffset  // Adjusting line number to 0-based
+        } catch (e: IndexOutOfBoundsException) {
+            e.printStackTrace();
+            throw e
+        }
+    }
 }
 
 data class ClassSourceInfo(val className: String, val sourceCode: String) {

@@ -67,6 +67,7 @@ class GenerateRpcAction(val promptTemplate: PromptTemplate) : AnAction() {
                 classes.stream().map { x -> x.className }.collect(Collectors.toList()).joinToString("\n")
             val GPT_methodInfo = classes.joinToString("\n")
             val GPT_methodName = method.name
+            val GPT_className = containingClass.name!!
             val GPT_simplifyClassText = newClass.text
 
 
@@ -74,7 +75,8 @@ class GenerateRpcAction(val promptTemplate: PromptTemplate) : AnAction() {
                 "GPT_methodInfo" to GPT_methodInfo,
                 "GPT_simplifyClassText" to GPT_simplifyClassText,
                 "GPT_methodName" to GPT_methodName,
-                "GPT_completeSignature" to GPT_completeSignature
+                "GPT_completeSignature" to GPT_completeSignature,
+                "GPT_className" to GPT_className
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
