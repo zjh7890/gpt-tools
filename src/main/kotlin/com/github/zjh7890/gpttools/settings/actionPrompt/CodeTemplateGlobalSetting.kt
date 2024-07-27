@@ -4,7 +4,7 @@ import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.components.*
 
 @Service(Service.Level.APP)
-@State(name = "CodeTemplateApplicationSettings4", storages = [Storage("CodeTemplateAppSettings4.xml")])
+@State(name = "CodeTemplateApplicationSettings5", storages = [Storage("CodeTemplateAppSettings5.xml")])
 class CodeTemplateApplicationSettingsService : PersistentStateComponent<CodeTemplateApplicationSettings> {
 
     private var myState = CodeTemplateApplicationSettings()
@@ -25,6 +25,11 @@ class CodeTemplateApplicationSettings : BaseState() {
             key = "ClassFinderAction",
             value = FileUtil.readResourceFile("prompt/ClassFinderAction.md"),
             desc = "Find Method Related Class"
+        ),
+        PromptTemplate(
+            key = "CodeReviewPromptAction",
+            value = FileUtil.readResourceFile("prompt/CodeReviewPromptAction.md.md"),
+            desc = "生成 Code Review"
         ),
         PromptTemplate(
             key = "DiffAction",
@@ -60,7 +65,7 @@ class CodeTemplateApplicationSettings : BaseState() {
 }
 
 data class PromptTemplate (
-    val key : String = "",
+    var key : String = "",
     var value : String = "",
-    val desc : String = ""
+    var desc : String = ""
 )

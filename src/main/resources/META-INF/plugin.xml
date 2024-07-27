@@ -64,6 +64,9 @@
             <add-to-group group-id="ProjectViewPopupMenu" anchor="after"
                           relative-to-action="ProjectViewPopupMenuRefactoringGroup"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="Vcs.Log.ChangesBrowser.Popup" relative-to-action="Vcs.RepositoryChangesBrowserMenu"
+                          anchor="after"/>
+            <add-to-group group-id="Vcs.Log.ContextMenu" relative-to-action="Vcs.ShowDiffWithLocal" anchor="after"/>
         </group>
 
 

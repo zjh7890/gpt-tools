@@ -1,8 +1,8 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
 import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
-import com.github.zjh7890.gpttools.utils.*
+import com.github.zjh7890.gpttools.utils.FileChange
+import com.github.zjh7890.gpttools.utils.GitDiffUtils.extractAffectedMethods
 import com.github.zjh7890.gpttools.utils.GitDiffUtils.parseGitDiffOutput
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
@@ -12,24 +12,14 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.editor.Document
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiMethod
-import com.intellij.psi.util.PsiTreeUtil
-import com.jetbrains.rd.util.string.println
-import git4idea.GitRevisionNumber
 import git4idea.GitUtil
 import git4idea.commands.Git
 import git4idea.commands.GitCommand
 import git4idea.commands.GitCommandResult
-import git4idea.history.GitHistoryUtils
 import git4idea.repo.GitRepository
 import java.io.File
 
@@ -52,13 +42,13 @@ class DiffAction(val promptTemplate: PromptTemplate) : AnAction() {
 
             if (repository != null) {
                 val currentBranchName = repository.currentBranchName ?: ""
-                val fileChanges = updateAndFetchBranchDiff(repository, currentBranchName)
-                extractAffectedMethods(project, fileChanges)
+                val fileChanges = updateAndFetchBranchDiff(repository, currentBranchName, "origin/master")
+                extractAffectedMethods(project, fileChanges, promptTemplate)
             }
         }
     }
 
-    private fun updateAndFetchBranchDiff(repository: GitRepository, currentBranch: String): List<FileChange> {
+    private fun updateAndFetchBranchDiff(repository: GitRepository, currentBranch: String, baseBranch: String): List<FileChange> {
         val project: Project = repository.project
         try {
             // Step 1: Fetch the latest changes from the remote repository
@@ -66,7 +56,7 @@ class DiffAction(val promptTemplate: PromptTemplate) : AnAction() {
 
             // Step 2: Compare current branch with remote master branch
 
-            var commandLine = GeneralCommandLine("git", "diff", "origin/master...$currentBranch")
+            var commandLine = GeneralCommandLine("git", "diff", "$baseBranch...$currentBranch")
             commandLine.workDirectory = File(repository.root.path)
             var processHandler = OSProcessHandler(commandLine)
             val stringBuilder = StringBuilder()
@@ -126,85 +116,6 @@ class DiffAction(val promptTemplate: PromptTemplate) : AnAction() {
             result.output.forEach { println(it) }
         } else {
             println("Command execution failed: ${result.errorOutput.joinToString("\n")}")
-        }
-    }
-
-    fun extractAffectedMethods(project: Project, fileChanges: List<FileChange>) {
-        ApplicationManager.getApplication().runReadAction {
-            val affectedMethods = mutableListOf<PsiMethod>()
-            fileChanges.forEach { change ->
-                if (change.filePath.contains("src/test") || !change.filePath.contains(".java")) {
-                    return@forEach
-                }
-                val psiFile = PsiManager.getInstance(project).findFile(project.baseDir.findFileByRelativePath(change.filePath)!!)
-                psiFile?.let { file ->
-                    val methods = PsiTreeUtil.findChildrenOfType(file, PsiMethod::class.java)
-                    methods.forEach { method ->
-                        val methodStartOffset = method.textRange.startOffset
-                        val methodEndOffset = method.textRange.endOffset
-
-                        change.additions.forEach { range ->
-                            val startOffset = getLineStartOffset(file, range.startLine)
-                            val endOffset = getLineEndOffset(file, range.endLine)
-                            if (methodStartOffset <= endOffset && methodEndOffset >= startOffset) {
-                                affectedMethods.add(method)
-                            }
-                        }
-
-                        change.deletions.forEach { range ->
-                            if (range.startLine == 0 || range.endLine > getLineCount(psiFile)) {
-                                return@forEach
-                            }
-                            val startOffset = getLineStartOffset(file, range.startLine)
-                            val endOffset = getLineEndOffset(file, range.endLine)
-                            if (methodStartOffset < endOffset && methodEndOffset > startOffset) {
-                                println("Affected Method: ${method.name}")
-                            }
-                        }
-                    }
-                }
-            }
-            // affectedMethods 去重
-            val uniqueAffectedMethods = affectedMethods.distinctBy { it }
-            val sb : StringBuilder = StringBuilder()
-            uniqueAffectedMethods.forEach {
-                sb.append("```\n").append(it.text).append("\n```\n\n")
-            }
-
-            val GPT_diffCode = sb.toString()
-            val map = mapOf(
-                "GPT_diffCode" to GPT_diffCode
-            )
-            val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
-            ClipboardUtils.copyToClipboard(result)
-        }
-    }
-
-    fun getLineCount(psiFile: PsiFile): Int {
-        val virtualFile = psiFile.virtualFile ?: return 0
-        val document: Document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return 0
-        return document.lineCount
-    }
-
-    fun getLineStartOffset(file: PsiFile, line: Int): Int {
-        val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
-        try {
-            val lineStartOffset = document.getLineStartOffset(line - 1)
-            return lineStartOffset  // line - 1 because line numbers are 0-based in Document
-        } catch (e: IndexOutOfBoundsException) {
-            e.printStackTrace();
-            throw e
-        }
-    }
-
-    fun getLineEndOffset(file: PsiFile, line: Int): Int {
-        val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
-        try {
-            val lineEndOffset = document.getLineEndOffset(line - 1)
-            return lineEndOffset  // Adjusting line number to 0-based
-        } catch (e: IndexOutOfBoundsException) {
-            e.printStackTrace();
-            throw e
         }
     }
 

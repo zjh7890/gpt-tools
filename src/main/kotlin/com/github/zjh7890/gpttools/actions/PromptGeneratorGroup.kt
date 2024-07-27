@@ -2,14 +2,8 @@ package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
 import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
-import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiFile
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.util.PsiUtilBase
 
 class PromptGeneratorGroup : ActionGroup() {
 
@@ -19,17 +13,17 @@ class PromptGeneratorGroup : ActionGroup() {
         }
         val project = e.project
         val editor = e.getData(LangDataKeys.EDITOR)
-        if (project == null || editor == null) {
+        if (project == null) {
             return emptyArray()
         }
 
         val settingsService = CodeTemplateApplicationSettingsService.getInstance()
         return settingsService.state.templates.map { template ->
-            createActionForTemplate(template, project, editor)
-        }.toTypedArray()
+            createActionForTemplate(template, project)
+        }.filterNotNull().toTypedArray()
     }
 
-    private fun createActionForTemplate(template: PromptTemplate, project: Project, editor: Editor): AnAction {
+    private fun createActionForTemplate(template: PromptTemplate, project: Project): AnAction? {
         if (template.key == "ClassFinderAction") {
             return ClassFinderAction(template)
         }
@@ -51,8 +45,12 @@ class PromptGeneratorGroup : ActionGroup() {
         else if (template.key == "StructConverterCodeGenAction") {
             return StructConverterCodeGenAction(template)
         }
+        else if (template.key == "CodeReviewPromptAction") {
+            return CodeReviewPromptAction(template)
+        }
         else {
-            throw IllegalArgumentException("Unsupported template key: ${template.key}")
+            IllegalArgumentException("Unsupported template key: ${template.key}").printStackTrace()
+            return null
         }
     }
 
