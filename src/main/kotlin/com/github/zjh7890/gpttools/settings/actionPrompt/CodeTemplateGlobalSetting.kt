@@ -28,7 +28,7 @@ class CodeTemplateApplicationSettings : BaseState() {
         ),
         PromptTemplate(
             key = "CodeReviewPromptAction",
-            value = FileUtil.readResourceFile("prompt/CodeReviewPromptAction.md.md"),
+            value = FileUtil.readResourceFile("prompt/CodeReviewPromptAction.md"),
             desc = "生成 Code Review"
         ),
         PromptTemplate(

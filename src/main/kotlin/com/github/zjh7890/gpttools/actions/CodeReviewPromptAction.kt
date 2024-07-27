@@ -109,7 +109,8 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
 
         val diffOutput = parseGitDiffOutput(patches)
         val methodsLinesMap = extractAffectedMethodsLines(project, diffOutput, this.promptTemplate)
-        val res = mutableListOf<String>()
+//        val res = mutableListOf<String>()
+        val res = StringBuilder()
         for (patch in patches) {
             if (patch !is TextFilePatch) {
                 continue
@@ -177,9 +178,17 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
                     sb.append("// ...\n")
                 }
             }
-            println(sb.toString())
+            res.appendLine(patch.filePath)
+            res.appendLine("```")
+                .appendLine(sb.toString())
+                .appendLine("```\n")
         }
-
+        val GPT_diffCode = res.toString()
+        val map = mapOf(
+            "GPT_diffCode" to GPT_diffCode
+        )
+        val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
+        ClipboardUtils.copyToClipboard(result)
     }
 
     private fun isBinaryOrTooLarge(@NotNull change: Change): Boolean {
