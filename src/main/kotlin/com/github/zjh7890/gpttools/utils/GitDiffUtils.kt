@@ -260,7 +260,7 @@ object GitDiffUtils {
     fun getLineStartOffset(file: PsiFile, line: Int): Int {
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
         try {
-            val lineStartOffset = document.getLineStartOffset(line - 1)
+            val lineStartOffset = document.getLineStartOffset(line)
             return lineStartOffset  // line - 1 because line numbers are 0-based in Document
         } catch (e: IndexOutOfBoundsException) {
             e.printStackTrace();
@@ -271,7 +271,7 @@ object GitDiffUtils {
     fun getLineEndOffset(file: PsiFile, line: Int): Int {
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
         try {
-            val lineEndOffset = document.getLineEndOffset(line - 1)
+            val lineEndOffset = document.getLineEndOffset(line)
             return lineEndOffset  // Adjusting line number to 0-based
         } catch (e: IndexOutOfBoundsException) {
             e.printStackTrace();

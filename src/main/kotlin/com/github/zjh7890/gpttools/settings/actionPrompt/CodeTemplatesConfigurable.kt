@@ -24,8 +24,7 @@ import javax.swing.event.DocumentListener
 
 class PluginConfigurable(private val project: Project) : Configurable {
     private var myComponent: MyConfigurableComponent? = null
-    private val appSettings: CodeTemplateApplicationSettingsService
-        get() = CodeTemplateApplicationSettingsService.getInstance()
+    private val appSettings: CodeTemplateApplicationSettingsService = CodeTemplateApplicationSettingsService.instance
     private val projectSettings: CodeTemplateProjectSetting
         get() = CodeTemplateProjectSetting.getInstance(project)
 
@@ -77,20 +76,24 @@ class MyConfigurableComponent(
             }
         }
 
-        val optionsDecorator = ToolbarDecorator.createDecorator(templateList)
+        val templatesDecorator = ToolbarDecorator.createDecorator(templateList)
             .setAddAction { addElement() }
             .setRemoveAction { removeSelectedElement() }
             .setMoveUpAction { moveElementUp() }
             .setMoveDownAction { moveElementDown() }
-            .setEditAction { editSelectedElement() }
-            .addExtraAction(object : AnAction("Export to Clipboard", "Export options to JSON string and copy to clipboard", AllIcons.ToolbarDecorator.Export) {
+            .addExtraAction(object : AnAction("Export to Clipboard", "Export templates to JSON string and copy to clipboard", AllIcons.ToolbarDecorator.Export) {
                 override fun actionPerformed(e: AnActionEvent) {
-                    exportOptionsToJson()
+                    exportTemplatesToJson()
                 }
             })
-            .addExtraAction(object : AnAction("Import from Clipboard", "Import options from JSON string provided by user", AllIcons.ToolbarDecorator.Import) {
+            .addExtraAction(object : AnAction("Import from Clipboard", "Import templates from JSON string provided by user", AllIcons.ToolbarDecorator.Import) {
                 override fun actionPerformed(e: AnActionEvent) {
-                    importOptionsFromJson()
+                    importTemplatesFromJson()
+                }
+            })
+            .addExtraAction(object : AnAction("Copy Configuration", "Copy selected configuration", AllIcons.Actions.Copy) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    copyTemplates()
                 }
             })
 
@@ -98,7 +101,7 @@ class MyConfigurableComponent(
         val jsonPanel = JPanel(BorderLayout())
         jsonPanel.add(JScrollPane(jsonTextArea), BorderLayout.CENTER)
 
-        val templatePanel = LeftRightComponent(optionsDecorator.createPanel(), combinedPanel).mainPanel
+        val templatePanel = LeftRightComponent(templatesDecorator.createPanel(), combinedPanel).mainPanel
 
         panel.addTab("Options", templatePanel)
         panel.addTab("JSON Data", jsonPanel)
@@ -110,8 +113,24 @@ class MyConfigurableComponent(
             val keyTextField = JTextField()
             val descTextField = JTextField()
             val valueTextArea = JTextArea(5, 80)
+            val input1 = JTextField()
+            val input2 = JTextField()
+            val input3 = JTextField()
+            val input4 = JTextField()
+            val input5 = JTextField()
+
 
             val formBuilder: FormBuilder = FormBuilder.createFormBuilder()
+            // 如果 desc 以 * 开头，添加警告标签
+            if (selectedItem.desc.startsWith("*")) {
+                val warningLabel = JLabel("* 开头的模板修改将不生效，请复制模板后去掉 * 号再进行修改").apply {
+//                    foreground = Color.ORANGE
+                    isOpaque = true
+                    background = Color(255, 255, 204)  // 浅黄色背景
+                }
+                formBuilder.addComponent(warningLabel)
+            }
+
             val formPane = formBuilder
                 .addLabeledComponent("Desc:", descTextField)
                 .addLabeledComponent("Key:", keyTextField)
@@ -126,14 +145,17 @@ class MyConfigurableComponent(
                     }
                 )
                 .addComponent(JScrollPane(valueTextArea))
+                .addLabeledComponent("Input1:", input1)
+                .addLabeledComponent("Input2:", input2)
+                .addLabeledComponent("Input3:", input3)
+                .addLabeledComponent("Input4:", input4)
+                .addLabeledComponent("Input5:", input5)
                 .addComponentFillVertically(JPanel(), 0)
                 .panel
 
 
 
-            valueTextArea.text = selectedItem.value ?: ""
             keyTextField.text = selectedItem.key ?: ""
-            descTextField.text = selectedItem.desc ?: ""
             keyTextField.document.addDocumentListener(object : DocumentListener {
                 override fun insertUpdate(e: DocumentEvent) = updateSelectedItem()
                 override fun removeUpdate(e: DocumentEvent) = updateSelectedItem()
@@ -144,6 +166,7 @@ class MyConfigurableComponent(
                 }
             })
 
+            valueTextArea.text = selectedItem.value ?: ""
             valueTextArea.document.addDocumentListener(object : DocumentListener {
                 override fun insertUpdate(e: DocumentEvent) = updateSettings()
                 override fun removeUpdate(e: DocumentEvent) = updateSettings()
@@ -153,6 +176,8 @@ class MyConfigurableComponent(
                     selectedItem.value = valueTextArea.text
                 }
             })
+
+            descTextField.text = selectedItem.desc ?: ""
             descTextField.document.addDocumentListener(object : DocumentListener {
                 override fun insertUpdate(e: DocumentEvent) = updateSettings()
                 override fun removeUpdate(e: DocumentEvent) = updateSettings()
@@ -160,6 +185,61 @@ class MyConfigurableComponent(
 
                 private fun updateSettings() {
                     selectedItem.desc = descTextField.text
+                }
+            })
+
+            input1.text = selectedItem.input1 ?: ""
+            input1.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.input1 = input1.text
+                }
+            })
+
+            input2.text = selectedItem.input2 ?: ""
+            input2.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.input2 = input2.text
+                }
+            })
+
+            input3.text = selectedItem.input3 ?: ""
+            input3.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.input3 = input3.text
+                }
+            })
+
+            input4.text = selectedItem.input4 ?: ""
+            input4.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.input4 = input4.text
+                }
+            })
+
+            input5.text = selectedItem.input5 ?: ""
+            input5.document.addDocumentListener(object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent) = updateSettings()
+                override fun removeUpdate(e: DocumentEvent) = updateSettings()
+                override fun changedUpdate(e: DocumentEvent) = updateSettings()
+
+                private fun updateSettings() {
+                    selectedItem.input5 = input5.text
                 }
             })
 
@@ -174,7 +254,7 @@ class MyConfigurableComponent(
     }
 
     // 导出模型到剪切板
-    private fun exportOptionsToJson() {
+    private fun exportTemplatesToJson() {
         val model = templateList.model as DefaultListModel<PromptTemplate>
         val templates = List(model.size()) { model.getElementAt(it) }
         val json = Gson().toJson(templates)
@@ -184,7 +264,7 @@ class MyConfigurableComponent(
     }
 
     // 从剪切板导入模型
-    private fun importOptionsFromJson() {
+    private fun importTemplatesFromJson() {
         val jsonInput = Messages.showInputDialog(
             "Paste the JSON here:",
             "Import Options",
@@ -203,6 +283,26 @@ class MyConfigurableComponent(
             } catch (ex: Exception) {
                 Messages.showErrorDialog("Failed to import options: " + ex.message, "Import Error")
             }
+        }
+    }
+
+    private fun copyTemplates() {
+        val selectedTemplate = templateList.selectedValue
+        if (selectedTemplate != null) {
+            val newTemplate = PromptTemplate(
+                key = selectedTemplate.key,
+                desc = selectedTemplate.desc.trim(' ').trim('*').trim(' '),
+                value = selectedTemplate.value,
+                input1 = selectedTemplate.input1,
+                input2 = selectedTemplate.input2,
+                input3 = selectedTemplate.input3,
+                input4 = selectedTemplate.input4,
+                input5 = selectedTemplate.input5
+            )
+            (templateList.model as DefaultListModel<PromptTemplate>).addElement(newTemplate)
+            templateList.selectedIndex = templateList.model.size - 1
+        } else {
+            Messages.showWarningDialog("No template selected to copy.", "Copy Failed")
         }
     }
 
@@ -246,7 +346,20 @@ class MyConfigurableComponent(
         SwingUtilities.invokeLater {
             val selectedIndex = templateList.selectedIndex
             if (selectedIndex != -1) {
-                (templateList.model as DefaultListModel<PromptTemplate>).remove(selectedIndex)
+                val model = templateList.model as DefaultListModel<PromptTemplate>
+                model.remove(selectedIndex)
+
+                // 计算新的选中索引
+                val newIndex = if (selectedIndex >= model.size) {
+                    model.size - 1
+                } else {
+                    selectedIndex
+                }
+
+                // 如果模型中还有元素，则设置新的选中索引
+                if (newIndex >= 0 && newIndex < model.size) {
+                    templateList.selectedIndex = newIndex
+                }
             }
         }
     }
@@ -275,19 +388,6 @@ class MyConfigurableComponent(
         }
     }
 
-    private fun editSelectedElement() {
-        SwingUtilities.invokeLater {
-            val selectedIndex = templateList.selectedIndex
-            if (selectedIndex != -1) {
-                val selectedTemplate = (templateList.model as DefaultListModel<PromptTemplate>).getElementAt(selectedIndex)
-                val updatedTemplate = showPromptTemplateDialog(selectedTemplate)
-                updatedTemplate?.let {
-                    (templateList.model as DefaultListModel<PromptTemplate>).set(selectedIndex, it) // Update display with the updated template
-                }
-            }
-        }
-    }
-
     fun isModified(
         appSetting: CodeTemplateApplicationSettings,
         settings: CodeTemplateProjectSettings
@@ -296,14 +396,15 @@ class MyConfigurableComponent(
         val listOptions = model.elements().asSequence().toList()
 
         // Check if the number of options has been modified
-        if (listOptions.size != appSetting.templates.size) {
+        val templates = JsonUtils.parse(appSetting.templates, object : TypeReference<List<PromptTemplate>>() {})
+        if (listOptions.size != templates.size) {
             return true
         }
 
         // Check for changes in each PromptTemplate
         for (i in listOptions.indices) {
             val uiTemplate = listOptions[i]
-            val originalTemplate = appSetting.templates.getOrNull(i)
+            val originalTemplate = templates.getOrNull(i)
 
             if (originalTemplate == null || uiTemplate.key != originalTemplate.key || uiTemplate.value != originalTemplate.value || uiTemplate.desc != originalTemplate.desc) {
                 return true
@@ -322,7 +423,7 @@ class MyConfigurableComponent(
     ) {
         val model = templateList.model as DefaultListModel<PromptTemplate>
         model.clear()
-        JsonUtils.parse(JsonUtils.toJson(appSetting.templates), object : TypeReference<List<PromptTemplate>>() {})
+        JsonUtils.parse(appSetting.templates, object : TypeReference<List<PromptTemplate>>() {})
             .forEach(model::addElement)
         jsonTextArea.text = settings.jsonData ?: "{}"
     }
@@ -331,17 +432,15 @@ class MyConfigurableComponent(
         appSetting: CodeTemplateApplicationSettings,
         settings: CodeTemplateProjectSettings
     ) {
-        SwingUtilities.invokeLater {
-            val model = templateList.model as DefaultListModel<PromptTemplate>
-            val newTemplatesList = model.elements().toList()
+        val model = templateList.model as DefaultListModel<PromptTemplate>
+        val newTemplatesList = model.elements().toList()
 
-            val templateList1 = JsonUtils.parse(JsonUtils.toJson(newTemplatesList), object : TypeReference<List<PromptTemplate>>() {})
+        val templateList1 = JsonUtils.parse(JsonUtils.toJson(newTemplatesList), object : TypeReference<List<PromptTemplate>>() {})
 
-            // 替换旧的列表与新的列表
-            appSetting.templates = templateList1
+        // 替换旧的列表与新的列表
+        appSetting.templates = JsonUtils.toJson(templateList1)
 
-            // 更新JSON数据
-            settings.jsonData = jsonTextArea.text
-        }
+        // 更新JSON数据
+        settings.jsonData = jsonTextArea.text
     }
 }

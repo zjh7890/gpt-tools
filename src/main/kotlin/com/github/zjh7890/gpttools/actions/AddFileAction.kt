@@ -1,14 +1,17 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel
+import com.github.zjh7890.gpttools.utils.GptToolsIcon
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.vfs.VirtualFile
-import com.github.zjh7890.gpttools.toolWindow.FileTreeListPanel
-import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Iconable
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowManager
+import javax.swing.Icon
 
-class AddFileAction : AnAction() {
+class AddFileAction : AnAction(), Iconable {
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project? = e.project
         val virtualFile: VirtualFile? = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.VIRTUAL_FILE)
@@ -21,5 +24,9 @@ class AddFileAction : AnAction() {
 
     override fun getActionUpdateThread(): ActionUpdateThread {
         return ActionUpdateThread.BGT
+    }
+
+    override fun getIcon(flags: Int): Icon {
+        return GptToolsIcon.PRIMARY
     }
 }

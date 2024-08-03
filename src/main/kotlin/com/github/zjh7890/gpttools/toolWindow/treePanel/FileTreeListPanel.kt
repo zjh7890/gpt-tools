@@ -1,7 +1,6 @@
-package com.github.zjh7890.gpttools.toolWindow
+package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
-import com.github.zjh7890.gpttools.utils.PsiUtils.findSourceCode
 import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
@@ -11,10 +10,6 @@ import javax.swing.JScrollPane
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
-import com.intellij.psi.PsiManager
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.PsiElement
-import com.intellij.openapi.roots.ProjectRootManager
 import javax.swing.tree.TreePath
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent

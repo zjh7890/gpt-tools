@@ -1,6 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.toolWindow.FileTreeListPanel
+import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
