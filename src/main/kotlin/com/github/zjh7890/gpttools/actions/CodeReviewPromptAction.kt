@@ -79,7 +79,6 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
         details: List<VcsFullCommitDetails>,
         changes: Array<out Change>
     ) {
-        val writer = StringWriter()
         val basePath = project.basePath ?: throw RuntimeException("Project base path is null.")
         val filteredChanges = changes.stream()
             .filter { change -> !isBinaryOrTooLarge(change!!) }
@@ -120,9 +119,12 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
             val list = methodsLinesMap.get(patch.filePath)
             val sb = StringBuilder()
             if (list!!.isEmpty()) {
+                var prev = 0
                 // 不需要特殊处理
                 for (hunk in patch.hunks) {
-                    sb.append("// ...\n")
+                    if (prev != hunk.startLineAfter - 1) {
+                        sb.append("// ...\n")
+                    }
                     for (line in hunk.lines) {
                         if (line.type == PatchLine.Type.CONTEXT) {
                             sb.appendLine("  " + line.text)
@@ -131,8 +133,10 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
                         } else if (line.type == PatchLine.Type.REMOVE) {
                             sb.appendLine("- " + line.text)
                         }
-                        sb.append("// ...\n")
                     }
+                }
+                if (patch.hunks.get(0).endLineAfter != lineCount) {
+                    sb.append("// ...\n")
                 }
             } else {
                 var i = 0
@@ -180,7 +184,7 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
             }
             res.appendLine(patch.filePath)
             res.appendLine("```")
-                .appendLine(sb.toString())
+                .appendLine(sb.toString().trim())
                 .appendLine("```\n")
         }
         val GPT_diffCode = res.toString()

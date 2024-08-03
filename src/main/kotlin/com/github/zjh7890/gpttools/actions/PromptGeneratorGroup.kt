@@ -1,11 +1,21 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
 import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.utils.GptToolsIcon
+import com.github.zjh7890.gpttools.utils.JsonUtils
+import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.Iconable
+import com.intellij.psi.PsiFile
+import javax.swing.Icon
 
-class PromptGeneratorGroup : ActionGroup() {
+class PromptGeneratorGroup : ActionGroup(), Iconable {
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         if (e == null) {
@@ -17,8 +27,8 @@ class PromptGeneratorGroup : ActionGroup() {
             return emptyArray()
         }
 
-        val settingsService = CodeTemplateApplicationSettingsService.getInstance()
-        return settingsService.state.templates.map { template ->
+        val settingsService = CodeTemplateApplicationSettingsService.instance
+        return JsonUtils.parse(settingsService.state.templates, object : TypeReference<List<PromptTemplate>>() {}).map { template ->
             createActionForTemplate(template, project)
         }.filterNotNull().toTypedArray()
     }
@@ -48,6 +58,9 @@ class PromptGeneratorGroup : ActionGroup() {
         else if (template.key == "CodeReviewPromptAction") {
             return CodeReviewPromptAction(template)
         }
+        else if (template.key == "ServiceImplAction") {
+            return ServiceImplAction(template)
+        }
         else {
             IllegalArgumentException("Unsupported template key: ${template.key}").printStackTrace()
             return null
@@ -55,4 +68,7 @@ class PromptGeneratorGroup : ActionGroup() {
     }
 
     override fun isDumbAware(): Boolean = true
+    override fun getIcon(flags: Int): Icon {
+        return GptToolsIcon.PRIMARY
+    }
 }

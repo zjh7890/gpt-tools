@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.toolWindow
+package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
