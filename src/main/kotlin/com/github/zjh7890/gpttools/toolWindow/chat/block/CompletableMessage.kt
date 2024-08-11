@@ -14,7 +14,7 @@ interface CompletableMessage {
     fun removeTextListener(textListener: MessageBlockTextListener)
 
     companion object {
-        val key: DataKey<CompletableMessage> = DataKey.create("CompletableMessage")
+//        val key: DataKey<CompletableMessage> = DataKey.create("CompletableMessage")
 
     }
 }

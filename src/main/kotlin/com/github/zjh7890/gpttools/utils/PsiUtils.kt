@@ -227,26 +227,47 @@ object PsiUtils {
         return document.getText().substring(lineStartOffset, lineEndOffset)
     }
 
-    fun getLineStartOffset(file: PsiFile, line: Int): Int {
-        val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
-        try {
-            val lineStartOffset = document.getLineStartOffset(line - 1)
-            return lineStartOffset  // line - 1 because line numbers are 0-based in Document
-        } catch (e: IndexOutOfBoundsException) {
-            e.printStackTrace();
-            throw e
-        }
-    }
+    fun getRelevantImportsForElement(element: PsiElement): List<PsiImportStatement> {
+        val psiFile = element.containingFile as? PsiJavaFile ?: return emptyList()
+        val importList = psiFile.importList ?: return emptyList()
+        val relevantImports = mutableListOf<PsiImportStatement>()
 
-    fun getLineEndOffset(file: PsiFile, line: Int): Int {
-        val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return -1
-        try {
-            val lineEndOffset = document.getLineEndOffset(line - 1)
-            return lineEndOffset  // Adjusting line number to 0-based
-        } catch (e: IndexOutOfBoundsException) {
-            e.printStackTrace();
-            throw e
+        val methodReferences = PsiTreeUtil.findChildrenOfType(element, PsiJavaCodeReferenceElement::class.java)
+        for (importStatement in importList.allImportStatements) {
+            if (importStatement is PsiImportStatement) {
+                val importReference = importStatement.importReference ?: continue
+                val resolved = importReference.resolve()
+                val importQualifiedName = resolved?.let {
+                    when (it) {
+                        is PsiClass -> it.qualifiedName
+                        is PsiPackage -> it.qualifiedName
+                        else -> null
+                    }
+                } ?: importReference.qualifiedName
+
+                if (importQualifiedName != null) {
+                    if (importQualifiedName.endsWith(".*")) {
+                        // Handle wildcard imports, check if any method references match the package
+                        val packageName = importQualifiedName.removeSuffix(".*")
+                        if (methodReferences.any { ref ->
+                                val refText = ref.qualifiedName ?: ref.text
+                                refText.startsWith(packageName)
+                            }) {
+                            relevantImports.add(importStatement)
+                        }
+                    } else {
+                        // Handle specific imports
+                        if (methodReferences.any { ref ->
+                                val refText = ref.qualifiedName ?: ref.text
+                                refText == importQualifiedName || refText.startsWith("${importQualifiedName}.")
+                            }) {
+                            relevantImports.add(importStatement)
+                        }
+                    }
+                }
+            }
         }
+        return relevantImports
     }
 }
 

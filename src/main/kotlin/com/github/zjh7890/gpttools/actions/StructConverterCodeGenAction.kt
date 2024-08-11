@@ -74,7 +74,6 @@ class StructConverterCodeGenAction(val promptTemplate: PromptTemplate) : AnActio
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
-            Messages.showMessageDialog(project, classInfos, "Class Finder Results", Messages.getInformationIcon())
             copyToClipboard(result)
         } catch (ex: Exception) {
             Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())

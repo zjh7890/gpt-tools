@@ -7,7 +7,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
     <depends>com.intellij.modules.java</depends>
-    <depends>com.intellij.modules.vcs</depends>
+<!--    <depends>com.intellij.modules.vcs</depends>-->
     <depends>Git4Idea</depends>
 
     <description></description>
@@ -15,13 +15,22 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="FileTreeListToolWindow"
+        <toolWindow id="GptToolsContextToolWindow"
                     anchor="right"
-                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListToolWindowFactory"
+                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"
                     canCloseContent="true"
                     canWorkInDumbMode="true"
             icon="/icons/icon.svg">
         </toolWindow>
+
+        <!-- mapper.xml文件属性提示 -->
+        <dom.fileMetaData id="baomidou.MapperDescription"
+                          rootTagName="mapper"
+                          implementation="com.baomidou.plugin.idea.mybatisx.dom.description.MapperDescription"/>
+        <!-- mybatis配置文件属性提示 -->
+        <dom.fileMetaData id="baomidou.ConfigurationDescription"
+                          rootTagName="configuration"
+                          implementation="com.baomidou.plugin.idea.mybatisx.dom.description.ConfigurationDescription"/>
 
         <intentionAction>
             <className>com.github.zjh7890.gpttools.actions.FixThisChunkAction</className>
@@ -90,6 +99,22 @@
                 description="Recursively adds files to the ToolWindow based on dependencies."
                 icon="/icons/icon_16px.svg">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+
+        <action id="ConvertToMermaid"
+                class="com.github.zjh7890.gpttools.actions.ConvertToMermaidAction"
+                text="ConvertToMermaid"
+                description="ConvertToMermaid"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+        </action>
+
+        <action id="PsiDependencyByMethodAction"
+                class="com.github.zjh7890.gpttools.actions.PsiDependencyByMethodAction"
+                text="PsiDependencyByMethodAction"
+                description="PsiDependencyByMethodAction"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </action>
     </actions>
 </idea-plugin>

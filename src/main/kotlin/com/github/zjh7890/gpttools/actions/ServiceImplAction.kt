@@ -64,13 +64,20 @@ class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
 
         // 在适当的地方创建和显示对话框
         val dialog = UMLFunctionDialog(project, promptTemplate)
-        dialog.show()
-        if (dialog.isOK) {
-            // 在对话框关闭后处理并打印数据
+
+        if (promptTemplate.input1.isNotBlank()
+            || promptTemplate.input2.isNotBlank()
+            || promptTemplate.input3.isNotBlank()
+            || promptTemplate.input4.isNotBlank()
+            || promptTemplate.input5.isNotBlank()) {
+            dialog.show()
+            if (dialog.isOK) {
+                // 在对话框关闭后处理并打印数据
 //            println("UML Text: ${dialog.input1}")
 //            println("Function Text: ${dialog.input2}")
-        } else {
-            return
+            } else {
+                return
+            }
         }
 
         try {
@@ -117,7 +124,6 @@ class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
-            Messages.showMessageDialog(project, classInfos, "Class Finder Results", Messages.getInformationIcon())
             copyToClipboard(result)
         } catch (ex: Exception) {
             Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())

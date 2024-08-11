@@ -1,13 +1,13 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.FileChange
-import com.github.zjh7890.gpttools.utils.GitDiffUtils.extractAffectedMethods
 import com.github.zjh7890.gpttools.utils.GitDiffUtils.extractAffectedMethodsLines
 import com.github.zjh7890.gpttools.utils.GitDiffUtils.getLineCount
 import com.github.zjh7890.gpttools.utils.GitDiffUtils.parseGitDiffOutput
-import com.github.zjh7890.gpttools.utils.PsiUtils.getLineContent
+import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.github.zjh7890.gpttools.utils.PsiUtils.getMethodStartAndEndLines
 import com.github.zjh7890.gpttools.utils.TemplateUtils
 import com.intellij.dvcs.repo.VcsRepositoryManager
@@ -20,8 +20,6 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diff.impl.patch.*
-import com.intellij.openapi.editor.Document
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -29,13 +27,8 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.*
-import com.intellij.project.stateStore
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.testFramework.utils.vfs.getDocument
 import com.intellij.util.containers.stream
 import com.intellij.vcs.log.VcsFullCommitDetails
 import com.intellij.vcs.log.VcsLogDataKeys
@@ -47,7 +40,6 @@ import git4idea.commands.GitCommandResult
 import git4idea.repo.GitRepository
 import org.jetbrains.annotations.NotNull
 import java.io.File
-import java.io.StringWriter
 import java.nio.file.Path
 import kotlin.math.min
 
@@ -60,17 +52,19 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
         val details: List<VcsFullCommitDetails> = vcsLog?.selectedDetails?.toList() ?: return
         val selectList = event.getData(VcsDataKeys.SELECTED_CHANGES) ?: return
 
-        var stories: List<String> = listOf()
         ProgressManager.getInstance().runProcessWithProgressSynchronously(Runnable {
-            val repositoryManager: VcsRepositoryManager = VcsRepositoryManager.getInstance(project)
-            val repository = repositoryManager.getRepositoryForFile(project.baseDir)
 
-            if (repository == null) {
-                Messages.showMessageDialog(project, "Repository not found!", "Error", Messages.getErrorIcon())
-                return@Runnable
+            ApplicationManager.getApplication().runReadAction {
+                val repositoryManager: VcsRepositoryManager = VcsRepositoryManager.getInstance(project)
+                val repository = repositoryManager.getRepositoryForFile(project.baseDir)
+
+                if (repository == null) {
+                    Messages.showMessageDialog(project, "Repository not found!", "Error", Messages.getErrorIcon())
+                    return@runReadAction
+                }
             }
-        }, "Prepare Repository", true, project)
 
+        }, "Prepare Repository", true, project)
         doReviewWithChanges(project, details, selectList)
     }
 
@@ -106,8 +100,8 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
             true
         )
 
-        val diffOutput = parseGitDiffOutput(patches)
-        val methodsLinesMap = extractAffectedMethodsLines(project, diffOutput, this.promptTemplate)
+        val diffOutput = parseGitDiffOutput(project, patches)
+        val methodsLinesMap = extractAffectedMethodsLines(project, diffOutput)
 //        val res = mutableListOf<String>()
         val res = StringBuilder()
         for (patch in patches) {
@@ -118,7 +112,7 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
             val lineCount = getLineCount(psiFile!!)
             val list = methodsLinesMap.get(patch.filePath)
             val sb = StringBuilder()
-            if (list!!.isEmpty()) {
+            if (list.isNullOrEmpty()) {
                 var prev = 0
                 // 不需要特殊处理
                 for (hunk in patch.hunks) {
@@ -150,7 +144,7 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
                             if (prev != consumedLine - 1) {
                                 sb.append("// ...\n")
                             }
-                            sb.appendLine("  " + getLineContent(psiFile, consumedLine, project))
+                            sb.appendLine("  " + PsiUtils.getLineContent(psiFile, consumedLine, project))
                             prev = consumedLine
                             consumedLine++
                         }
