@@ -62,7 +62,7 @@ class PromptGeneratorGroup : ActionGroup(), Iconable {
             return ServiceImplAction(template)
         }
         else {
-            IllegalArgumentException("Unsupported template key: ${template.key}").printStackTrace()
+            println("Unsupported template key: ${template.key}")
             return null
         }
     }

@@ -14,7 +14,7 @@ class AddRecursiveFileAction : AnAction() {
         val project: Project? = e.project
         val virtualFile: VirtualFile? = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.VIRTUAL_FILE)
         if (project != null && virtualFile != null) {
-            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("FileTreeListToolWindow")
+            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("GptToolsContextToolWindow")
             toolWindow?.show {
                 ApplicationManager.getApplication().executeOnPooledThread {
                     ApplicationManager.getApplication().runReadAction {

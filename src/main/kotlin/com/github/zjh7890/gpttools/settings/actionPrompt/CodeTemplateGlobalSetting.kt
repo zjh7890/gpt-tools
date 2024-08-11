@@ -47,7 +47,7 @@ class CodeTemplateApplicationSettings {
         PromptTemplate(
             key = "ClassFinderAction",
             value = FileUtil.readResourceFile("prompt/ClassFinderAction.md"),
-            desc = "* Find Method Related Class"
+            desc = "* 递归获取参数返回值类信息"
         ),
         PromptTemplate(
             key = "CodeReviewPromptAction",

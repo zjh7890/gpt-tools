@@ -8,11 +8,15 @@ import com.intellij.openapi.diff.impl.patch.TextFilePatch
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.history.VcsHistoryProvider
+import com.intellij.openapi.vcs.history.VcsHistorySession
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.vcsUtil.VcsUtil
+import git4idea.changes.filePath
 
 
 /**
@@ -99,14 +103,24 @@ object GitDiffUtils {
         return changes
     }
 
-    fun parseGitDiffOutput(patchs: List<FilePatch>): List<FileChange> {
+    fun parseGitDiffOutput(project: Project, patchs: List<FilePatch>): List<FileChange> {
         val changes = mutableListOf<FileChange>()
 
         for (patch in patchs) {
             if (patch !is TextFilePatch) {
                 continue
             }
-            var currentFileChange: FileChange = FileChange(patch.afterName, "modified")
+
+//            GitDiffUtils.getFileContentAtRevision(project, patch.filePath, patch.afterVersionId)
+//            if (patch.isNewFile) {
+//                changes.add(FileChange(patch.afterName, "create"))
+//                continue
+//            }
+//            if (patch.isDeletedFile) {
+//                changes.add(FileChange(patch.afterName, "delete"))
+//                continue
+//            }
+            var currentFileChange = FileChange(patch.afterName, "modified")
             for (hunk in patch.hunks) {
                 var originalFileLine = hunk.startLineBefore - 1 // 对应原始文件的行
                 var currentFileLine = hunk.startLineAfter - 1 // 对应新文件的行
@@ -158,7 +172,7 @@ object GitDiffUtils {
         return changes
     }
 
-    fun extractAffectedMethodsLines(project: Project, fileChanges: List<FileChange>, promptTemplate: PromptTemplate): MutableMap<String, List<PsiMethod>> {
+    fun extractAffectedMethodsLines(project: Project, fileChanges: List<FileChange>): MutableMap<String, List<PsiMethod>> {
         val map = mutableMapOf<String,List<PsiMethod>>()
         fileChanges.forEach { change ->
             if (change.filePath.contains("src/test")) {
@@ -278,11 +292,43 @@ object GitDiffUtils {
             throw e
         }
     }
+
+    @Throws(Exception::class)
+    @JvmStatic
+    fun getBeforeVersion(project: Project, filePatch: FilePatch): String {
+        val beforeFileName = filePatch.beforeName ?: throw Exception("Before file name is null")
+        return getFileContentAtRevision(project, beforeFileName, filePatch.beforeVersionId)
+    }
+
+    @Throws(Exception::class)
+    @JvmStatic
+    fun getAfterVersion(project: Project, filePatch: FilePatch): String {
+        val afterFileName = filePatch.afterName ?: throw Exception("After file name is null")
+        return getFileContentAtRevision(project, afterFileName, filePatch.afterVersionId)
+    }
+
+    @Throws(Exception::class)
+    private fun getFileContentAtRevision(project: Project, filePathStr: String, revisionNumber: String?): String {
+
+        val filePath = VcsUtil.getFilePath(filePathStr, false)
+        val historyProvider = VcsUtil.getVcsFor(project, filePath)?.vcsHistoryProvider
+            ?: throw Exception("No history provider found for: $filePath")
+
+        val session: VcsHistorySession = historyProvider.createSessionFor(filePath)!!
+        val revisions = session.revisionList
+
+        val revision = revisions.find { it.revisionNumber.asString() == revisionNumber }
+            ?: throw Exception("Revision not found: $revisionNumber")
+
+        return String(revision.loadContent()!!, Charsets.UTF_8)
+    }
 }
+
+
 
 data class FileChange(
     val filePath: String,
-    var changeType: String,
+    var changeType: String,  // create  delete  modified
     val additions: MutableList<LineRange> = mutableListOf(),
     // 可能包含第 0 行和 第 n + 1行
     val deletions: MutableList<LineRange> = mutableListOf()

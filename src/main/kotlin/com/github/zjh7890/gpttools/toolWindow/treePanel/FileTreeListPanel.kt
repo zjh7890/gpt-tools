@@ -7,7 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import javax.swing.JPanel
 import javax.swing.JScrollPane
-import javax.swing.JTree
+import com.intellij.ui.treeStructure.Tree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
@@ -18,7 +18,7 @@ import java.util.*
 
 class FileTreeListPanel(private val project: Project) : JPanel() {
     private val root = DefaultMutableTreeNode("Files")
-    val tree = JTree(root)
+    val tree = Tree(root)
     private val addedFiles = mutableSetOf<VirtualFile>()
 
     init {

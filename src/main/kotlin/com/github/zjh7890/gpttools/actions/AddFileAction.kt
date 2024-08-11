@@ -16,7 +16,7 @@ class AddFileAction : AnAction(), Iconable {
         val project: Project? = e.project
         val virtualFile: VirtualFile? = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.VIRTUAL_FILE)
         if (project != null && virtualFile != null) {
-            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("FileTreeListToolWindow")
+            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("GptToolsContextToolWindow")
             val fileTreeListPanel = toolWindow?.contentManager?.getContent(0)?.component as? FileTreeListPanel
             fileTreeListPanel?.addFile(virtualFile)
         }

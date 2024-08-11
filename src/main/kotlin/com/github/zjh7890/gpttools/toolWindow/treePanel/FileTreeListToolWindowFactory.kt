@@ -9,7 +9,7 @@ import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 
-class FileTreeListToolWindowFactory : ToolWindowFactory {
+class GptToolsContextToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val contentFactory = ContentFactory.getInstance()
         val panel = FileTreeListPanel(project)
@@ -34,10 +34,6 @@ class FileTreeListToolWindowFactory : ToolWindowFactory {
         val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
             override fun actionPerformed(e: AnActionEvent) {
                 panel.copyAllFiles()
-            }
-
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = panel.tree.selectionPath != null
             }
 
             override fun getActionUpdateThread(): ActionUpdateThread {

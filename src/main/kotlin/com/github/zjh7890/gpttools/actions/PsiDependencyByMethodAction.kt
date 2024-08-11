@@ -1,5 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.baomidou.plugin.idea.mybatisx.dom.model.IdDomElement
+import com.baomidou.plugin.idea.mybatisx.service.JavaService
 import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -10,8 +12,8 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
-import java.util.*
-import kotlin.collections.ArrayDeque
+import com.intellij.util.CommonProcessors
+
 
 class PsiDependencyByMethodAction : AnAction() {
 
@@ -31,11 +33,44 @@ class PsiDependencyByMethodAction : AnAction() {
 
         val dependency = findMethodDependency(method, project)
 
-        val psiFields = findDubboReferenceFields(dependency)
+//        val psiFields = findDubboReferenceFields(dependency)
+        val callsLinks = generateRpcCallsLinksFromTree(dependency.methodTree)
+        val message = callsLinks.joinToString("\n")
 
-        val element = simplyFileByDependency(method.containingFile!!, dependency, project)
-        val message = element.text
-        println(message)
+//        val element = simplyFileByDependency(method.containingFile!!, dependency, project)
+//        val message = element.text
+        ClipboardUtils.copyToClipboard(message)
+    }
+
+    fun generateRpcCallsLinksFromTree(node: NodeInfo): List<String> {
+        val links = mutableListOf<String>()
+
+        // 处理当前节点的 rpcCalls
+        node.rpcCalls.forEach { rpcCall ->
+            val psiMethod = rpcCall.resolveMethod() ?: return@forEach
+
+            // 获取 PsiMethod 的包名、类名、方法名和参数类型
+            val containingClass = psiMethod.containingClass ?: return@forEach
+            val methodName = psiMethod.name
+            val packageName = (containingClass.containingFile as? PsiJavaFile)?.packageName ?: return@forEach
+            val className = containingClass.name ?: return@forEach
+
+            // 获取方法的参数类型列表
+            val parameterTypes = psiMethod.parameterList.parameters.joinToString(", ") { parameter ->
+                parameter.type.presentableText
+            }
+
+            // 构建链接格式的字符串，包含参数类型
+            val link = "{@link $packageName.$className#$methodName($parameterTypes)}"
+            links.add(link)
+        }
+
+        // 递归处理子节点
+        node.childrenNodes.forEach { childNode ->
+            links.addAll(generateRpcCallsLinksFromTree(childNode))
+        }
+
+        return links
     }
 
     fun findDubboReferenceFields(dependency: PsiDependency): List<PsiField> {
@@ -147,68 +182,284 @@ class PsiDependencyByMethodAction : AnAction() {
     }
 
     private fun findMethodDependency(method: PsiMethod, project: Project): PsiDependency {
-        val psiDependency = PsiDependency()
-        val queue = ArrayDeque<PsiElement>() // 用于广度遍历的队列
+        val methodTree = NodeInfo(method)
+        val psiDependency = PsiDependency(methodTree = methodTree)
+        exploreMethodDependencies(method, psiDependency, project, methodTree)
 
-        // 将初始方法加入队列
-        queue.add(method)
+        return psiDependency
+    }
 
-        while (queue.isNotEmpty()) {
-            val element = queue.removeFirst() // 取出队列中的第一个元素
+    private fun exploreMethodDependencies(
+        element: PsiElement,
+        psiDependency: PsiDependency,
+        project: Project,
+        curNode: NodeInfo?
+    ) {
+        // 如果元素已经在 psiElementList 中，跳过以避免重复处理
+        if (element in psiDependency.psiElementList) {
+            return
+        }
 
-            // 如果元素已经在 psiElementList 中，跳过以避免重复处理
-            if (element in psiDependency.psiElementList) {
-                continue
+        // 将 PsiElement 添加到 psiElementList 中去重
+        psiDependency.psiElementList.add(element)
+
+        // 维护 psiFileList 和 psiClassList
+        val containingFile = element.containingFile
+        if (containingFile != null && containingFile !in psiDependency.psiFileList) {
+            psiDependency.psiFileList.add(containingFile)
+        }
+
+        // 如果 element 本身是 PsiClass，则将其添加到 psiClassList
+        if (element is PsiClass) {
+            if (element !in psiDependency.psiClassList) {
+                psiDependency.psiClassList.add(element)
             }
-
-            // 将 PsiElement 添加到 psiElementList 中去重
-            psiDependency.psiElementList.add(element)
-
-            // 维护 psiFileList 和 psiClassList
-            val containingFile = element.containingFile
-            if (containingFile != null && containingFile !in psiDependency.psiFileList) {
-                psiDependency.psiFileList.add(containingFile)
+        } else {
+            val containingClass = PsiTreeUtil.getParentOfType(element, PsiClass::class.java)
+            if (containingClass != null && containingClass !in psiDependency.psiClassList) {
+                psiDependency.psiClassList.add(containingClass)
             }
+        }
 
-            // 如果 element 本身是 PsiClass，则将其添加到 psiClassList
-            if (element is PsiClass) {
-                if (element !in psiDependency.psiClassList) {
-                    psiDependency.psiClassList.add(element)
-                }
-            } else {
-                val containingClass = PsiTreeUtil.getParentOfType(element, PsiClass::class.java)
-                if (containingClass != null && containingClass !in psiDependency.psiClassList) {
-                    psiDependency.psiClassList.add(containingClass)
-                }
-            }
+        val processedMethodCalls: MutableList<PsiMethodCallExpression> = mutableListOf()
 
-            PsiTreeUtil.findChildrenOfType(element, PsiJavaCodeReferenceElement::class.java).forEach {
-                when (it) {
-                    is PsiJavaCodeReferenceElement -> {
-                        val resolvedElement = it.resolve()
-                        if (resolvedElement is PsiMethod || resolvedElement is PsiField || isDataClass(resolvedElement)) {
-                            // 使用 getOrDefault 确保得到的是一个可变的列表
-                            val dependencies = psiDependency.elementDependsList.getOrDefault(element, mutableListOf())
-                            dependencies.add(ElementDependInfo(resolvedElement!!, it))
-                            psiDependency.elementDependsList[element] = dependencies
+        // 查找元素中的引用，并将其解析为 PsiElement
+        PsiTreeUtil.findChildrenOfType(element, PsiJavaCodeReferenceElement::class.java).forEach {
+            when (it) {
+                is PsiJavaCodeReferenceElement -> {
+                    val resolvedElement = it.resolve()
+                    if (resolvedElement is PsiMethod || resolvedElement is PsiField || isDataClass(resolvedElement)) {
+                        // 使用 getOrDefault 确保得到的是一个可变的列表
+                        val dependencies = psiDependency.elementDependsList.getOrDefault(element, mutableListOf())
+                        dependencies.add(ElementDependInfo(resolvedElement!!, it))
+                        psiDependency.elementDependsList[element] = dependencies
 
+                        // 更新 incomingList
+                        val incomingList = psiDependency.elementIncomingList.getOrDefault(resolvedElement, mutableListOf())
+                        incomingList.add(ElementDependInfo(element, it))
+                        psiDependency.elementIncomingList[resolvedElement] = incomingList
 
-                            // 更新 incomingList
-                            val incomingList = psiDependency.elementIncomingList.getOrDefault(resolvedElement, mutableListOf())
-                            incomingList.add(ElementDependInfo(element, it))
-                            psiDependency.elementIncomingList[resolvedElement] = incomingList
+                        if (curNode != null) {
+                            val methodCallExpression = PsiTreeUtil.getParentOfType(it, PsiMethodCallExpression::class.java)
+                            if (methodCallExpression != null && !processedMethodCalls.contains(methodCallExpression)) {
+                                // 如果祖先节点存在 PsiMethodCallExpression 且未处理过
 
-                            // 将解析出的元素添加到队列中，进行广度遍历
-                            if (isElementInProject(resolvedElement, project)) {
-                                queue.add(resolvedElement)
+                                // 标记这个方法调用表达式为已处理
+                                processedMethodCalls.add(methodCallExpression)
+
+                                if (isDubboReferenceMethodCall(methodCallExpression)) {
+                                    curNode.rpcCalls.add(methodCallExpression)
+                                    curNode.calls.add(methodCallExpression)
+                                    curNode.hasRpc = true
+                                } else if (isMybatisMethodCall(it, project)) {
+                                    curNode.mybatisCalls.add(methodCallExpression)
+                                    curNode.calls.add(methodCallExpression)
+                                    curNode.hasMybatis = true
+                                } else if (isKafkaMethodCall(methodCallExpression)) {
+                                    curNode.kafkaCalls.add(methodCallExpression)
+                                    curNode.calls.add(methodCallExpression)
+                                    curNode.hasKafka = true
+                                } else if (isRedisMethodCall(methodCallExpression)) {
+                                    curNode.redisCalls.add(methodCallExpression)
+                                    curNode.calls.add(methodCallExpression)
+                                    curNode.hasRedis = true
+                                } else if (isAriesMethodCall(methodCallExpression)) {
+                                    curNode.ariesCalls.add(methodCallExpression)
+                                    curNode.calls.add(methodCallExpression)
+                                    curNode.hasAries = true
+                                } else if (isLogMethodCall(methodCallExpression)) {
+                                    curNode.logCalls.add(methodCallExpression)
+                                    curNode.calls.add(methodCallExpression)
+                                    curNode.hasLog = true
+                                }
+                            }
+                        }
+
+                        // 使用递归调用进行深度遍历
+                        if (isElementInProject(resolvedElement, project)) {
+
+                            var childNode: NodeInfo? = null
+                            if (element is PsiMethod) {
+                                childNode = NodeInfo(element)
+                            }
+                            exploreMethodDependencies(resolvedElement, psiDependency, project, childNode)
+
+                            if (curNode != null) {
+                                if (childNode != null) {
+                                    if (childNode.childHasRpc || childNode.hasRpc
+                                        || childNode.childHasMybatis || childNode.hasMybatis
+                                        || childNode.childHasKafka || childNode.hasKafka
+                                        || childNode.childHasRedis || childNode.hasRedis
+                                        || childNode.childHasAries || childNode.hasAries
+                                        || childNode.childHasLog || childNode.hasLog) {
+                                        // 在 methodTree 中找到 parentNode 的子节点列表
+                                        // 将子节点的信息合并到当前节点
+                                        curNode.childHasRpc = curNode.childHasRpc || childNode.childHasRpc || childNode.hasRpc
+                                        curNode.childHasMybatis = curNode.childHasMybatis || childNode.childHasMybatis || childNode.hasMybatis
+                                        curNode.childHasKafka = curNode.childHasKafka || childNode.childHasKafka || childNode.hasKafka
+                                        curNode.childHasRedis = curNode.childHasRedis || childNode.childHasRedis || childNode.hasRedis
+                                        curNode.childHasAries = curNode.childHasAries || childNode.childHasAries || childNode.hasAries
+                                        curNode.childHasLog = curNode.childHasLog || childNode.childHasLog || childNode.hasLog
+                                        curNode.childrenNodes.add(childNode)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
 
-        return psiDependency
+    private fun isLogMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+        // 获取调用者表达式
+        val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+        // 确保调用者表达式存在并且是一个字段引用
+        if (qualifierExpression is PsiReferenceExpression) {
+            // 解析引用到的元素
+            val resolvedElement = qualifierExpression.resolve()
+
+            // 检查解析到的元素是否是字段
+            if (resolvedElement is PsiField) {
+                // 获取字段的类型
+                val fieldType = resolvedElement.type
+                val fieldTypeCanonicalText = fieldType.canonicalText
+
+                // 检查字段类型是否为常见的 Logger 类
+                if (fieldTypeCanonicalText == "org.slf4j.Logger" ||
+                    fieldTypeCanonicalText == "org.apache.logging.log4j.Logger" ||
+                    fieldTypeCanonicalText == "org.apache.log4j.Logger" ||
+                    fieldTypeCanonicalText == "java.util.logging.Logger" ||
+                    fieldTypeCanonicalText == "ch.qos.logback.classic.Logger") {
+                    return true
+                }
+            }
+        }
+
+        // 如果不是字段引用或者类型不匹配，返回 false
+        return false
+    }
+
+    private fun isAriesMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+        // 获取调用者表达式
+        val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+        // 确保调用者表达式存在并且是一个字段引用
+        if (qualifierExpression is PsiReferenceExpression) {
+            // 解析引用到的元素
+            val resolvedElement = qualifierExpression.resolve()
+
+            // 检查解析到的元素是否是字段
+            if (resolvedElement is PsiField) {
+                // 获取字段的类型
+                val fieldType = resolvedElement.type
+                val fieldTypeCanonicalText = fieldType.canonicalText
+
+                // 检查字段类型是否为 AriesTemplate
+                if (fieldTypeCanonicalText == "com.yupaopao.framework.spring.boot.aries.AriesTemplate") {
+                    return true
+                }
+            }
+        }
+
+        // 如果不是字段引用或者类型不匹配，返回 false
+        return false
+    }
+
+    private fun isRedisMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+        // 获取调用者表达式
+        val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+        // 确保调用者表达式存在并且是一个字段引用
+        if (qualifierExpression is PsiReferenceExpression) {
+            // 解析引用到的元素
+            val resolvedElement = qualifierExpression.resolve()
+
+            // 检查解析到的元素是否是字段
+            if (resolvedElement is PsiField) {
+                // 获取字段的类型
+                val fieldType = resolvedElement.type
+                val fieldTypeCanonicalText = fieldType.canonicalText
+
+                // 检查字段类型是否为 RedisService、RedisTemplate 或 RedissonClient
+                if (fieldTypeCanonicalText == "com.yupaopao.framework.spring.boot.redis.RedisService" ||
+                    fieldTypeCanonicalText == "org.springframework.data.redis.core.RedisTemplate<*>" || // 处理泛型情况
+                    fieldTypeCanonicalText.startsWith("org.springframework.data.redis.core.RedisTemplate<") ||
+                    fieldTypeCanonicalText == "org.redisson.api.RedissonClient") { // RedissonClient 类型检查
+                    return true
+                }
+            }
+        }
+
+        // 如果不是字段引用或者类型不匹配，返回 false
+        return false
+    }
+
+    private fun isKafkaMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+        // 获取调用者表达式
+        val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+        // 确保调用者表达式存在并且是一个字段引用
+        if (qualifierExpression is PsiReferenceExpression) {
+            // 解析引用到的元素
+            val resolvedElement = qualifierExpression.resolve()
+
+            // 检查解析到的元素是否是字段
+            if (resolvedElement is PsiField) {
+                // 获取字段的类型
+                val fieldType = resolvedElement.type
+
+                // 检查字段类型是否为 com.yupaopao.framework.spring.boot.kafka.KafkaProducer
+                if (fieldType.canonicalText == "com.yupaopao.framework.spring.boot.kafka.KafkaProducer") {
+                    return true
+                }
+            }
+        }
+
+        // 如果不是字段引用或者类型不匹配，返回 false
+        return false
+    }
+
+    private fun isMybatisMethodCall(it: PsiJavaCodeReferenceElement, project: Project): Boolean {
+        val resolvedElement = it.resolve()
+
+        // 检查 resolvedElement 是否为 PsiMethod
+        if (resolvedElement is PsiMethod) {
+            // 使用属性访问语法代替 getter
+            val processor = CommonProcessors.CollectProcessor<IdDomElement>()
+            JavaService.getInstance(it.project).processMethod(resolvedElement, processor)
+            return processor.getResults().size > 0
+        }
+        // 如果 resolvedElement 不是 PsiMethod，返回 false 或者进行其他处理
+        return false
+    }
+
+    fun isDubboReferenceMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+        // 获取调用者表达式
+        val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+        // 确保调用者表达式存在并且是一个字段引用
+        if (qualifierExpression is PsiReferenceExpression) {
+            // 解析引用到的元素
+            val resolvedElement = qualifierExpression.resolve()
+
+            // 检查解析到的元素是否是字段
+            if (resolvedElement is PsiField) {
+                // 获取字段上的注解
+                val annotations = resolvedElement.annotations
+
+                // 检查是否有 @DubboReference 或 @Reference 注解
+                return annotations.any { annotation ->
+                    val qualifiedName = annotation.qualifiedName
+                    qualifiedName == "org.apache.dubbo.config.annotation.DubboReference" ||
+                            qualifiedName == "org.apache.dubbo.config.annotation.Reference"
+                }
+            }
+        }
+
+        // 如果不是字段引用或者没有注解，返回 false
+        return false
     }
 
     fun isElementInProject(element: PsiElement, project: Project): Boolean {
@@ -243,8 +494,8 @@ class PsiDependencyByMethodAction : AnAction() {
     private fun ifGetterOrSetter(method: PsiMethod): Boolean {
         val name = method.name
         // 检查方法是否符合 getter 或 setter 的标准签名
-        return (name.startsWith("get") && method.parameterList.isEmpty && method.returnType != PsiType.VOID) ||
-                (name.startsWith("set") && method.parameterList.parametersCount == 1 && method.returnType == PsiType.VOID)
+        return (name.startsWith("get") && method.parameterList.isEmpty && method.returnType != PsiTypes.voidType()) ||
+                (name.startsWith("set") && method.parameterList.parametersCount == 1 && method.returnType == PsiTypes.voidType())
     }
 
     private fun PsiMethod.isStandardClassMethod(): Boolean {
@@ -265,7 +516,9 @@ data class PsiDependency(
     // 记录 element 依赖的节点，可以是 method, field, 或者是 data class
     val elementDependsList: MutableMap<PsiElement, MutableList<ElementDependInfo>> = mutableMapOf(),
     // 记录依赖 element 的节点，对方可以是 method, field, 或者是 data class
-    val elementIncomingList: MutableMap<PsiElement, MutableList<ElementDependInfo>> = mutableMapOf()
+    val elementIncomingList: MutableMap<PsiElement, MutableList<ElementDependInfo>> = mutableMapOf(),
+
+    val methodTree: NodeInfo
 )
 
 data class ElementDependInfo (
@@ -276,4 +529,32 @@ data class ElementDependInfo (
 data class DependencyNode(
     val element: PsiElement,
     val children: MutableList<DependencyNode> = mutableListOf()
+)
+
+data class NodeInfo(
+    val element: PsiElement,
+
+    var hasRpc: Boolean = false,
+    var hasMybatis: Boolean = false,
+    var hasKafka: Boolean = false,
+    var hasRedis: Boolean = false,
+    var hasAries: Boolean = false,
+    var hasLog: Boolean = false,
+
+    var childHasRpc: Boolean = false,
+    var childHasMybatis: Boolean = false,
+    var childHasKafka: Boolean = false,
+    var childHasRedis: Boolean = false,
+    var childHasAries: Boolean = false,
+    var childHasLog: Boolean = false,
+
+    val rpcCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+    val mybatisCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+    val kafkaCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+    val redisCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+    val ariesCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+    val logCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+    val calls: MutableList<PsiMethodCallExpression> = mutableListOf(),
+
+    val childrenNodes : MutableList<NodeInfo> = mutableListOf()
 )
