@@ -15,7 +15,7 @@ exampleLibrary = { group = "com.example", name = "exampleLibrary", version.ref =
 [plugins]
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
 gradleIntelliJPlugin = { id = "org.jetbrains.intellij.platform", version.ref = "gradleIntelliJPlugin" }
-migration = { id = "org.jetbrains.intellij.platform.migration", version = "2.0.0" }
+migration = { id = "org.jetbrains.intellij.platform.migration", version = "2.0.1" }
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }
