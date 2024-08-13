@@ -116,5 +116,13 @@
                 icon="/icons/icon_16px.svg">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </action>
+
+        <action id="CopyMethodFile"
+                class="com.github.zjh7890.gpttools.actions.CopyMethodFile"
+                text="CopyMethodFile"
+                description="CopyMethodFile"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+        </action>
     </actions>
 </idea-plugin>
