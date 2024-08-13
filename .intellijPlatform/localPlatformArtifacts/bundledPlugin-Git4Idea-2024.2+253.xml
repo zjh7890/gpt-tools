@@ -1,0 +1,16 @@
+<ivy-module version="2.0">
+  <info organisation="bundledPlugin" module="Git4Idea" revision="2024.2+253"/>
+  <configurations>
+    <conf name="default" visibility="public"/>
+  </configurations>
+  <publications>
+    <artifact name="/Users/zjh/.gradle/caches/transforms-4/e557025c54c5a1fa5df07d8714d5b707/transformed/ideaIU-2024.2-aarch64/plugins/vcs-git" type="directory" conf="default"/>
+  </publications>
+  <dependencies>
+    <dependency org="bundledPlugin" name="com.jetbrains.performancePlugin" rev="242.20224.300+538"/>
+    <dependency org="bundledPlugin" name="org.jetbrains.plugins.terminal" rev="242.20224.300+958"/>
+    <dependency org="bundledModule" name="intellij.platform.collaborationTools" rev="242.20224.300+976"/>
+    <dependency org="bundledModule" name="intellij.platform.ide.newUiOnboarding" rev="242.20224.300+976"/>
+    <dependency org="bundledModule" name="intellij.platform.coverage" rev="242.20224.300+976"/>
+  </dependencies>
+</ivy-module>
