@@ -41,6 +41,7 @@ class PsiDependencyByMethodAction : AnAction() {
 //        val element = simplyFileByDependency(method.containingFile!!, dependency, project)
 //        val message = element.text
         ClipboardUtils.copyToClipboard(message)
+        println(message)
     }
 
     fun generateRpcCallsLinksFromTree(node: NodeInfo): List<String> {
