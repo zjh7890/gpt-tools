@@ -42,6 +42,7 @@ class PsiDependencyByMethodAction : AnAction() {
 //        val message = element.text
         ClipboardUtils.copyToClipboard(message)
         println(message)
+        println(message)
     }
 
     fun generateRpcCallsLinksFromTree(node: NodeInfo): List<String> {
