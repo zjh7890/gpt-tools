@@ -2,6 +2,7 @@ package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -56,14 +57,16 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         queue.add(file to rootNode)
         addedFiles.add(file)
 
-        while (queue.isNotEmpty()) {
-            val (currentFile, currentNode) = queue.poll()
-            val dependencies = getDependencies(currentFile, project)
-            dependencies.filter { it.isValid }.forEach { dependency ->
-                if (addedFiles.add(dependency)) {
-                    val childNode = DefaultMutableTreeNode(dependency.name)
-                    currentNode.add(childNode)
-                    queue.add(dependency to childNode)
+        ApplicationManager.getApplication().runReadAction {
+            while (queue.isNotEmpty()) {
+                val (currentFile, currentNode) = queue.poll()
+                val dependencies = getDependencies(currentFile, project)
+                dependencies.filter { it.isValid }.forEach { dependency ->
+                    if (addedFiles.add(dependency)) {
+                        val childNode = DefaultMutableTreeNode(dependency.name)
+                        currentNode.add(childNode)
+                        queue.add(dependency to childNode)
+                    }
                 }
             }
         }
@@ -75,10 +78,12 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
     private fun getExpandedPaths(): Set<TreePath> {
         val expandedPaths = mutableSetOf<TreePath>()
-        for (i in 0 until tree.rowCount) {
-            val path = tree.getPathForRow(i)
-            if (tree.isExpanded(path)) {
-                expandedPaths.add(path)
+        ApplicationManager.getApplication().invokeAndWait {
+            for (i in 0 until tree.rowCount) {
+                val path = tree.getPathForRow(i)
+                if (tree.isExpanded(path)) {
+                    expandedPaths.add(path)
+                }
             }
         }
         return expandedPaths
@@ -90,12 +95,19 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         }
     }
 
-    fun removeSelectedNode() {
-        val selectedNode = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
-        if (selectedNode != null && selectedNode != root) { // 防止移除根节点
+    fun removeSelectedNodes() {
+        val expandedPaths = getExpandedPaths()
+        val selectedPaths = tree.selectionPaths
+        if (selectedPaths != null) {
             val model = tree.model as DefaultTreeModel
-            removeNodeAndChildren(selectedNode)
+            selectedPaths.forEach { path ->
+                val selectedNode = path.lastPathComponent as? DefaultMutableTreeNode
+                if (selectedNode != null && selectedNode != root) { // 防止移除根节点
+                    removeNodeAndChildren(selectedNode)
+                }
+            }
             model.reload(root)
+            restoreExpandedPaths(expandedPaths) // 恢复展开路径
         }
     }
 

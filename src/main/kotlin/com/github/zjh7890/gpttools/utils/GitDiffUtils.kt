@@ -8,6 +8,7 @@ import com.intellij.openapi.diff.impl.patch.TextFilePatch
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.history.VcsHistoryProvider
 import com.intellij.openapi.vcs.history.VcsHistorySession
 import com.intellij.psi.PsiDocumentManager
@@ -18,117 +19,31 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.vcsUtil.VcsUtil
 import git4idea.changes.filePath
 
-
 /**
  * @Author: zhujunhua
  * @Date: 2024/7/9 19:12
  */
 object GitDiffUtils {
-    fun parseGitDiffOutput(diffOutput: String): List<FileChange> {
-        val changes = mutableListOf<FileChange>()
-        var currentFileChange: FileChange? = null
-        var originalFileLine = 0 // 对应原始文件的行
-        var currentFileLine = 0 // 对应新文件的行
-        var state = 0 // 1 delete, 2 modify
-        var startOfAddLine = 0
-
-        diffOutput.lineSequence().forEach { line ->
-            when {
-                line.startsWith("diff --git") -> {
-                    if (state == 1) {
-                        currentFileChange?.deletions?.add(LineRange(currentFileLine, currentFileLine + 1))
-                        state = 0
-                    } else if (state == 2) {
-                        currentFileChange?.additions?.add(LineRange(startOfAddLine, currentFileLine))
-                        state = 0
-                        startOfAddLine = 0
-                    }
-                    currentFileChange?.let { changes.add(it) }
-                    val filePath = line.substringAfter(" b/").trim()
-                    currentFileChange = FileChange(filePath, "modified") // Default to modified unless stated otherwise
-                }
-                line.startsWith("+++") -> {}
-                line.startsWith("---") -> {}
-                line.startsWith("@@ ") -> {
-                    // Extract start line from diff range information
-                    val regex = """@@ -(\d+),\d+ \+(\d+),\d+ @@""".toRegex()
-                    val matchResult = regex.find(line)
-                    val (originalFileLineStr, currentFileLineStr) = matchResult!!.destructured
-                    // 赋值给全局变量
-                    originalFileLine = originalFileLineStr.toInt() - 1
-                    currentFileLine = currentFileLineStr.toInt() - 1
-//                    currentStartLine = lineInfo.substring(1).split(",")[0].toInt()
-                }
-
-                line.startsWith("+") && !line.startsWith("+++") -> {
-                    if (state != 2) {
-                        startOfAddLine = currentFileLine + 1
-                    }
-                    state = 2
-                    currentFileLine++
-                }
-
-                line.startsWith("-") && !line.startsWith("---") -> {
-                    if (state == 0) {
-                        state = 1
-                    }
-                    originalFileLine++
-                }
-
-                else -> {
-                    if (state == 1) {
-                        currentFileChange?.deletions?.add(LineRange(currentFileLine, currentFileLine + 1))
-                        state = 0
-                    } else if (state == 2) {
-                        currentFileChange?.additions?.add(LineRange(startOfAddLine, currentFileLine))
-                        state = 0
-                        startOfAddLine = 0
-                    }
-                    originalFileLine++
-                    currentFileLine++
-                }
-            }
-        }
-
-        if (state == 1) {
-            currentFileChange?.deletions?.add(LineRange(currentFileLine, currentFileLine + 1))
-            state = 0
-        } else if (state == 2) {
-            currentFileChange?.additions?.add(LineRange(startOfAddLine, currentFileLine))
-            state = 0
-            startOfAddLine = 0
-        }
-
-        currentFileChange?.let { changes.add(it) } // Add the last parsed file
-        return changes
-    }
-
-    fun parseGitDiffOutput(project: Project, patchs: List<FilePatch>): List<FileChange> {
+    fun parseGitDiffOutput(project: Project, fileChanges: List<FileChange>): List<FileChange> {
         val changes = mutableListOf<FileChange>()
 
-        for (patch in patchs) {
-            if (patch !is TextFilePatch) {
-                continue
-            }
+        for (fileChange in fileChanges) {
+            val patch = fileChange.filePatch
 
-//            GitDiffUtils.getFileContentAtRevision(project, patch.filePath, patch.afterVersionId)
-//            if (patch.isNewFile) {
-//                changes.add(FileChange(patch.afterName, "create"))
-//                continue
-//            }
-//            if (patch.isDeletedFile) {
-//                changes.add(FileChange(patch.afterName, "delete"))
-//                continue
-//            }
-            var currentFileChange = FileChange(patch.afterName, "modified")
+            if (patch !is TextFilePatch) continue
+
+            // We already have a FileChange instance, so we don't need to create a new one
+            var currentFileChange = fileChange
+
             for (hunk in patch.hunks) {
-                var originalFileLine = hunk.startLineBefore - 1 // 对应原始文件的行
-                var currentFileLine = hunk.startLineAfter - 1 // 对应新文件的行
-                var state = 0 // 1 delete, 2 modify
+                var originalFileLine = hunk.startLineBefore - 1 // Corresponds to the original file's line number
+                var currentFileLine = hunk.startLineAfter - 1 // Corresponds to the new file's line number
+                var state = 0 // 1: delete, 2: modify
                 var startOfAddLine = 0
+
                 for (line in hunk.lines) {
-                    when {
-                        line.type == PatchLine.Type.ADD -> {
+                    when (line.type) {
+                        PatchLine.Type.ADD -> {
                             if (state != 2) {
                                 startOfAddLine = currentFileLine + 1
                             }
@@ -136,7 +51,7 @@ object GitDiffUtils {
                             currentFileLine++
                         }
 
-                        line.type == PatchLine.Type.REMOVE -> {
+                        PatchLine.Type.REMOVE -> {
                             if (state == 0) {
                                 state = 1
                             }
@@ -145,10 +60,10 @@ object GitDiffUtils {
 
                         else -> {
                             if (state == 1) {
-                                currentFileChange?.deletions?.add(LineRange(currentFileLine, currentFileLine + 1))
+                                currentFileChange.deletions.add(LineRange(currentFileLine, currentFileLine + 1))
                                 state = 0
                             } else if (state == 2) {
-                                currentFileChange?.additions?.add(LineRange(startOfAddLine, currentFileLine))
+                                currentFileChange.additions.add(LineRange(startOfAddLine, currentFileLine))
                                 state = 0
                                 startOfAddLine = 0
                             }
@@ -157,16 +72,19 @@ object GitDiffUtils {
                         }
                     }
                 }
+
+                // Handle any remaining state after processing the lines
                 if (state == 1) {
-                    currentFileChange?.deletions?.add(LineRange(currentFileLine, currentFileLine + 1))
+                    currentFileChange.deletions.add(LineRange(currentFileLine, currentFileLine + 1))
                     state = 0
                 } else if (state == 2) {
-                    currentFileChange?.additions?.add(LineRange(startOfAddLine, currentFileLine))
+                    currentFileChange.additions.add(LineRange(startOfAddLine, currentFileLine))
                     state = 0
                     startOfAddLine = 0
                 }
-                currentFileChange?.let { changes.add(it) } // Add the last parsed file
             }
+
+            changes.add(currentFileChange) // Add the processed FileChange to the list
         }
 
         return changes
@@ -214,57 +132,6 @@ object GitDiffUtils {
         return map
     }
 
-    fun extractAffectedMethods(project: Project, fileChanges: List<FileChange>, promptTemplate: PromptTemplate) {
-        ApplicationManager.getApplication().runReadAction {
-            val affectedMethods = mutableListOf<PsiMethod>()
-            fileChanges.forEach { change ->
-                if (change.filePath.contains("src/test")) {
-                    return@forEach
-                }
-                val psiFile = PsiManager.getInstance(project).findFile(project.baseDir.findFileByRelativePath(change.filePath)!!)
-                psiFile?.let { file ->
-                    val methods = PsiTreeUtil.findChildrenOfType(file, PsiMethod::class.java)
-                    methods.forEach { method ->
-                        val methodStartOffset = method.textRange.startOffset
-                        val methodEndOffset = method.textRange.endOffset
-
-                        change.additions.forEach { range ->
-                            val startOffset = getLineStartOffset(file, range.startLine)
-                            val endOffset = getLineEndOffset(file, range.endLine)
-                            if (methodStartOffset <= endOffset && methodEndOffset >= startOffset) {
-                                affectedMethods.add(method)
-                            }
-                        }
-
-                        change.deletions.forEach { range ->
-                            if (range.startLine == 0 || range.endLine > getLineCount(psiFile)) {
-                                return@forEach
-                            }
-                            val startOffset = getLineStartOffset(file, range.startLine)
-                            val endOffset = getLineEndOffset(file, range.endLine)
-                            if (methodStartOffset < endOffset && methodEndOffset > startOffset) {
-                                println("Affected Method: ${method.name}")
-                            }
-                        }
-                    }
-                }
-            }
-            // affectedMethods 去重
-            val uniqueAffectedMethods = affectedMethods.distinctBy { it }
-            val sb : StringBuilder = StringBuilder()
-            uniqueAffectedMethods.forEach {
-                sb.append("```\n").append(it.text).append("\n```\n\n")
-            }
-
-            val GPT_diffCode = sb.toString()
-            val map = mapOf(
-                "GPT_diffCode" to GPT_diffCode
-            )
-            val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
-            ClipboardUtils.copyToClipboard(result)
-        }
-    }
-
     fun getLineCount(psiFile: PsiFile): Int {
         val virtualFile = psiFile.virtualFile ?: return 0
         val document: Document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return 0
@@ -292,36 +159,6 @@ object GitDiffUtils {
             throw e
         }
     }
-
-    @Throws(Exception::class)
-    @JvmStatic
-    fun getBeforeVersion(project: Project, filePatch: FilePatch): String {
-        val beforeFileName = filePatch.beforeName ?: throw Exception("Before file name is null")
-        return getFileContentAtRevision(project, beforeFileName, filePatch.beforeVersionId)
-    }
-
-    @Throws(Exception::class)
-    @JvmStatic
-    fun getAfterVersion(project: Project, filePatch: FilePatch): String {
-        val afterFileName = filePatch.afterName ?: throw Exception("After file name is null")
-        return getFileContentAtRevision(project, afterFileName, filePatch.afterVersionId)
-    }
-
-    @Throws(Exception::class)
-    private fun getFileContentAtRevision(project: Project, filePathStr: String, revisionNumber: String?): String {
-
-        val filePath = VcsUtil.getFilePath(filePathStr, false)
-        val historyProvider = VcsUtil.getVcsFor(project, filePath)?.vcsHistoryProvider
-            ?: throw Exception("No history provider found for: $filePath")
-
-        val session: VcsHistorySession = historyProvider.createSessionFor(filePath)!!
-        val revisions = session.revisionList
-
-        val revision = revisions.find { it.revisionNumber.asString() == revisionNumber }
-            ?: throw Exception("Revision not found: $revisionNumber")
-
-        return String(revision.loadContent()!!, Charsets.UTF_8)
-    }
 }
 
 
@@ -331,7 +168,10 @@ data class FileChange(
     var changeType: String,  // create  delete  modified
     val additions: MutableList<LineRange> = mutableListOf(),
     // 可能包含第 0 行和 第 n + 1行
-    val deletions: MutableList<LineRange> = mutableListOf()
+    val deletions: MutableList<LineRange> = mutableListOf(),
+
+    val change: Change,  // Add non-null Change object
+    val filePatch: FilePatch // Add non-null FilePatch object
 )
 
 data class LineRange(val startLine: Int, val endLine: Int)
