@@ -18,7 +18,7 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
 
         val removeAction = object : AnAction("Remove Node", "Remove the selected node", AllIcons.Actions.DeleteTag) {
             override fun actionPerformed(e: AnActionEvent) {
-                panel.removeSelectedNode()
+                panel.removeSelectedNodes()
             }
 
             override fun update(e: AnActionEvent) {

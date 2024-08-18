@@ -17,10 +17,8 @@ class AddRecursiveFileAction : AnAction() {
             val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("GptToolsContextToolWindow")
             toolWindow?.show {
                 ApplicationManager.getApplication().executeOnPooledThread {
-                    ApplicationManager.getApplication().runReadAction {
-                        val fileTreeListPanel = toolWindow.contentManager.getContent(0)?.component as? FileTreeListPanel
-                        fileTreeListPanel?.addFileRecursively(virtualFile, project)
-                    }
+                    val fileTreeListPanel = toolWindow.contentManager.getContent(0)?.component as? FileTreeListPanel
+                    fileTreeListPanel?.addFileRecursively(virtualFile, project)
                 }
             }
         }

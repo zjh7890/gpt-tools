@@ -55,11 +55,6 @@ class CodeTemplateApplicationSettings {
             desc = "* 生成 Code Review",
         ),
         PromptTemplate(
-            key = "DiffAction",
-            value = FileUtil.readResourceFile("prompt/DiffAction.md"),
-            desc = "* 获取更改代码"
-        ),
-        PromptTemplate(
             key = "FileTestAction",
             value = FileUtil.readResourceFile("prompt/FileTestAction.md"),
             desc = "* 生成类单测"

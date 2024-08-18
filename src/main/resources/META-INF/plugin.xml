@@ -124,5 +124,13 @@
                 icon="/icons/icon_16px.svg">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </action>
+
+        <action id="AllMethodFile"
+                class="com.github.zjh7890.gpttools.actions.AllMethodFile"
+                text="AllMethodFile"
+                description="AllMethodFile"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+        </action>
     </actions>
 </idea-plugin>

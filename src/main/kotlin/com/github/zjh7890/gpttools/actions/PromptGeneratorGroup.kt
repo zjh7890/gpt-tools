@@ -37,9 +37,6 @@ class PromptGeneratorGroup : ActionGroup(), Iconable {
         if (template.key == "ClassFinderAction") {
             return ClassFinderAction(template)
         }
-        else if (template.key == "DiffAction") {
-            return DiffAction(template)
-        }
         else if (template.key == "FileTestAction") {
             return FileTestAction(template)
         }
