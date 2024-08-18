@@ -1,7 +1,5 @@
 package com.github.zjh7890.gpttools.utils
 
-import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diff.impl.patch.FilePatch
 import com.intellij.openapi.diff.impl.patch.PatchLine
 import com.intellij.openapi.diff.impl.patch.TextFilePatch
@@ -9,15 +7,12 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
-import com.intellij.openapi.vcs.history.VcsHistoryProvider
-import com.intellij.openapi.vcs.history.VcsHistorySession
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.vcsUtil.VcsUtil
-import git4idea.changes.filePath
 
 /**
  * @Author: zhujunhua
@@ -132,8 +127,53 @@ object GitDiffUtils {
         return map
     }
 
+    fun extractAffectedMethodsLines(project: Project, fileChange: FileChange): List<PsiMethod> {
+        val affectedMethods = mutableListOf<PsiMethod>()
+
+        if (fileChange.filePath.contains("src/test")) {
+            return affectedMethods // Skip test files
+        }
+
+        val psiFile = PsiManager.getInstance(project).findFile(project.baseDir.findFileByRelativePath(fileChange.filePath)!!)
+        psiFile?.let { file ->
+            var methods = PsiTreeUtil.findChildrenOfType(file, PsiMethod::class.java)
+            // Sort methods by their start offset in the file
+            methods = methods.sortedBy { it.textRange.startOffset }
+
+            methods.forEach { method ->
+                val methodStartOffset = method.textRange.startOffset
+                val methodEndOffset = method.textRange.endOffset
+
+                fileChange.additions.forEach { range ->
+                    val startOffset = getLineStartOffset(file, range.startLine)
+                    val endOffset = getLineEndOffset(file, range.endLine)
+                    if (!affectedMethods.contains(method) && methodStartOffset <= endOffset && methodEndOffset >= startOffset) {
+                        affectedMethods.add(method)
+                    }
+                }
+
+                fileChange.deletions.forEach { range ->
+                    if (range.startLine == 0 || range.endLine > getLineCount(psiFile)) {
+                        return@forEach
+                    }
+                    val startOffset = getLineStartOffset(file, range.startLine)
+                    val endOffset = getLineEndOffset(file, range.endLine)
+                    if (!affectedMethods.contains(method) && methodStartOffset < endOffset && methodEndOffset > startOffset) {
+                        affectedMethods.add(method)
+                    }
+                }
+            }
+        }
+
+        return affectedMethods
+    }
+
     fun getLineCount(psiFile: PsiFile): Int {
         val virtualFile = psiFile.virtualFile ?: return 0
+        return getLineCount(virtualFile)
+    }
+
+    fun getLineCount(virtualFile: VirtualFile): Int {
         val document: Document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return 0
         return document.lineCount
     }

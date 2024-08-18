@@ -215,15 +215,20 @@ object PsiUtils {
         return Pair(startLine, endLine)
     }
 
-    fun getLineContent(file: PsiFile, lineNumber: Int, project: Project): String {
-        val document: Document? = PsiDocumentManager.getInstance(project).getDocument(file)
+    fun getLineContent(virtualFile: VirtualFile, lineNumber: Int, project: Project): String {
+        // Get the document associated with the VirtualFile
+        val document: Document? = FileDocumentManager.getInstance().getDocument(virtualFile)
+
+        // If the document is null or the line number is out of bounds, return an empty string
         if (document == null || lineNumber < 0 || lineNumber >= document.lineCount) {
             return ""
         }
 
+        // Get the start and end offsets of the line
         val lineStartOffset = document.getLineStartOffset(lineNumber)
         val lineEndOffset = document.getLineEndOffset(lineNumber)
 
+        // Return the text of the line
         return document.getText().substring(lineStartOffset, lineEndOffset)
     }
 

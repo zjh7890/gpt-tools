@@ -96,77 +96,91 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
         }
 
         GitDiffUtils.parseGitDiffOutput(project, fileChanges)
-        val methodsLinesMap = GitDiffUtils.extractAffectedMethodsLines(project, fileChanges)
 
         val res = StringBuilder()
         for (fileChange in fileChanges) {
             val patch = fileChange.filePatch
 
             if (patch !is TextFilePatch) continue
-            
-            val psiFile = PsiManager.getInstance(project).findFile(project.baseDir.findFileByRelativePath(fileChange.filePath)!!)
-            val lineCount = GitDiffUtils.getLineCount(psiFile!!)
-            val list = methodsLinesMap[fileChange.filePath]
+
             val sb = StringBuilder()
-            if (list.isNullOrEmpty()) {
-                var prev = 0
-                for (hunk in patch.hunks) {
-                    if (prev != hunk.startLineAfter - 1) {
-                        sb.append("// ...\n")
-                    }
-                    for (line in hunk.lines) {
-                        sb.appendLine(
-                            when (line.type) {
-                                PatchLine.Type.CONTEXT -> "  ${line.text}"
-                                PatchLine.Type.ADD -> "+ ${line.text}"
-                                PatchLine.Type.REMOVE -> "- ${line.text}"
-                            }
-                        )
-                    }
+            if (fileChange.change.type == Change.Type.NEW) {
+                for (line in patch.hunks[0].lines) {
+                    sb.appendLine("+ ${line.text}")
                 }
-                if (patch.hunks[0].endLineAfter != lineCount) {
-                    sb.append("// ...\n")
+            } else if (fileChange.change.type == Change.Type.DELETED) {
+                for (line in patch.hunks[0].lines) {
+                    sb.appendLine("- ${line.text}")
                 }
-            } else {
-                var i = 0
-                var method: PsiMethod? = list[i]
-                val methodStartAndEndLines = PsiUtils.getMethodStartAndEndLines(method!!)
-                var consumedLine = methodStartAndEndLines.first
-                var prev = 0
-                for (hunk in patch.hunks) {
-                    if (method != null && hunk.startLineAfter > consumedLine) {
-                        while (consumedLine < min(hunk.startLineAfter, methodStartAndEndLines.second)) {
-                            if (prev != consumedLine - 1) {
-                                sb.append("// ...\n")
-                            }
-                            sb.appendLine("  " + PsiUtils.getLineContent(psiFile, consumedLine, project))
-                            prev = consumedLine
-                            consumedLine++
+            } else if (fileChange.change.type == Change.Type.MODIFICATION) {
+                val list = GitDiffUtils.extractAffectedMethodsLines(project, fileChange)
+                val psiFile = fileChange.change.afterRevision!!.file.virtualFile!!
+                val lineCount = GitDiffUtils.getLineCount(psiFile)
+                if (list.isEmpty()) {
+                    var prev = 0
+                    for (hunk in patch.hunks) {
+                        if (prev != hunk.startLineAfter - 1) {
+                            sb.append("// ...\n")
+                        }
+                        for (line in hunk.lines) {
+                            sb.appendLine(
+                                when (line.type) {
+                                    PatchLine.Type.CONTEXT -> "  ${line.text}"
+                                    PatchLine.Type.ADD -> "+ ${line.text}"
+                                    PatchLine.Type.REMOVE -> "- ${line.text}"
+                                }
+                            )
                         }
                     }
-                    if (prev != hunk.startLineAfter - 1) {
+                    if (patch.hunks[0].endLineAfter != lineCount) {
                         sb.append("// ...\n")
                     }
-                    for (line in hunk.lines) {
-                        sb.appendLine(
-                            when (line.type) {
-                                PatchLine.Type.CONTEXT -> "  ${line.text}"
-                                PatchLine.Type.ADD -> "+ ${line.text}"
-                                PatchLine.Type.REMOVE -> "- ${line.text}"
+                } else {
+                    var i = 0
+                    var method: PsiMethod? = list[i]
+                    val methodStartAndEndLines = PsiUtils.getMethodStartAndEndLines(method!!)
+                    var consumedLine = methodStartAndEndLines.first
+                    var prev = 0
+                    for (hunk in patch.hunks) {
+                        if (method != null && hunk.startLineAfter > consumedLine) {
+                            while (consumedLine < min(hunk.startLineAfter, methodStartAndEndLines.second)) {
+                                if (prev != consumedLine - 1) {
+                                    sb.append("// ...\n")
+                                }
+                                sb.appendLine("  " + PsiUtils.getLineContent(psiFile, consumedLine, project))
+                                prev = consumedLine
+                                consumedLine++
                             }
-                        )
+                        }
+                        if (prev != hunk.startLineAfter - 1) {
+                            sb.append("// ...\n")
+                        }
+                        for (line in hunk.lines) {
+                            sb.appendLine(
+                                when (line.type) {
+                                    PatchLine.Type.CONTEXT -> "  ${line.text}"
+                                    PatchLine.Type.ADD -> "+ ${line.text}"
+                                    PatchLine.Type.REMOVE -> "- ${line.text}"
+                                }
+                            )
+                        }
+                        if (consumedLine < hunk.endLineAfter && hunk.endLineAfter < methodStartAndEndLines.second) {
+                            consumedLine = hunk.endLineAfter + 1
+                        } else if (hunk.endLineAfter >= methodStartAndEndLines.second) {
+                            i++
+                            method = if (i < list.size) list[i] else null
+                        }
                     }
-                    if (consumedLine < hunk.endLineAfter && hunk.endLineAfter < methodStartAndEndLines.second) {
-                        consumedLine = hunk.endLineAfter + 1
-                    } else if (hunk.endLineAfter >= methodStartAndEndLines.second) {
-                        i++
-                        method = if (i < list.size) list[i] else null
+                    if (patch.hunks[0].endLineAfter != lineCount) {
+                        sb.append("// ...\n")
                     }
                 }
-                if (patch.hunks[0].endLineAfter != lineCount) {
-                    sb.append("// ...\n")
-                }
+            } else {
+                // moved
+                continue
             }
+            
+
             res.appendLine(fileChange.filePath)
                 .appendLine("```")
                 .appendLine(sb.toString().trim())
