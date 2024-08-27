@@ -10,6 +10,7 @@
 <!-- Plugin description end -->
 
 ## Installation
+推荐 Manually 安装，IDEA 商店的可能不是最新版。
 
 - Using the IDE built-in plugin system:
   
