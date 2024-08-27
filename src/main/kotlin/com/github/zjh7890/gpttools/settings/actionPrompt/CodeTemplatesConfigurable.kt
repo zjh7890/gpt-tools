@@ -3,13 +3,14 @@ package com.github.zjh7890.gpttools.settings.actionPrompt
 import com.fasterxml.jackson.core.type.TypeReference
 import com.github.zjh7890.gpttools.components.JsonLanguageField
 import com.github.zjh7890.gpttools.components.LeftRightComponent
+import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.JsonUtils
+import com.google.common.reflect.TypeToken
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -17,7 +18,6 @@ import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
 import com.intellij.util.ui.FormBuilder
 import java.awt.*
-import java.awt.datatransfer.StringSelection
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -29,21 +29,23 @@ class PluginConfigurable(private val project: Project) : Configurable {
         get() = CodeTemplateProjectSetting.getInstance(project)
 
     override fun createComponent(): JComponent? {
-        myComponent = MyConfigurableComponent(project)
+        myComponent = MyConfigurableComponent(project, appSettings, this)
         return myComponent?.panel
     }
 
     override fun isModified(): Boolean = myComponent?.isModified(appSettings.state, projectSettings.state) ?: false
     override fun apply(): Unit = myComponent!!.applyTo(appSettings.state, projectSettings.state)
     override fun reset(): Unit = myComponent!!.resetFrom(appSettings.state, projectSettings.state)
-    override fun getDisplayName(): String = "GPT Tools Configuration"
+    override fun getDisplayName(): String = "gpt-tools Template"
     override fun disposeUIResources() {
         myComponent = null
     }
 }
 
 class MyConfigurableComponent(
-    project: Project
+    val project: Project,
+    val appSettings: CodeTemplateApplicationSettingsService,
+    val pluginConfigurable: PluginConfigurable
 ) {
     val panel = JTabbedPane()
     private val templateList = JBList<PromptTemplate>(DefaultListModel<PromptTemplate>())
@@ -256,29 +258,34 @@ class MyConfigurableComponent(
     // 导出模型到剪切板
     private fun exportTemplatesToJson() {
         val model = templateList.model as DefaultListModel<PromptTemplate>
-        val templates = List(model.size()) { model.getElementAt(it) }
-        val json = Gson().toJson(templates)
-        val stringSelection = StringSelection(json)
-        CopyPasteManager.getInstance().setContents(stringSelection)
+        val newTemplatesList = model.elements().toList()
+
+        val templateList1 = JsonUtils.parse(JsonUtils.toJson(newTemplatesList), object : TypeReference<List<PromptTemplate>>() {})
+        ClipboardUtils.copyToClipboard(JsonUtils.toJson(templateList1))
+
         Messages.showInfoMessage("Options exported to clipboard.", "Export Successful")
     }
 
     // 从剪切板导入模型
     private fun importTemplatesFromJson() {
-        val jsonInput = Messages.showInputDialog(
+        val jsonInput = Messages.showMultilineInputDialog(
+            project,
             "Paste the JSON here:",
             "Import Options",
-            AllIcons.Actions.ShowImportStatements
+            "",  // 图标可以传 `null`，如果没有自定义图标的需求
+            null,
+            null
         )
         if (jsonInput != null) {
             try {
+                // 校验下是 json 格式
                 val type = object : TypeToken<List<PromptTemplate>>() {}.type
                 val importedTemplates = Gson().fromJson<List<PromptTemplate>>(jsonInput, type)
-                val model = templateList.model as DefaultListModel<PromptTemplate>
-                model.removeAllElements()
-                importedTemplates.forEach(model::addElement)
-                if (model.size() > 0) {
-                    templateList.selectedIndex = 0
+
+                appSettings.state.templates = jsonInput
+
+                ApplicationManager.getApplication().invokeLater {
+                    pluginConfigurable.reset()
                 }
             } catch (ex: Exception) {
                 Messages.showErrorDialog("Failed to import options: " + ex.message, "Import Error")

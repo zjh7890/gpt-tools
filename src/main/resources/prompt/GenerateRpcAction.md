@@ -6,6 +6,7 @@ rpc 层规范：
 3. 如果 rpc 的返回值是对象类型，当你想要返回空对象时，你不要使用 Optional 类，也不要使用 new 一个空对象，可以返回 null, 调用方会判空。
 4. 你可以认为调用 DubboReference 时不会出现异常，因为框架已经实现了 Filter，不要再捕获异常，代码冗余
 5. 如果调用是成功的，不要打印日志，因为日志太多会拖垮服务,如果response.isSuccess()为false,打印错误日志
+6. 如果 Request 里面只有简单参数，生成 RPC 方法的时候必须拆分开，如 fooRpc(int a, int b, int c)
 
 源文件示例如下，仅仅是示例，只给你用作格式参考，跟本地项目没有任何关系，纯属虚构:
 ```java
@@ -59,7 +60,7 @@ public class LiveAnchorAuthRPC {
 就是一个 spring bean，核心逻辑所在
 
 按照前文提到的Rpc规范生成 ${GPT_methodName} 方法的 Rpc 调用代码，中文作答，注释也用中文。
-以下是提供的一些信息: 
+以下是提供的一些信息:
 ${GPT_completeSignature}
 ```
 ${GPT_simplifyClassText}

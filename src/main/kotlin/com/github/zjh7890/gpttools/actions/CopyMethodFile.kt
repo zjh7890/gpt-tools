@@ -16,7 +16,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.CommonProcessors
 
 
-class CopyMethodFile : AnAction() {
+class CopyMethodSingleFile : AnAction() {
 
     override fun actionPerformed(e: AnActionEvent) {
         // 获取当前编辑的文件

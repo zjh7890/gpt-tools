@@ -34,7 +34,6 @@
 
         <intentionAction>
             <className>com.github.zjh7890.gpttools.actions.FixThisChunkAction</className>
-            <category>gpt-tools</category>
         </intentionAction>
 
 <!--        <toolWindow id="ChatTool"-->
@@ -55,9 +54,9 @@
 
         <projectConfigurable instance="com.github.zjh7890.gpttools.settings.actionPrompt.PluginConfigurable"/>
 
-        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"
-                                 id="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"
-                                 displayName="GptToolLlm"/>
+<!--        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
+<!--                                 id="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
+<!--                                 displayName="GptToolLlm"/>-->
 
 <!--        <applicationConfigurable instance="com.example.plugin.MyPluginConfigurable"/>-->
 
@@ -81,24 +80,24 @@
             <add-to-group group-id="Vcs.Log.ChangesBrowser.Popup" relative-to-action="Vcs.RepositoryChangesBrowserMenu"
                           anchor="first"/>
             <add-to-group group-id="Vcs.Log.ContextMenu" relative-to-action="Vcs.ShowDiffWithLocal" anchor="first"/>
-            <add-to-group group-id="ShowIntentionsGroup" relative-to-action="ShowIntentionActions" anchor="first"/>
             <add-to-group group-id="ConsoleEditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </group>
-
 
         <action id="AddFileAction"
                 class="com.github.zjh7890.gpttools.actions.AddFileAction"
                 text="Add File to ToolWindow"
                 description="Adds the selected file to the ToolWindow."
                 icon="/icons/icon_16px.svg">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
+
         <action id="AddRecursiveFileAction"
                 class="com.github.zjh7890.gpttools.actions.AddRecursiveFileAction"
                 text="Recursively Add Files to ToolWindow"
                 description="Recursively adds files to the ToolWindow based on dependencies."
                 icon="/icons/icon_16px.svg">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
         <action id="ConvertToMermaid"
@@ -106,7 +105,7 @@
                 text="ConvertToMermaid"
                 description="ConvertToMermaid"
                 icon="/icons/icon_16px.svg">
-            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
         <action id="PsiDependencyByMethodAction"
@@ -114,15 +113,15 @@
                 text="PsiDependencyByMethodAction"
                 description="PsiDependencyByMethodAction"
                 icon="/icons/icon_16px.svg">
-            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
-        <action id="CopyMethodFile"
-                class="com.github.zjh7890.gpttools.actions.CopyMethodFile"
-                text="CopyMethodFile"
-                description="CopyMethodFile"
+        <action id="CopyMethodSingleFile"
+                class="com.github.zjh7890.gpttools.actions.CopyMethodSingleFile"
+                text="CopyMethodSingleFile"
+                description="CopyMethodSingleFile"
                 icon="/icons/icon_16px.svg">
-            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
         <action id="AllMethodFile"
@@ -130,7 +129,7 @@
                 text="AllMethodFile"
                 description="AllMethodFile"
                 icon="/icons/icon_16px.svg">
-            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
     </actions>
 </idea-plugin>
