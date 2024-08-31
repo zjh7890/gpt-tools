@@ -84,6 +84,22 @@
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </group>
 
+        <action id="FindUsagesAcrossProjectsAction"
+                class="com.github.zjh7890.gpttools.actions.FindUsagesAcrossProjectsAction"
+                text="微服务 -Find Usages"
+                description="Find Usages in other projects"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
+        <action id="FindImplAcrossProjectsAction"
+                class="com.github.zjh7890.gpttools.actions.FindImplAcrossProjectsAction"
+                text="微服务 -Find Impl"
+                description="Find Impl in other projects"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
         <action id="AddFileAction"
                 class="com.github.zjh7890.gpttools.actions.AddFileAction"
                 text="Add File to ToolWindow"
