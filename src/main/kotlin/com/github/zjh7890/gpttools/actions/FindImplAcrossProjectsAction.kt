@@ -4,6 +4,7 @@ import com.intellij.lang.java.JavaLanguage
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbAware
@@ -24,6 +25,7 @@ import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class FindImplAcrossProjectsAction : AnAction(), DumbAware {
+    private val logger = Logger.getInstance(FindImplAcrossProjectsAction::class.java)
 
     override fun actionPerformed(event: AnActionEvent) {
         val project = event.project ?: return
@@ -117,21 +119,35 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
             "$projectName - $className - $methodName"
         }
 
+        logger.info("popupItems: $popupItems")
+
         val popup = JBPopupFactory.getInstance()
             .createPopupChooserBuilder(popupItems)
             .setTitle("Implementation Results")
             .setItemChosenCallback { item ->
+                logger.info("popupItems callback: $popupItems")
+                Messages.showErrorDialog(project, "callback 无法找到", "项目路径未找到")
                 val selectedImpl = implementations[popupItems.indexOf(item)]
                 navigateToImplementation(project, selectedImpl)
             }
             .createPopup()
 
+        logger.info("popupItems showInFocusCenter: $popupItems")
+
         popup.showInFocusCenter()
     }
 
     private fun navigateToImplementation(project: Project, implementation: MethodImplUsage) {
-        val projectBasePath = project.basePath ?: return
-        val parentPath = File(projectBasePath).parent ?: return
+        val projectBasePath = project.basePath
+        if (projectBasePath == null) {
+            Messages.showErrorDialog(project, "projectBasePath 无法找到", "项目路径未找到")
+            return
+        }
+        val parentPath = File(projectBasePath).parent
+        if (parentPath == null) {
+            Messages.showErrorDialog(project, "parentPath 无法找到", "父路径未找到")
+            return
+        }
 
         val targetProjectPath = File(parentPath, implementation.projectName).absolutePath
 
@@ -147,11 +163,14 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
             val file = File(filePath)
             val newVirtualFile: VirtualFile? = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
             if (newVirtualFile != null) {
+                logger.info("popupItems navigate to: $filePath")
                 val descriptor = OpenFileDescriptor(openedProject, newVirtualFile, implementation.reference.textOffset)
                 descriptor.navigate(true)
             } else {
                 Messages.showErrorDialog(openedProject, "无法通过路径找到文件：$filePath", "文件未找到")
             }
+        } else {
+            Messages.showErrorDialog(project, "无法打开项目：$targetProjectPath", "项目未打开")
         }
     }
 }

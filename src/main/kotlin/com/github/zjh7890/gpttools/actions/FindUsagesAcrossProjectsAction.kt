@@ -4,10 +4,10 @@ import com.intellij.lang.java.JavaLanguage
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbAware
-import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.Messages
@@ -25,6 +25,7 @@ import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
+    private val logger = Logger.getInstance(FindUsagesAcrossProjectsAction::class.java)
 
     override fun actionPerformed(event: AnActionEvent) {
         val project = event.project ?: return
@@ -46,7 +47,7 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
                     if (usages.isEmpty()) {
                         Messages.showInfoMessage(project, "No usages found in other projects.", "Search Complete")
                     } else {
-                        displayUsagesPopup(project, usages)
+                        displayUsagesPopup(project, usages, event)
                     }
                 }
             },
@@ -104,7 +105,7 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
         })
     }
 
-    private fun displayUsagesPopup(project: Project, usages: List<ReferenceUsage>) {
+    private fun displayUsagesPopup(project: Project, usages: List<ReferenceUsage>, event: AnActionEvent) {
         val projectBasePath = project.basePath ?: return // 获取当前项目的根目录
         val parentPath = File(projectBasePath).parent ?: return // 获取当前项目根目录的父路径
 
@@ -115,21 +116,36 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
             "$projectName - $className - $methodName"
         }
 
+        logger.info("popupItems: $popupItems")
+
         val popup = JBPopupFactory.getInstance()
             .createPopupChooserBuilder(popupItems)
             .setTitle("Usage Results")
             .setItemChosenCallback { item ->
+                logger.info("popupItems callback: $popupItems")
                 val selectedUsage = usages[popupItems.indexOf(item)]
                 navigateToUsage(project, selectedUsage)
             }
             .createPopup()
 
-        popup.showInFocusCenter()
+        ApplicationManager.getApplication().invokeLater {
+            logger.info("Attempting to show popup using showInBestPositionFor")
+            popup.showInBestPositionFor(event.dataContext)
+            logger.info("Popup should now be visible")
+        }
     }
 
     private fun navigateToUsage(project: Project, usage: ReferenceUsage) {
-        val projectBasePath = project.basePath ?: return // 获取当前项目的根目录
-        val parentPath = File(projectBasePath).parent ?: return // 获取当前项目根目录的父路径
+        val projectBasePath = project.basePath
+        if (projectBasePath == null) {
+            Messages.showErrorDialog(project, "projectBasePath 无法找到当前项目路径", "项目路径未找到")
+            return
+        }
+        val parentPath = File(projectBasePath).parent
+        if (parentPath == null) {
+            Messages.showErrorDialog(project, "parentPath 无法找到当前项目路径的父路径", "项目路径未找到")
+            return
+        }
 
         // 生成目标项目路径
         val targetProjectPath = File(parentPath, usage.projectName).absolutePath
@@ -152,12 +168,15 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
             val file = File(filePath)
             val newVirtualFile: VirtualFile? = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
             if (newVirtualFile != null) {
+                logger.info("popupItems navigate to: $filePath")
                 // 直接通过路径和偏移量在目标项目中打开文件并跳转
                 val descriptor = OpenFileDescriptor(openedProject, newVirtualFile, usage.reference.textOffset)
                 descriptor.navigate(true) // 自动聚焦并跳转到指定位置
             } else {
                 Messages.showErrorDialog(openedProject, "无法通过路径找到文件：$filePath", "文件未找到")
             }
+        } else {
+            Messages.showErrorDialog(project, "无法打开项目：$targetProjectPath", "项目未打开")
         }
     }
 }
