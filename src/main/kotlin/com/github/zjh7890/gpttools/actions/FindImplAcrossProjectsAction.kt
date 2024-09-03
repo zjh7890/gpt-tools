@@ -49,7 +49,7 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
                     if (implementations.isEmpty()) {
                         Messages.showInfoMessage(project, "No implementations found in other projects.", "Search Complete")
                     } else {
-                        displayImplementationsPopup(project, implementations)
+                        displayImplementationsPopup(project, implementations, event)
                     }
                 }
             },
@@ -108,7 +108,11 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
         })
     }
 
-    private fun displayImplementationsPopup(project: Project, implementations: List<MethodImplUsage>) {
+    private fun displayImplementationsPopup(
+        project: Project,
+        implementations: List<MethodImplUsage>,
+        event: AnActionEvent
+    ) {
         val projectBasePath = project.basePath ?: return
         val parentPath = File(projectBasePath).parent ?: return
 
@@ -126,7 +130,6 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
             .setTitle("Implementation Results")
             .setItemChosenCallback { item ->
                 logger.info("popupItems callback: $popupItems")
-                Messages.showErrorDialog(project, "callback 无法找到", "项目路径未找到")
                 val selectedImpl = implementations[popupItems.indexOf(item)]
                 navigateToImplementation(project, selectedImpl)
             }
@@ -134,7 +137,12 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
 
         logger.info("popupItems showInFocusCenter: $popupItems")
 
-        popup.showInFocusCenter()
+        ApplicationManager.getApplication().invokeLater {
+            logger.info("Attempting to show popup using showInBestPositionFor")
+            popup.showInBestPositionFor(event.dataContext)
+            logger.info("Popup should now be visible")
+        }
+
     }
 
     private fun navigateToImplementation(project: Project, implementation: MethodImplUsage) {
