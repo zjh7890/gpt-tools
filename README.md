@@ -10,18 +10,13 @@
 <!-- Plugin description end -->
 
 ## Installation
-推荐 Manually 安装，IDEA 商店的可能不是最新版。
+
+应用商店安装，直接搜 gpt-tools
 
 - Using the IDE built-in plugin system:
   
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "gpt-tools"</kbd> >
   <kbd>Install</kbd>
-  
-- Manually:
-
-  Download the [latest release](https://github.com/zjh7890/gpt-tools/releases/latest) and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
-
 
 ---
 Plugin based on the [IntelliJ Platform Plugin Template][template].
