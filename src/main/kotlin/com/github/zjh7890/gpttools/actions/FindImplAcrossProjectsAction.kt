@@ -123,24 +123,24 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
             "$projectName - $className - $methodName"
         }
 
-        logger.info("popupItems: $popupItems")
+        logger.warn("popupItems: $popupItems")
 
         val popup = JBPopupFactory.getInstance()
             .createPopupChooserBuilder(popupItems)
             .setTitle("Implementation Results")
             .setItemChosenCallback { item ->
-                logger.info("popupItems callback: $popupItems")
+                logger.warn("popupItems callback: $popupItems")
                 val selectedImpl = implementations[popupItems.indexOf(item)]
                 navigateToImplementation(project, selectedImpl)
             }
             .createPopup()
 
-        logger.info("popupItems showInFocusCenter: $popupItems")
+        logger.warn("popupItems showInFocusCenter: $popupItems")
 
         ApplicationManager.getApplication().invokeLater {
-            logger.info("Attempting to show popup using showInBestPositionFor")
+            logger.warn("Attempting to show popup using showInBestPositionFor")
             popup.showInBestPositionFor(event.dataContext)
-            logger.info("Popup should now be visible")
+            logger.warn("Popup should now be visible")
         }
 
     }
@@ -171,7 +171,7 @@ class FindImplAcrossProjectsAction : AnAction(), DumbAware {
             val file = File(filePath)
             val newVirtualFile: VirtualFile? = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
             if (newVirtualFile != null) {
-                logger.info("popupItems navigate to: $filePath")
+                logger.warn("popupItems navigate to: $filePath")
                 val descriptor = OpenFileDescriptor(openedProject, newVirtualFile, implementation.reference.textOffset)
                 descriptor.navigate(true)
             } else {

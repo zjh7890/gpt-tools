@@ -56,7 +56,7 @@ class TextBlockView(private val block: MessageBlock) : MessageBlockView {
     }
 
     private fun parseText(txt: String): String {
-        if (block.getMessage().getRole() === ChatRole.Assistant) {
+        if (block.getMessage().getRole() === ChatRole.assistant) {
             return convertMarkdownToHtml(txt)
         }
 

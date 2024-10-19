@@ -22,30 +22,30 @@ import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
-class PluginConfigurable(private val project: Project) : Configurable {
-    private var myComponent: MyConfigurableComponent? = null
+class TemplateConfigurable(private val project: Project) : Configurable {
+    private var myComponent: CodeTemplateUi? = null
     private val appSettings: CodeTemplateApplicationSettingsService = CodeTemplateApplicationSettingsService.instance
     private val projectSettings: CodeTemplateProjectSetting
         get() = CodeTemplateProjectSetting.getInstance(project)
 
     override fun createComponent(): JComponent? {
-        myComponent = MyConfigurableComponent(project, appSettings, this)
+        myComponent = CodeTemplateUi(project, appSettings, this)
         return myComponent?.panel
     }
 
     override fun isModified(): Boolean = myComponent?.isModified(appSettings.state, projectSettings.state) ?: false
     override fun apply(): Unit = myComponent!!.applyTo(appSettings.state, projectSettings.state)
     override fun reset(): Unit = myComponent!!.resetFrom(appSettings.state, projectSettings.state)
-    override fun getDisplayName(): String = "gpt-tools Template"
+    override fun getDisplayName(): String = "gpt-tools"
     override fun disposeUIResources() {
         myComponent = null
     }
 }
 
-class MyConfigurableComponent(
+class CodeTemplateUi(
     val project: Project,
     val appSettings: CodeTemplateApplicationSettingsService,
-    val pluginConfigurable: PluginConfigurable
+    val templateConfigurable: TemplateConfigurable
 ) {
     val panel = JTabbedPane()
     private val templateList = JBList<PromptTemplate>(DefaultListModel<PromptTemplate>())
@@ -105,7 +105,7 @@ class MyConfigurableComponent(
 
         val templatePanel = LeftRightComponent(templatesDecorator.createPanel(), combinedPanel).mainPanel
 
-        panel.addTab("Options", templatePanel)
+        panel.addTab("Templates", templatePanel)
         panel.addTab("JSON Data", jsonPanel)
     }
 
@@ -285,7 +285,7 @@ class MyConfigurableComponent(
                 appSettings.state.templates = jsonInput
 
                 ApplicationManager.getApplication().invokeLater {
-                    pluginConfigurable.reset()
+                    templateConfigurable.reset()
                 }
             } catch (ex: Exception) {
                 Messages.showErrorDialog("Failed to import options: " + ex.message, "Import Error")

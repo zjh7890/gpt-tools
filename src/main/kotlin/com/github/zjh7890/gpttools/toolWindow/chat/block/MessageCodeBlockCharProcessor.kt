@@ -1,100 +1,236 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.github.zjh7890.gpttools.toolWindow.chat.block
 
 import com.github.zjh7890.gpttools.toolWindow.chat.MessageBlockType
-
-enum class BorderType {
-    START,
-    END
-}
-
-class Parameters(val char: Char, val charIndex: Int, val fullMessage: String)
-class ContextChange(@JvmField val contextType: MessageBlockType, @JvmField val borderType: BorderType)
+import com.intellij.lang.Language
+import com.intellij.openapi.diagnostic.logger
 
 class MessageCodeBlockCharProcessor {
     private val codeBlockChar: Char = '`'
-    private val borderBlock: String = "```"
-    private val changeStartBlock: String = "repo-relative-path-for-gpt-tools"
+    private val changeBlockChar: Char = '-'
+    private val changeStartBlock: String = "----- CHANGES START -----"
+    private val changeEndBlock: String = "----- CHANGES END -----"
+    private val logger = logger<MessageCodeBlockCharProcessor>()
 
-    fun suggestTypeChange(
-        parameters: Parameters,
-        currentContextType: MessageBlockType,
-        blockStart: Int
-    ): ContextChange? {
-        if (parameters.char != codeBlockChar
-            && parameters.char != '\n'
-            && parameters.char != '-'
-            && parameters.char != changeStartBlock[0]) return null
+    fun getParts(message: CompletableMessage): MutableList<MessageBlock> {
+        val messageText = message.text
+        val fullMessage = messageText
+        val parts = mutableListOf<MessageBlock>()
+        var index = 0
+        var blockStart = 0
+        var contextType = MessageBlockType.PlainText
+        var currentBorderBacktickCount = 0
 
-        // 检测代码更改区块的开始和结束
-        when (currentContextType) {
-            MessageBlockType.PlainText -> {
-                if (isChangeBlockStart(parameters.fullMessage, parameters.charIndex)) {
-                    return ContextChange(MessageBlockType.CodeChange, BorderType.START)
-                } else if (isCodeBlockStart(parameters)) {
-                    return ContextChange(MessageBlockType.CodeEditor, BorderType.START)
+        while (index < messageText.length) {
+            val char = messageText[index]
+
+            // 对于非特殊字符，直接跳过
+            if (char != codeBlockChar && char != changeBlockChar) {
+                index++
+                continue
+            }
+
+            when (contextType) {
+                MessageBlockType.PlainText -> {
+                    if (isChangeBlockStart(fullMessage, index)) {
+                        contextType = MessageBlockType.CodeChange
+
+                        // 处理从 PlainText 到 CodeChange 的转换
+                        if (index > blockStart) {
+                            pushPart(
+                                blockStart,
+                                messageText,
+                                MessageBlockType.PlainText,
+                                message,
+                                parts,
+                                index - 1,
+                                currentBorderBacktickCount
+                            )
+                        }
+                        blockStart = index
+
+                        // 跳过变化块开始标记的长度
+                        index += changeStartBlock.length
+                        continue
+
+                    } else {
+                        val backtickCount = isCodeBlockStart(fullMessage, index)
+                        if (backtickCount != null) {
+                            contextType = MessageBlockType.CodeEditor
+                            currentBorderBacktickCount = backtickCount
+
+                            // 处理从 PlainText 到 CodeEditor 的转换
+                            if (index > blockStart) {
+                                pushPart(
+                                    blockStart,
+                                    messageText,
+                                    MessageBlockType.PlainText,
+                                    message,
+                                    parts,
+                                    index - 1,
+                                    currentBorderBacktickCount
+                                )
+                            }
+                            blockStart = index
+
+                            // 跳过反引号的长度
+                            index += backtickCount
+                            continue
+                        } else {
+                            index++
+                        }
+                    }
+                }
+
+                MessageBlockType.CodeChange -> {
+                    if (isChangeBlockEnd(fullMessage, index)) {
+                        contextType = MessageBlockType.PlainText
+
+                        // 跳过变化块结束标记的长度
+                        index += changeEndBlock.length
+                        // 处理从 CodeChange 到 PlainText 的转换
+                        pushPart(
+                            blockStart,
+                            messageText,
+                            MessageBlockType.CodeChange,
+                            message,
+                            parts,
+                            index - 1,
+                            currentBorderBacktickCount
+                        )
+                        blockStart = index
+                        continue
+
+                    } else if (isChangeBlockStart(fullMessage, index)) {
+                        // 已经在 CodeChange 中，不能再次开始
+                        logger.error("Type change suggests starting $contextType while it's already open")
+                        index += changeStartBlock.length
+                        continue
+                    } else {
+                        index++
+                    }
+                }
+
+                MessageBlockType.CodeEditor -> {
+                    if (isCodeBlockEnd(fullMessage, index, currentBorderBacktickCount)) {
+                        contextType = MessageBlockType.PlainText
+
+                        // 跳过反引号的长度
+                        index += currentBorderBacktickCount
+                        // 处理从 CodeEditor 到 PlainText 的转换
+                        pushPart(blockStart, messageText, MessageBlockType.CodeEditor, message, parts, index - 1, currentBorderBacktickCount)
+                        blockStart = index
+                        continue
+                    } else {
+                        index++
+                    }
                 }
             }
-
-            MessageBlockType.CodeChange -> {
-                if (isChangeBlockEnd(parameters.fullMessage, parameters.charIndex, blockStart)) {
-                    return ContextChange(MessageBlockType.CodeChange, BorderType.END)
-                }
-            }
-
-            MessageBlockType.CodeEditor -> {
-                if (isCodeBlockEnd(parameters, blockStart)) {
-                    return ContextChange(MessageBlockType.CodeEditor, BorderType.END)
-                }
-            }
         }
-        return null
+
+        if (blockStart < messageText.length) {
+            pushPart(
+                blockStart,
+                messageText,
+                contextType,
+                message,
+                parts,
+                messageText.length - 1,
+                currentBorderBacktickCount
+            )
+        }
+
+        return parts
     }
 
-    private fun isCodeBlockEnd(parameters: Parameters, blockStart: Int): Boolean {
-        if (parameters.charIndex - blockStart < 5) {
-            return false
+    private fun pushPart(
+        blockStart: Int,
+        messageText: String,
+        contextType: MessageBlockType,
+        message: CompletableMessage,
+        list: MutableList<MessageBlock>,
+        partUpperOffset: Int,
+        currentBorderBacktickCount: Int
+    ) {
+        val newPart = createPart(blockStart, partUpperOffset, messageText, contextType, message, currentBorderBacktickCount)
+        list.add(newPart)
+    }
+
+    private fun isCodeBlockStart(fullMessage: String, charIndex: Int): Int? {
+        if (fullMessage[charIndex] != codeBlockChar) return null
+
+        // 检查是否为行首
+        val isLineStart = charIndex == 0 || fullMessage[charIndex - 1] == '\n'
+        if (!isLineStart) return null
+
+        // 检测连续的反引号数量
+        var backtickCount = 0
+        var index = charIndex
+        while (index < fullMessage.length && fullMessage[index] == codeBlockChar) {
+            backtickCount++
+            index++
         }
-        val fullMessage = parameters.fullMessage
-        val charIndex = parameters.charIndex
-        return when {
-            parameters.char == codeBlockChar && charIndex == fullMessage.length - 1 -> {
-                val subSequence = fullMessage.subSequence(charIndex - 3, charIndex + 1)
-                subSequence == "\n$borderBlock"
-            }
 
-            parameters.char == '\n' && (charIndex - 3) - 1 >= 0 -> {
-                val subSequence = fullMessage.subSequence(charIndex - 4, charIndex)
-                subSequence == "\n$borderBlock"
-            }
-
-            else -> false
+        // 至少需要3个反引号才能开始一个代码块
+        return if (backtickCount >= 3) {
+            backtickCount
+        } else {
+            null
         }
     }
 
-    private fun isCodeBlockStart(parameters: Parameters): Boolean {
-        if (parameters.char == codeBlockChar && parameters.charIndex + 3 < parameters.fullMessage.length) {
-            val isLineStart = parameters.charIndex == 0 || parameters.fullMessage[parameters.charIndex - 1] == '\n'
-            if (isLineStart) {
-                val subSequence = parameters.fullMessage.subSequence(parameters.charIndex, parameters.charIndex + 3)
-                return subSequence.all { it == codeBlockChar }
-            }
+    private fun isCodeBlockEnd(fullMessage: String, charIndex: Int, currentBorderBacktickCount: Int): Boolean {
+        if (fullMessage[charIndex] != codeBlockChar) return false
+
+        // 检查是否为行首
+        val isLineStart = charIndex == 0 || fullMessage[charIndex - 1] == '\n'
+        if (!isLineStart) return false
+
+        // 检测连续的反引号数量
+        var backtickCount = 0
+        var index = charIndex
+        while (index < fullMessage.length && fullMessage[index] == codeBlockChar) {
+            backtickCount++
+            index++
         }
-        return false
+
+        // 如果反引号数量与开始时的数量相同，则认为是结束边界
+        return backtickCount == currentBorderBacktickCount
     }
 
-    // 检测代码更改区块的开始
     private fun isChangeBlockStart(fullMessage: String, index: Int): Boolean {
-        // 确保在字符串的边界内查找
         if (index + changeStartBlock.length > fullMessage.length) return false
         return fullMessage.regionMatches(index, changeStartBlock, 0, changeStartBlock.length, ignoreCase = true)
     }
 
-    private fun isChangeBlockEnd(fullMessage: String, index: Int, blockStart: Int): Boolean {
-        // 确保在字符串的边界内查找
-        // 从 index 向前查找，检查是否匹配 changeEndBlock
-        val regex = "-----\n(.*?)-----".toRegex(setOf(RegexOption.DOT_MATCHES_ALL))
-        val matchResult = regex.find(fullMessage.substring(blockStart, index + 1))
-        return matchResult != null
+    private fun isChangeBlockEnd(fullMessage: String, index: Int): Boolean {
+        if (index + changeEndBlock.length > fullMessage.length) return false
+        return fullMessage.regionMatches(index, changeEndBlock, 0, changeEndBlock.length, ignoreCase = true)
+    }
+
+    companion object {
+        private fun createPart(
+            blockStart: Int,
+            partUpperOffset: Int,
+            messageText: String,
+            contextType: MessageBlockType,
+            message: CompletableMessage,
+            currentBorderBacktickCount: Int
+        ): MessageBlock {
+            check(blockStart < messageText.length)
+            check(partUpperOffset < messageText.length)
+
+            val blockText = messageText.substring(blockStart, partUpperOffset + 1)
+            val part: MessageBlock = when (contextType) {
+                MessageBlockType.CodeEditor -> CodeBlock(blockText, language = Language.ANY, message)
+                MessageBlockType.PlainText -> TextBlock(message)
+                MessageBlockType.CodeChange -> CodeChange(message)
+            }
+
+            if (blockText.isNotEmpty()) {
+                part.addContent(blockText)
+            }
+
+            return part
+        }
     }
 }

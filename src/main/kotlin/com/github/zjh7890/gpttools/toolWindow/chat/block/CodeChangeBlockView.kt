@@ -1,5 +1,5 @@
-import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.chat.block.*
+import com.github.zjh7890.gpttools.utils.Desc
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.contents.DocumentContent
@@ -17,33 +17,21 @@ import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.github.zjh7890.gpttools.toolWindow.chat.fullHeight
-import com.github.zjh7890.gpttools.toolWindow.chat.fullWidth
-import com.intellij.ide.projectView.ProjectView
-import com.intellij.openapi.editor.Document
-import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.ui.MessageType
-import com.intellij.openapi.ui.popup.Balloon
-import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.openapi.wm.WindowManager
-import com.intellij.psi.PsiManager
-import com.intellij.ui.awt.RelativePoint
-import com.intellij.ui.dsl.builder.panel
 import org.apache.commons.text.similarity.LevenshteinDistance
-import java.awt.Color
 import java.awt.Component
-import java.awt.event.ActionEvent
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
 import java.io.IOException
 import javax.swing.*
+
 
 class CodeChangeBlockView(private val codeChangeBlock: CodeChange,
                           private val project: Project
 ) : MessageBlockView {
-    private val changesList = JList<CodeChangeFile>()
     private val panel = SimpleToolWindowPanel(true, true)
-    private lateinit var changeData : CodeChangeFile
+    private lateinit var changesListView: ChangesListView
+
+    init {
+        initialize()
+    }
 
     override fun getBlock(): MessageBlock {
         return codeChangeBlock
@@ -54,175 +42,56 @@ class CodeChangeBlockView(private val codeChangeBlock: CodeChange,
     }
 
     override fun initialize() {
-        changeData = parseCodeChanges(codeChangeBlock.getTextContent())
+        val changes = parseCodeChanges(codeChangeBlock.getTextContent())
+        changesListView = ChangesListView(changes, project)
 
-        val originalFile = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + changeData.path)
-        if (originalFile != null) {
-            changeData.changeType = "UPDATE"
-        } else {
-            changeData.changeType = "CREATE"
-        }
-//        changesList.setListData(changes.toTypedArray())
-
-//        changesList.cellRenderer = object : ListCellRenderer<CodeChangeFile> {
-//            override fun getListCellRendererComponent(
-//                list: JList<out CodeChangeFile>?,
-//                value: CodeChangeFile?,
-//                index: Int,
-//                isSelected: Boolean,
-//                cellHasFocus: Boolean
-//            ): Component {
-//                val panel = JPanel().apply {
-//                    layout = BoxLayout(this, BoxLayout.X_AXIS)
-//                    val mergeStatus = if (value?.isMerged == true) "✅" else "❗"
-//                    val statusLabel = JLabel(mergeStatus)
-//                    add(statusLabel)
-//
-//                    val filenameColor = when (value?.changeType) {
-//                        "CREATE" -> Color.decode("#067D17")
-//                        "UPDATE" -> Color.decode("#0033B3")
-//                        "DELETE" -> Color.decode("#6C707E")
-//                        else -> list?.foreground
-//                    }
-//
-//                    val label = JLabel("${value?.filename} (${value?.dirPath})").apply {
-//                        foreground = filenameColor
-//                    }
-//                    add(label)
-//                }
-//                panel.isOpaque = true
-//                if (isSelected) {
-//                    panel.background = list?.selectionBackground
-//                    panel.foreground = list?.selectionForeground
-//                } else {
-//                    panel.background = list?.background
-//                    panel.foreground = list?.foreground
-//                }
-//                return panel
-//            }
-//        }
-
-        // 创建主面板
-        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-
-        // 文件名，根据 changeType 设置颜色
-        val filenameLabel = JTextField(changeData.filename).apply {
-            isEditable = false  // 设置为不可编辑
-            border = null       // 去掉边框，使其看起来像标签
-            foreground = when (changeData.changeType) {
-                "CREATE" -> Color.decode("#067D17")
-                "UPDATE" -> Color.decode("#0033B3")
-                "DELETE" -> Color.decode("#6C707E")
-                else -> Color.BLACK
-            }
-            setOpaque(false)    // 背景透明
-        }
-
-        filenameLabel.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent?) {
-                super.mouseClicked(e)
-                // 尝试找到并打开文件
-                val fileToOpen = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + changeData.path)
-                if (fileToOpen != null && fileToOpen.exists()) {
-                    // 文件存在，打开文件
-                    FileEditorManager.getInstance(project).openFile(fileToOpen, true)
-                } else {
-                    // 文件不存在，显示提示
-                    JBPopupFactory.getInstance()
-                        .createHtmlTextBalloonBuilder("File not found: ${changeData.filename}", MessageType.INFO, null)
-                        .setFadeoutTime(3000)
-                        .createBalloon()
-                        .show(
-                            RelativePoint.getSouthEastOf(WindowManager.getInstance().getStatusBar(project).component!!),
-                            Balloon.Position.atRight)
-                }
-            }
-        })
-
-        // 路径，使用 HTML 以支持自动换行
-        val pathLabel = JTextArea(changeData.dirPath).apply {
-            isEditable = false  // 设置为不可编辑
-            border = null       // 去掉边框，使其看起来像标签
-            lineWrap = true
-            foreground = Color.GRAY
-            setOpaque(false)    // 背景透明
-        }
-
-        // 在 initialize 方法中设置 pathLabel 的 MouseListener
-        pathLabel.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
-                super.mouseClicked(e)
-                if (e.clickCount == 2) {  // 检查是否为双击事件
-                    val directoryPath = project.basePath + "/" + changeData.dirPath
-                    val virtualFile = LocalFileSystem.getInstance().findFileByPath(directoryPath)
-                    if (virtualFile != null && virtualFile.isDirectory) {
-                        // 选中并展示目录
-                        ApplicationManager.getApplication().invokeLater {
-                            val psiDirectory = PsiManager.getInstance(project).findDirectory(virtualFile)
-                            ProjectView.getInstance(project).select(psiDirectory, virtualFile, false)
-                        }
-                    } else {
-                        // 如果目录不存在，可以选择显示错误信息
-                        JBPopupFactory.getInstance()
-                            .createHtmlTextBalloonBuilder("Directory not found: ${changeData.dirPath}", MessageType.ERROR, null)
-                            .setFadeoutTime(3000)
-                            .createBalloon()
-                            .show(RelativePoint.getSouthWestOf(pathLabel), Balloon.Position.atRight)
-                    }
-                }
-            }
-        })
-
+        panel.setContent(changesListView)
         setupToolbar()
-
-        val blockView = CodeBlockView(
-            CodeBlock(SimpleMessage(changeData.fileContent, changeData.fileContent, ChatRole.User)),
-            project
-        ) {}
-
-
-        panel.add(filenameLabel)
-        panel.add(pathLabel)
-        panel.add(blockView.getComponent())
-        // 展示
     }
 
-    private fun parseCodeChanges(textContent: String): CodeChangeFile {
+    private fun parseCodeChanges(textContent: String): List<CodeChangeFile> {
         val changes = mutableListOf<CodeChangeFile>()
-
-        // Regex to extract individual file change blocks
-        val fileChangeRegex = """repo-relative-path-for-gpt-tools: (.*?)\ntype:(\s)*(CREATE|UPDATE|DELETE)(\s)*\n-----\n(.*?)\n-----""".toRegex(
+        // 外层匹配 CHANGES START/END
+        val outerBlockRegex = """----- CHANGES START -----(.*?)----- CHANGES END -----""".toRegex(
+            setOf(RegexOption.DOT_MATCHES_ALL)
+        )
+        // 内层匹配 CHANGE START/END
+        val innerBlockRegex = """----- CHANGE START -----(.*?)----- CHANGE END -----""".toRegex(
+            setOf(RegexOption.DOT_MATCHES_ALL)
+        )
+        val pathRegex = """path: (.+?)\n""".toRegex()
+        val changeTypeRegex = """changeType: (.+?)\n""".toRegex()
+        val changeRegex = """<<<< ORIGINAL\n(.*?)====\n(.*?)>>>> UPDATED""".toRegex(
             setOf(RegexOption.DOT_MATCHES_ALL)
         )
 
-        // Iterate over each match to extract details
-        fileChangeRegex.findAll(textContent).forEach { match ->
-            val filePath = match.groups[1]?.value ?: "Unknown path"
-            val changeType = match.groups[3]?.value ?: "Unknown"
-            val fileContent = match.groups[5]?.value?.trim() ?: ""
+        outerBlockRegex.findAll(textContent).forEach { outerBlockMatch ->
+            val outerBlockContent = outerBlockMatch.groups[1]?.value ?: ""
+            innerBlockRegex.findAll(outerBlockContent).forEach { blockMatch ->
+                val blockContent = blockMatch.groups[1]?.value ?: ""
+                val fullPath = pathRegex.find(blockContent)?.groups?.get(1)?.value ?: "Unknown path"
+                val pathParts = fullPath.split("/").let {
+                    it.last() to it.dropLast(1).reversed().joinToString("/")
+                }
+                val changeType = changeTypeRegex.find(blockContent)?.groups?.get(1)?.value ?: "Unknown"
 
-            // Extract directory path and file name
-            val pathParts = filePath.split("/").let {
-                it.last() to it.dropLast(1).joinToString("/")
+                val fileChangeItems = mutableListOf<FileChangeItem>()
+                changeRegex.findAll(blockContent).forEach { changeMatch ->
+                    val original = changeMatch.groups[1]?.value?.trim() ?: "No original content"
+                    val updated = changeMatch.groups[2]?.value?.trim() ?: "No updated content"
+                    fileChangeItems.add(FileChangeItem(original, updated))
+                }
+                if (fileChangeItems.isNotEmpty()) {
+                    changes.add(CodeChangeFile(fullPath, pathParts.second, pathParts.first, fileChangeItems, isMerged = false, changeType = changeType))
+                }
             }
-
-            // Create a new CodeChangeFile object and add it to the list
-            changes.add(CodeChangeFile(
-                path = filePath,
-                dirPath = pathParts.second,
-                filename = pathParts.first,
-                fileContent = fileContent,
-                isMerged = false,
-                changeType = changeType
-            ))
         }
-
-        return changes.get(0)
+        return changes
     }
 
     private fun setupToolbar() {
         val actionGroup = DefaultActionGroup().apply {
-            add(ShowChangeViewAction(project, changeData))
+            add(ShowChangeViewAction(project, changesListView.getChangesList()))
         }
 
         val toolbar: ActionToolbar = ActionManager.getInstance().createActionToolbar("CodeChangesToolbar", actionGroup, true)
@@ -232,10 +101,16 @@ class CodeChangeBlockView(private val codeChangeBlock: CodeChange,
     }
 }
 
-class ShowChangeViewAction(private val project: Project, private val changeData: CodeChangeFile) : AnAction("Show Diffs", "Show the differences", null) {
+class ShowChangeViewAction(private val project: Project, private val changesList: JList<CodeChangeFile>) : AnAction("Show Diffs", "Show the differences", null) {
     override fun actionPerformed(e: AnActionEvent) {
-        val selectedData = changeData
-        showDiffFor(selectedData, project)
+        val selectedData = changesList.selectedValue
+        if (selectedData != null) {
+            showDiffFor(selectedData, project)
+        }
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread {
+        return ActionUpdateThread.BGT
     }
 
     private fun showDiffFor(data: CodeChangeFile, project: Project) {
@@ -246,15 +121,15 @@ class ShowChangeViewAction(private val project: Project, private val changeData:
         if (data.changeType == "CREATE") {
             content1 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
 
-            val createContent = EditorFactory.getInstance().createDocument(data.fileContent)
+            val createContent = EditorFactory.getInstance().createDocument(data.changeItems[0].updatedChunk)
             content2 = diffContentFactory.create(project, createContent)
             originalFile = null
-        } else if (data.changeType == "UPDATE") {
+        } else if (data.changeType == "MODIFY") {
             try {
                 originalFile = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + data.path)
-                val document: Document
+                val document: String
                 if (originalFile != null) {
-                    document = FileDocumentManager.getInstance().getDocument(originalFile)!!
+                    document = FileDocumentManager.getInstance().getDocument(originalFile)!!.text
                 } else {
                     // 日志告警
                     Messages.showMessageDialog(
@@ -263,16 +138,15 @@ class ShowChangeViewAction(private val project: Project, private val changeData:
                         "Error",
                         Messages.getErrorIcon()
                     )
-                    return;
-//                    document = ""
+                    document = ""
                 }
 
-                val updated = data.fileContent
+                val updated = getUpdatedFileContent(document, data.changeItems)
                 val updatedDocument = EditorFactory.getInstance().createDocument(updated)
 
 //                val documentManager = FileDocumentManager.getInstance().get
 
-                content1 = diffContentFactory.create(project, document)
+                content1 = diffContentFactory.create(document, PlainTextFileType.INSTANCE)
                 content2 = diffContentFactory.create(project, updatedDocument)
             } catch (e: Exception) {
                 TODO("Not yet implemented")
@@ -287,7 +161,7 @@ class ShowChangeViewAction(private val project: Project, private val changeData:
                     Messages.getErrorIcon()
                 )
             }
-            content1 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
+            content1 = diffContentFactory.create(data.changeItems[0].originalChunk, PlainTextFileType.INSTANCE)
             content2 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
         } else {
             throw RuntimeException("unknown type")
@@ -301,52 +175,42 @@ class ShowChangeViewAction(private val project: Project, private val changeData:
         val dialogBuilder = DialogBuilder(this.project).apply {
             setTitle("Diff: ${data.filename}")
             setCenterPanel(diffPanel.component)
-
-            if (data.changeType == "UPDATE") {
-                addAction(object : AbstractAction("Accept Left") {
-                    override fun actionPerformed(e: ActionEvent?) {
-                        WriteCommandAction.runWriteCommandAction(project) {
-                            when (data.changeType) {
-                                "UPDATE" -> originalFile?.let {
-                                    FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content1.document.text)
-                                }
-                            }
-                            dialogWrapper.close(0)
-                            data.isMerged = true
+            addOkAction()
+            setOkOperation {
+                WriteCommandAction.runWriteCommandAction(project) {
+                    when (data.changeType) {
+                        "CREATE" -> {
+                            createFileWithParents(project.basePath!!, data.path, content2.document.text)
                         }
-                    }
-                })
-                addAction(object : AbstractAction("Accept Right") {
-                    override fun actionPerformed(e: ActionEvent?) {
-                        WriteCommandAction.runWriteCommandAction(project) {
-                            when (data.changeType) {
-                                "UPDATE" -> originalFile?.let {
-                                    FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
-                                }
-                            }
-                            dialogWrapper.close(0)
-                            data.isMerged = true
+                        "MODIFY" -> originalFile?.let {
+                            FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
                         }
+                        "DELETE" -> originalFile?.delete(this)
                     }
-                })
-            }
-            else {
-                addOkAction()
-                setOkOperation {
-                    WriteCommandAction.runWriteCommandAction(project) {
-                        when (data.changeType) {
-                            "CREATE" -> {
-                                createFileWithParents(project.basePath!!, data.path, content2.document.text)
-                            }
-                            "DELETE" -> originalFile?.delete(this)
-                        }
-                        dialogWrapper.close(0)
-                        data.isMerged = true
-                    }
+                    dialogWrapper.close(0)
                 }
+                dialogWrapper.close(0)
+                data.isMerged = true
             }
         }
         dialogBuilder.show()
+    }
+
+    private fun getUpdatedFileContent(text: String, changeItems: List<FileChangeItem>): String {
+        var updatedText = text
+        val levenshteinDistance = LevenshteinDistance()
+
+        changeItems.forEach { changeItem ->
+            // Find the best match for the original text in the current file content using Levenshtein distance
+            val bestMatch = findBestMatchOptimized(updatedText, changeItem.originalChunk, levenshteinDistance)
+
+            if (bestMatch != null) {
+                // Replace the best match with the updated content
+                updatedText = updatedText.replaceFirst(bestMatch.trim(), changeItem.updatedChunk.trim())
+            }
+        }
+
+        return updatedText
     }
 
     fun createFileWithParents(projectBasePath: String, relativePath: String, fileContent: String) {
@@ -386,13 +250,110 @@ class ShowChangeViewAction(private val project: Project, private val changeData:
         }
         return currentDir
     }
+
+    /**
+     * 优化后的 findBestMatch 函数，基于行分块并忽略空格进行匹配
+     *
+     * @param text 待搜索的文本
+     * @param original 原始块，需要在 text 中找到最相似的块
+     * @param levenshteinDistance Levenshtein 距离计算器
+     * @return 最佳匹配的块，若无匹配则返回 null
+     */
+    fun findBestMatchOptimized(text: String, original: String, levenshteinDistance: LevenshteinDistance): String? {
+        // 将文本和原始块按行分割
+        val textLines = text.lines()
+        val originalLines = original.lines()
+        val blockSize = originalLines.size  // 使用与 original 块相同的行数进行分块
+
+        // 预处理：去除每行的所有空格
+        val normalizedTextLines = textLines.map { it.replace("\\s".toRegex(), "") }
+        val normalizedOriginalLines = originalLines.map { it.replace("\\s".toRegex(), "") }
+        val normalizedOriginal = normalizedOriginalLines.joinToString("\n")
+
+        // 构建哈希映射
+        val hashMap = HashMap<String, MutableList<Int>>()
+        for (i in 0..(normalizedTextLines.size - blockSize)) {
+            val block = normalizedTextLines.subList(i, i + blockSize).joinToString("\n")
+            val hash = block.hashCode().toString()
+            hashMap.computeIfAbsent(hash) { mutableListOf() }.add(i)
+        }
+
+        // 计算 original 块的哈希值
+        val originalHash = normalizedOriginal.hashCode().toString()
+        val candidateIndices = hashMap[originalHash] ?: emptyList()
+
+        var minDistance = Int.MAX_VALUE
+        var bestMatch: String? = null
+
+        // 优先检查哈希完全匹配的块
+        for (index in candidateIndices) {
+            val candidateBlock = textLines.subList(index, index + blockSize).joinToString("\n")
+            val distance = levenshteinDistance.apply(candidateBlock.replace("\\s".toRegex(), ""), original)
+            if (distance < minDistance) {
+                minDistance = distance
+                bestMatch = candidateBlock
+            }
+        }
+
+        // 如果没有找到哈希匹配的块，退回到滑动窗口并使用行分块进行优化
+        if (bestMatch == null) {
+
+            for (i in 0..(textLines.size - blockSize)) {
+                val block = textLines.subList(i, i + blockSize).joinToString("\n")
+                val normalizedBlock = block.replace("\\s".toRegex(), "")
+                val distance = levenshteinDistance.apply(normalizedBlock, normalizedOriginal)
+                if (distance < minDistance) {
+                    minDistance = distance
+                    bestMatch = block
+                }
+            }
+        }
+
+        return bestMatch
+    }
+
+    // 辅助函数：计算 Levenshtein 距离
+    fun levenshteinDistance(a: String, b: String): Int {
+        val n = a.length
+        val m = b.length
+
+        if (n == 0) return m
+        if (m == 0) return n
+
+        val dp = Array(n + 1) { it }
+        for (j in 1..m) {
+            var prev = dp[0]
+            dp[0] = j
+            for (i in 1..n) {
+                val temp = dp[i]
+                dp[i] = if (a[i - 1] == b[j - 1]) {
+                    prev
+                } else {
+                    1 + minOf(prev, dp[i], dp[i - 1])
+                }
+                prev = temp
+            }
+        }
+        return dp[n]
+    }
+
 }
 
 data class CodeChangeFile(
     val path: String,  // 文件路径
     val dirPath: String,
     val filename: String,
-    val fileContent: String,
+    val changeItems: List<FileChangeItem>,
     var isMerged: Boolean,
-    var changeType: String  // "CREATE", "UPDATE", "DELETE"
+    val changeType: String  // "CREATE", "MODIFY", "DELETE"
+)
+
+data class FileChangeItem(
+    @Desc("原始文件内容chunk，如果该字段不为空，如果要填充该字段，一般意味着你需要先读取原始的文件内容, originalChunk 需要尽量保证在整个文件的唯一性，因为最终是使用 replace 函数修改文件内容，如果 originalChunk 在文件有多处的话，会导致错误的多余的修改") val originalChunk: String,
+    @Desc("原始文件内容chunk 对应的更新内容") val updatedChunk: String,
+)
+
+data class FileChange(
+    @Desc("文件路径") val path: String,
+    @Desc("一个文件的多个变更，每一项是一个变更的 chunk") val changeItems: List<FileChangeItem>,
 )

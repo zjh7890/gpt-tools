@@ -13,6 +13,8 @@ plugins {
     alias(libs.plugins.changelog) // Gradle Changelog Plugin
     alias(libs.plugins.qodana) // Gradle Qodana Plugin
     alias(libs.plugins.kover) // Gradle Kover Plugin
+    alias(libs.plugins.serialization)
+
 }
 
 group = properties("pluginGroup").get()
@@ -30,6 +32,14 @@ repositories {
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
     implementation("com.azure:azure-ai-openai:1.0.0-beta.11")
+    implementation("com.squareup.okhttp3:okhttp:4.4.1")
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.9")
+    implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.apache.commons:commons-text:1.9")
+
     intellijPlatform {
 //        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
@@ -53,6 +63,7 @@ kotlin {
 
 // Configure Gradle IntelliJ Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellijPlatform {
+    autoReload=false
     pluginConfiguration {
         name = properties("pluginName")
         version = properties("pluginVersion")

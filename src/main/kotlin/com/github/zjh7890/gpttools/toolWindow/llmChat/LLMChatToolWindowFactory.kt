@@ -1,7 +1,10 @@
 package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.MyBundle
-import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory.Companion.contentPanel
+import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
+import com.github.zjh7890.gpttools.utils.ClipboardUtils
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
@@ -18,32 +21,87 @@ class LLMChatToolWindowFactory : ToolWindowFactory, DumbAware {
     }
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        contentPanel = LLMChatToolPanel(toolWindow.disposable, project)
-        val content =
-            ContentFactory.getInstance()
-                .createContent(contentPanel, MyBundle.message("chat.title"), false)
-
-        ApplicationManager.getApplication().invokeLater {
-            toolWindow.contentManager.addContent(content)
-        }
+        createToolWindowContentStatic(project, toolWindow, true)
+        
     }
 
     override fun init(toolWindow: ToolWindow) {
-        toolWindow.setTitleActions(listOfNotNull(LLMClearChatHistoryAction()))
+        toolWindow.setTitleActions(listOfNotNull(
+            LLMNewChatAction(),
+            ExportChatHistoryAction(),
+            AppendMessageAction()
+
+        ))
     }
 
     companion object {
-        lateinit var contentPanel: LLMChatToolPanel
-
         fun getToolWindow(project: Project): ToolWindow? {
             return ToolWindowManager.getInstance(project).getToolWindow(Util.id)
+        }
+        
+
+        fun getPanel(project: Project): LLMChatToolPanel? {
+            return LLMChatToolWindowFactory.getToolWindow(project)
+                ?.contentManager?.getContent(0)?.component as? LLMChatToolPanel
+        }
+
+        fun createToolWindowContentStatic(project: Project, toolWindow: ToolWindow, reloadSession: Boolean = false) {
+            val contentManager = toolWindow.contentManager
+
+            // 创建 Chat Panel
+            val chatPanel = LLMChatToolPanel(toolWindow.disposable, project)
+            val chatContent = ContentFactory.getInstance()
+                .createContent(chatPanel, MyBundle.message("chat.title"), false)
+            contentManager.addContent(chatContent)
+
+            // 创建 Chat History Panel
+            val chatHistoryPanel = ChatHistoryPanel(project)
+            val historyContent = ContentFactory.getInstance()
+                .createContent(chatHistoryPanel, "Chat History", false)
+            contentManager.addContent(historyContent)
+            if (reloadSession) {
+                ApplicationManager.getApplication().invokeLater {chatPanel.reloadConversation()}
+            }
         }
     }
 }
 
-class LLMClearChatHistoryAction : AnAction("Clear Chat History") {
+class LLMNewChatAction : AnAction("New Chat", "New Chat", AllIcons.Actions.Edit) {
     override fun actionPerformed(e: AnActionEvent) {
-        // Assuming `ChatToolPanel` has a method `clearHistory()`
-        contentPanel.resetChatSession()
+        val project = e.project ?: return
+        val contentPanel = LLMChatToolWindowFactory.getToolWindow(project)
+            ?.contentManager?.getContent(0)?.component as? LLMChatToolPanel
+        if (contentPanel == null) {
+            throw IllegalStateException("Content panel is null")
+        }
+        contentPanel.newChatSession()
+    }
+}
+
+class ExportChatHistoryAction : AnAction("Export Chat History", "Export the chat history", AllIcons.ToolbarDecorator.Export) {
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        val chatCodingService = ChatCodingService.getInstance(project)
+        val exportedContent = chatCodingService.exportChatHistory()
+        ClipboardUtils.copyToClipboard(exportedContent)
+    }
+}
+
+// 新增 AppendMessageAction 类
+class AppendMessageAction : AnAction("Append Message", "Append a new message", AllIcons.ToolbarDecorator.AddIcon) {
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+        val dialog = AppendMessageDialog(project)
+        dialog.show()
+        if (dialog.isOK) {
+            // 修改 actionPerformed 方法中的角色赋值
+            val role: ChatRole = dialog.selectedRole
+            val message = dialog.message
+// 处理添加消息
+            val chatCodingService = ChatCodingService.getInstance(project)
+            val chatMessage = chatCodingService.appendLocalMessage(role, message)
+            contentPanel?.addMessage(message, role == ChatRole.user, render = true, chatMessage = chatMessage)
+        }
     }
 }

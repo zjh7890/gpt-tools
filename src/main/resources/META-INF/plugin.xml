@@ -18,7 +18,7 @@
         <toolWindow id="GptToolsContextToolWindow"
                     anchor="right"
                     factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"
-                    canCloseContent="true"
+                    canCloseContent="false"
                     canWorkInDumbMode="true"
             icon="/icons/icon.svg">
         </toolWindow>
@@ -36,6 +36,14 @@
             <className>com.github.zjh7890.gpttools.actions.FixThisChunkAction</className>
         </intentionAction>
 
+        <intentionAction>
+            <className>com.github.zjh7890.gpttools.actions.ChatWithThisAction</className>
+        </intentionAction>
+
+        <intentionAction>
+            <className>com.github.zjh7890.gpttools.actions.CompleteThisAction</className>
+        </intentionAction>
+
 <!--        <toolWindow id="ChatTool"-->
 <!--                    anchor="right"-->
 <!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.chat.ChatToolWindowFactory"-->
@@ -44,19 +52,25 @@
 <!--            <title>Plan Code</title>-->
 <!--        </toolWindow>-->
 
-<!--        <toolWindow id="LLMChatTool"-->
-<!--                    anchor="right"-->
-<!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory"-->
-<!--                    canCloseContents="false"-->
-<!--                    icon="/icons/iconLLM.svg">-->
-<!--            <title>Plan Code</title>-->
-<!--        </toolWindow>-->
+        <toolWindow id="LLMChat"
+                    anchor="right"
+                    factoryClass="com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory"
+                    canCloseContents="false"
+                    icon="/icons/iconLLM.svg">
+            <title>LLm Chat Code</title>
+        </toolWindow>
 
-        <projectConfigurable instance="com.github.zjh7890.gpttools.settings.actionPrompt.PluginConfigurable"/>
+        <toolWindow id="SearchToolWindowFactory" anchor="right" factoryClass="com.github.zjh7890.gpttools.toolWindow.search.SearchToolWindowFactory" />
+
+        <projectConfigurable instance="com.github.zjh7890.gpttools.settings.actionPrompt.TemplateConfigurable"/>
 
 <!--        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
 <!--                                 id="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
 <!--                                 displayName="GptToolLlm"/>-->
+
+        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSetting.ShireLlmSettingsConfigurable"
+                                 id="shireLlmSettingsConfigurable"
+                                 displayName="GptLLM"/>
 
 <!--        <applicationConfigurable instance="com.example.plugin.MyPluginConfigurable"/>-->
 
@@ -65,6 +79,16 @@
 <!--                displayName="Code Templates"-->
 <!--                instanceClass="com.github.zjh7890.gpttools.settings.PluginConfigurable" />-->
     </extensions>
+
+    <extensions defaultExtensionNs="com.gpttools">
+        <shireLlmProvider implementation="com.github.zjh7890.gpttools.llm.impl.OpenAILikeProvider"/>
+    </extensions>
+
+<!--    <extensionPoints>-->
+<!--        <extensionPoint qualifiedName="com.gpttools.shireLlmProvider"-->
+<!--                        interface="com.github.zjh7890.gpttools.llm.LlmProvider"-->
+<!--                        dynamic="true"/>-->
+<!--    </extensionPoints>-->
 
     <applicationListeners>
 <!--        <listener class="com.github.zjh7890.gpttools.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>-->
@@ -83,6 +107,14 @@
             <add-to-group group-id="ConsoleEditorPopupMenu" anchor="first"/>
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </group>
+
+        <action id="com.github.zjh7890.gpttools.actions.AddToSessionFileListAction"
+                class="com.github.zjh7890.gpttools.actions.AddToSessionFileListAction"
+                text="Add to Session File List"
+                description="Add the current file to the session's file list."
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
 
         <action id="FindUsagesAcrossProjectsAction"
                 class="com.github.zjh7890.gpttools.actions.FindUsagesAcrossProjectsAction"
@@ -146,6 +178,14 @@
                 description="AllMethodFile"
                 icon="/icons/icon_16px.svg">
             <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
+        <action id="OpenChatLogDirectoryAction"
+                class="com.github.zjh7890.gpttools.actions.OpenChatLogDirectoryAction"
+                text="gpt-tools 日志"
+                description="gpt-tools 日志"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

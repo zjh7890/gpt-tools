@@ -63,13 +63,13 @@ class TextBlock(val msg: CompletableMessage) : AbstractMessageBlock(msg) {
     override val type: MessageBlockType = MessageBlockType.PlainText
 }
 
-class CodeBlock(private val msg: CompletableMessage, language: Language = Language.ANY) : AbstractMessageBlock(msg) {
+class CodeBlock(val msg: String, language: Language = Language.ANY, message: CompletableMessage) : AbstractMessageBlock(message) {
     override var type: MessageBlockType = MessageBlockType.CodeEditor
 
-    var code: Code
+    public var code: Code
 
     init {
-        this.code = Code(language, msg.text, false)
+        this.code = Code.parse(msg)
     }
 
     override fun onContentChanged(content: String) {
@@ -80,13 +80,13 @@ class CodeBlock(private val msg: CompletableMessage, language: Language = Langua
 class CodeChange(private val msg: CompletableMessage, language: Language = Language.ANY) : AbstractMessageBlock(msg) {
     override var type: MessageBlockType = MessageBlockType.CodeEditor
 
-    var code: Code
+//    var code: Code
 
     init {
-        this.code = Code(language, msg.text, false)
+//        this.code = Code.parse(msg)
     }
 
     override fun onContentChanged(content: String) {
-        this.code = Code.parse(content)
+//        this.code = Code.parse(content)
     }
 }

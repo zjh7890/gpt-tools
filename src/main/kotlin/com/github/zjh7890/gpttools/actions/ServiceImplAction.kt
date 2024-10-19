@@ -6,6 +6,7 @@ import com.github.zjh7890.gpttools.utils.DrawioToMermaidConverter
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
 import com.github.zjh7890.gpttools.utils.TemplateUtils
+import com.github.zjh7890.gpttools.utils.sendToChatWindow
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -86,7 +87,7 @@ class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
             val newClasses = listOf(clazz.containingFile.virtualFile) + classes
             val classInfos =
                 newClasses.stream().map { x -> x.name }.collect(Collectors.toList()).joinToString("\n")
-            val GPT_methodInfo = newClasses.map { "${it.name}\n```\n${FileUtil.readContentFromVirtualFile(it)}```\n" }.joinToString("\n")
+            val GPT_methodInfo = newClasses.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
             val GPT_className = clazz.name!!
 
             if (promptTemplate.input1.contains("UML Text")) {
@@ -124,6 +125,11 @@ class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
+            // Update the content to send to the chat window
+            sendToChatWindow(project, { contentPanel, chatCodingService ->
+                chatCodingService.newSession()
+                contentPanel.setInput(result)
+            })
             copyToClipboard(result)
         } catch (ex: Exception) {
             Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())

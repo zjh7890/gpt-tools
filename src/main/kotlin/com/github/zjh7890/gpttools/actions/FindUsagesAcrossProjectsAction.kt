@@ -116,22 +116,22 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
             "$projectName - $className - $methodName"
         }
 
-        logger.info("popupItems: $popupItems")
+        logger.warn("popupItems: $popupItems")
 
         val popup = JBPopupFactory.getInstance()
             .createPopupChooserBuilder(popupItems)
             .setTitle("Usage Results")
             .setItemChosenCallback { item ->
-                logger.info("popupItems callback: $popupItems")
+                logger.warn("popupItems callback: $popupItems")
                 val selectedUsage = usages[popupItems.indexOf(item)]
                 navigateToUsage(project, selectedUsage)
             }
             .createPopup()
 
         ApplicationManager.getApplication().invokeLater {
-            logger.info("Attempting to show popup using showInBestPositionFor")
+            logger.warn("Attempting to show popup using showInBestPositionFor")
             popup.showInBestPositionFor(event.dataContext)
-            logger.info("Popup should now be visible")
+            logger.warn("Popup should now be visible")
         }
     }
 
@@ -168,7 +168,7 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
             val file = File(filePath)
             val newVirtualFile: VirtualFile? = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
             if (newVirtualFile != null) {
-                logger.info("popupItems navigate to: $filePath")
+                logger.warn("popupItems navigate to: $filePath")
                 // 直接通过路径和偏移量在目标项目中打开文件并跳转
                 val descriptor = OpenFileDescriptor(openedProject, newVirtualFile, usage.reference.textOffset)
                 descriptor.navigate(true) // 自动聚焦并跳转到指定位置

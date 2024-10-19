@@ -46,60 +46,60 @@ class CodeTemplateApplicationSettings {
         JsonUtils.toJson(listOf(
         PromptTemplate(
             key = "ClassFinderAction",
-            value = FileUtil.readResourceFile("prompt/ClassFinderAction.md"),
+            value = FileUtil.readResourceFile("template/ClassFinderAction.md"),
             desc = "* 递归获取参数返回值类信息"
         ),
         PromptTemplate(
             key = "CodeReviewPromptAction",
-            value = FileUtil.readResourceFile("prompt/CodeReviewPromptAction.md"),
+            value = FileUtil.readResourceFile("template/CodeReviewPromptAction.md"),
             desc = "* 生成 Code Review",
         ),
         PromptTemplate(
             key = "FileTestAction",
-            value = FileUtil.readResourceFile("prompt/FileTestAction.md"),
+            value = FileUtil.readResourceFile("template/FileTestAction.md"),
             desc = "* 生成类单测"
         ),
         PromptTemplate(
             key = "GenerateMethodTestAction",
-            value = FileUtil.readResourceFile("prompt/GenerateMethodTestAction.md"),
+            value = FileUtil.readResourceFile("template/GenerateMethodTestAction.md"),
             desc = "* 生成方法单测"
         ),
         PromptTemplate(
             key = "GenerateRpcAction",
-            value = FileUtil.readResourceFile("prompt/GenerateRpcAction.md"),
+            value = FileUtil.readResourceFile("template/GenerateRpcAction.md"),
             desc = "* 生成RPC代码"
         ),
         PromptTemplate(
             key = "GenJsonAction",
-            value = FileUtil.readResourceFile("prompt/GenJsonAction.md"),
+            value = FileUtil.readResourceFile("template/GenJsonAction.md"),
             desc = "* 生成 json 示例"
         ),
         PromptTemplate(
             key = "StructConverterCodeGenAction",
-            value = FileUtil.readResourceFile("prompt/StructConverterCodeGenAction.md"),
+            value = FileUtil.readResourceFile("template/StructConverterCodeGenAction.md"),
             desc = "* 生成 converter 代码"
         ),
         PromptTemplate(
             key = "ServiceImplAction",
-            value = FileUtil.readResourceFile("prompt/ServiceImplAction.md"),
+            value = FileUtil.readResourceFile("template/ServiceImplAction.md"),
             desc = "* 实现 service 逻辑",
             input1 = "UML Text:",
             input2 = "Function Text"
         ),
         PromptTemplate(
             key = "ServiceImplAction",
-            value = FileUtil.readResourceFile("prompt/GenApolloConfigByJson.md"),
+            value = FileUtil.readResourceFile("template/GenApolloConfigByJson.md"),
             desc = "* 根据 json 生成 apollo 配置",
             input1 = "json",
         ),
         PromptTemplate(
             key = "ServiceImplAction",
-            value = FileUtil.readResourceFile("prompt/AddRedisCache.md"),
+            value = FileUtil.readResourceFile("template/AddRedisCache.md"),
             desc = "* 给函数增加 redis 缓存"
         ),
             PromptTemplate(
                 key = "FixThisChunkAction",
-                value = FileUtil.readResourceFile("prompt/FixThisChunkAction.md"),
+                value = FileUtil.readResourceFile("template/FixThisChunkAction.md"),
                 desc = "* 修复块"
             )
     ))

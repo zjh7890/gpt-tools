@@ -1,13 +1,11 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
 import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.FileUtil
-import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
-import com.github.zjh7890.gpttools.utils.PsiUtils.generateSignature
 import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
 import com.github.zjh7890.gpttools.utils.TemplateUtils
+import com.github.zjh7890.gpttools.utils.sendToChatWindow
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -45,7 +43,7 @@ class FileTestAction(val promptTemplate: PromptTemplate) : AnAction() {
 
             val classInfos =
                 newClasses.stream().map { x -> x.name }.collect(Collectors.toList()).joinToString("\n")
-            val GPT_methodInfo = newClasses.map { "${it.name}\n```\n${FileUtil.readContentFromVirtualFile(it)}```\n" }.joinToString("\n")
+            val GPT_methodInfo = newClasses.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
             val GPT_className = clazz.name!!
 
             val map = mapOf(
@@ -54,6 +52,11 @@ class FileTestAction(val promptTemplate: PromptTemplate) : AnAction() {
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
+            // Update the content to send to the chat window
+            sendToChatWindow(project, { contentPanel, chatCodingService ->
+                chatCodingService.newSession()
+                contentPanel.setInput(result)
+            })
             copyToClipboard(result)
         } catch (ex: Exception) {
             Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())

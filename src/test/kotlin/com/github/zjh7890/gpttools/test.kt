@@ -1,5 +1,9 @@
 package com.github.zjh7890.gpttools
 
+import com.azure.ai.openai.OpenAIClientBuilder
+import com.azure.ai.openai.models.*
+import com.azure.core.credential.AzureKeyCredential
+
 fun parseGitDiff(diffText: String): String {
     val result = mutableListOf<Map<String, Any>>()
     val lines = diffText.split("\n")
@@ -81,5 +85,31 @@ index 850dd6a8..329367a0 100644
 """
 
 fun main() {
-    println(parseGitDiff(diffText))
+//    println(parseGitDiff(diffText))
+
+    val client = OpenAIClientBuilder()
+        .credential(AzureKeyCredential(""))
+        .endpoint("https://dashscope.aliyuncs.com/compatible-mode/v1")
+        .buildClient()
+
+    val chatMessages: MutableList<ChatRequestMessage> = ArrayList()
+    chatMessages.add(ChatRequestSystemMessage("You are a helpful assistant. You will talk like a pirate."))
+    chatMessages.add(ChatRequestUserMessage("Can you help me?"))
+    chatMessages.add(ChatRequestAssistantMessage("Of course, me hearty! What can I do for ye?"))
+    chatMessages.add(ChatRequestUserMessage("What's the best way to train a parrot?"))
+
+    val chatCompletions = client.getChatCompletions(
+        "qwen-max",
+        ChatCompletionsOptions(chatMessages)
+    )
+
+    System.out.printf("Model ID=%s is created at %s.%n", chatCompletions.id, chatCompletions.createdAt)
+    for (choice in chatCompletions.choices) {
+        val message = choice.message
+        System.out.printf("Index: %d, Chat Role: %s.%n", choice.index, message.role)
+        println("Message:")
+        println(message.content)
+    }
+
+
 }

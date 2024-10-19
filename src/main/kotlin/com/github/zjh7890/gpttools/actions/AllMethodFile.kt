@@ -23,6 +23,9 @@ class AllMethodFile : AnAction() {
         // 获取当前编辑的文件
         val psiFile = e.getData(CommonDataKeys.PSI_FILE) ?: return
 
+
+
+
         // 获取当前光标所在的元素
         val editor = e.getData(CommonDataKeys.EDITOR) ?: return
         val caretOffset = editor.caretModel.offset

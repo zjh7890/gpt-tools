@@ -1,9 +1,9 @@
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
+import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import javax.swing.JPanel
@@ -35,6 +35,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                     if (virtualFile != null) {
                         FileEditorManager.getInstance(project).openFile(virtualFile, true)
                     }
+                    e.consume()
                 }
             }
         })
@@ -130,13 +131,10 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     }
 
     fun copyAllFiles() {
+        val files = addedFiles.map { FileUtil.readFileInfoForLLM(it) }.joinToString ("\n\n")
+
         val sb: StringBuilder = StringBuilder()
-        sb.append("下面是提供的信息：\n")
-        for (addedFile in addedFiles) {
-            val documentManager = FileDocumentManager.getInstance()
-            val document = documentManager.getDocument(addedFile)
-            sb.append("```\n"  + document?.text + "\n```\n").append("\n")
-        }
+        sb.append("下面是提供的信息：\n" + FileUtil.wrapBorder(files))
         ClipboardUtils.copyToClipboard(sb.toString())
     }
 }

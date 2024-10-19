@@ -5,6 +5,7 @@ import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
 import com.github.zjh7890.gpttools.utils.TemplateUtils
+import com.github.zjh7890.gpttools.utils.sendToChatWindow
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -74,6 +75,11 @@ class StructConverterCodeGenAction(val promptTemplate: PromptTemplate) : AnActio
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
+            // Update the content to send to the chat window
+            sendToChatWindow(project, { contentPanel, chatCodingService ->
+                chatCodingService.newSession()
+                contentPanel.setInput(result)
+            })
             copyToClipboard(result)
         } catch (ex: Exception) {
             Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())

@@ -1,9 +1,17 @@
 package com.github.zjh7890.gpttools.toolWindow.chat
 
-
 import CodeChangeBlockView
+import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
+import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.services.ChatContextMessage
+import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.block.*
-import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolPanel
+import com.github.zjh7890.gpttools.utils.DirectoryUtil
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
 import com.intellij.openapi.application.ApplicationManager
@@ -18,13 +26,20 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
 import java.awt.*
 import javax.swing.*
-import kotlin.jvm.internal.Ref
 
-class MessageView(private val message: String, val role: ChatRole, private val displayText: String, val project: Project) :
-    JBPanel<MessageView>() {
+class MessageView(
+    val message: String,
+    val role: ChatRole,
+    private val displayText: String,
+    val project: Project,
+    render: Boolean,
+    val chatMessage: ChatContextMessage?,
+    val llmChatToolPanel: LLMChatToolPanel
+) : JBPanel<MessageView>() {
     private val myNameLabel: Component
     private val component: DisplayComponent = DisplayComponent(message)
-    private var centerPanel: JPanel = JPanel(VerticalLayout(JBUI.scale(8)))
+    var centerPanel: JPanel = JPanel(VerticalLayout(JBUI.scale(8)))
+    val componentList : MutableList<Component> = mutableListOf(component)
 
     init {
         isDoubleBuffered = true
@@ -32,12 +47,12 @@ class MessageView(private val message: String, val role: ChatRole, private val d
         background = JBColor(0xEAEEF7, 0x45494A)
 
         val authorLabel = JLabel()
-        authorLabel.setFont(JBFont.h4())
-        authorLabel.setText(when (role) {
-            ChatRole.System -> "System"
-            ChatRole.Assistant -> "Assistant"
-            ChatRole.User -> "User"
-        })
+        authorLabel.font = JBFont.h4()
+        authorLabel.text = when (role) {
+            ChatRole.system -> "System"
+            ChatRole.assistant -> "Assistant"
+            ChatRole.user -> "User"
+        }
         myNameLabel = authorLabel
 
         this.border = JBEmptyBorder(8)
@@ -47,10 +62,12 @@ class MessageView(private val message: String, val role: ChatRole, private val d
         centerPanel.isOpaque = false
         centerPanel.border = JBUI.Borders.emptyRight(8)
 
-        centerPanel.add(myNameLabel)
+
+//        centerPanel.add(myNameLabel)
+        centerPanel.add(createTitlePanel(this))
         add(centerPanel, BorderLayout.CENTER)
 
-        if (role == ChatRole.User) {
+        if (role == ChatRole.user || render) {
             ApplicationManager.getApplication().invokeLater {
                 val simpleMessage = SimpleMessage(displayText, message, role)
                 renderInPartView(simpleMessage)
@@ -63,28 +80,35 @@ class MessageView(private val message: String, val role: ChatRole, private val d
         }
     }
 
-    private fun createTitlePanel(): JPanel {
+    private fun createTitlePanel(messageView: MessageView): JPanel {
         val panel = BorderLayoutPanel()
-        panel.setOpaque(false)
+        panel.isOpaque = false
         panel.addToCenter(this.myNameLabel)
 
-        val group = ActionUtil.getActionGroup("AutoDev.ToolWindow.Message.Toolbar.Assistant")
-
-        if (group != null) {
-            val toolbar = ActionToolbarImpl(javaClass.getName(), group, true)
-            toolbar.layoutStrategy = ToolbarLayoutStrategy.NOWRAP_STRATEGY
-            toolbar.component.setOpaque(false)
-            toolbar.component.setBorder(JBUI.Borders.empty())
-            toolbar.setTargetComponent(this)
-            panel.addToRight(toolbar.component)
+        val group = DefaultActionGroup().apply {
+            if (role == ChatRole.user) {
+                add(EditMessageAction(messageView, llmChatToolPanel))
+            }
+            // 如果需要，您可以为助手消息添加其他操作
+            if (role == ChatRole.assistant) {
+                add(ApplyResponseAction(messageView))
+            }
         }
 
-        panel.setOpaque(false)
+        val toolbar = ActionToolbarImpl(javaClass.name, group, true)
+        toolbar.layoutStrategy = ToolbarLayoutStrategy.NOWRAP_STRATEGY
+        toolbar.component.isOpaque = false
+        toolbar.component.border = JBUI.Borders.empty()
+        toolbar.setTargetComponent(this)
+        panel.addToRight(toolbar.component)
+
+        panel.isOpaque = false
         return panel
     }
 
-    private fun renderInPartView(message: SimpleMessage) {
-        val parts = layoutAll(message)
+    fun renderInPartView(message: SimpleMessage) {
+        val processor = MessageCodeBlockCharProcessor()
+        val parts = processor.getParts(message)
         parts.forEach {
             val blockView = when (it) {
                 is CodeBlock -> {
@@ -93,19 +117,19 @@ class MessageView(private val message: String, val role: ChatRole, private val d
                 is CodeChange -> {
                     CodeChangeBlockView(it, project)
                 }
-
                 else -> TextBlockView(it)
             }
 
             blockView.initialize()
             val component = blockView.getComponent() ?: return@forEach
 
-            component.setForeground(JBUI.CurrentTheme.Label.foreground())
+            component.foreground = JBUI.CurrentTheme.Label.foreground()
+            componentList.add(component)
             centerPanel.add(component)
         }
     }
 
-    private var answer: String = ""
+    var answer: String = ""
 
     fun updateContent(content: String) {
         this.answer = content
@@ -119,15 +143,15 @@ class MessageView(private val message: String, val role: ChatRole, private val d
         }
     }
 
-    fun reRenderAssistantOutput() {
+    fun reRender() {
         ApplicationManager.getApplication().invokeLater {
-            centerPanel.remove(component)
+            for (displayComponent in componentList) {
+                centerPanel.remove(displayComponent)
+            }
+            componentList.clear()
             centerPanel.updateUI()
 
-            centerPanel.add(myNameLabel)
-            centerPanel.add(createTitlePanel())
-
-            val message = SimpleMessage(answer, answer, ChatRole.Assistant)
+            val message = SimpleMessage(answer, answer, ChatRole.assistant)
             renderInPartView(message)
 
             centerPanel.revalidate()
@@ -154,90 +178,28 @@ class MessageView(private val message: String, val role: ChatRole, private val d
 
     companion object {
         private val logger = logger<MessageView>()
-        private fun createPart(
-            blockStart: Int,
-            partUpperOffset: Int,
-            messageText: String,
-            currentContextType: Ref.ObjectRef<MessageBlockType>,
-            message: CompletableMessage
-        ): MessageBlock {
-            check(blockStart < messageText.length)
-            check(partUpperOffset < messageText.length)
+    }
+}
 
-            val blockText = messageText.substring(blockStart, partUpperOffset + 1)
-            val part: MessageBlock = when (currentContextType.element!!) {
-                MessageBlockType.CodeEditor -> CodeBlock(message)
-                MessageBlockType.PlainText -> TextBlock(message)
-                MessageBlockType.CodeChange -> CodeChange(message)
-            }
+class EditMessageAction(private val messageView: MessageView, val llmChatToolPanel: LLMChatToolPanel) :
+    AnAction("Edit", "Edit this message", AllIcons.Actions.Edit) {
 
-            if (blockText.isNotEmpty()) {
-                part.addContent(blockText)
-            }
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        val chatCodingService = ChatCodingService.getInstance(project)
+        // 设置 AutoDevInputSection 为编辑模式，并设置要编辑的消息
+        llmChatToolPanel.setEditingMessage(messageView)
+    }
+}
 
-            return part
+class ApplyResponseAction(val messageView: MessageView) : AnAction("Apply", "Apply", AllIcons.Actions.ToggleVisibility) {
+    override fun actionPerformed(e: AnActionEvent) {
+        if (e.project == null) {
+            return
         }
-
-        private fun pushPart(
-            blockStart: Ref.IntRef,
-            messageText: String,
-            currentContextType: Ref.ObjectRef<MessageBlockType>,
-            message: CompletableMessage,
-            list: MutableList<MessageBlock>,
-            partUpperOffset: Int
-        ) {
-            val newPart = createPart(blockStart.element, partUpperOffset, messageText, currentContextType, message)
-            list.add(newPart)
-
-            blockStart.element = partUpperOffset + 1
-            currentContextType.element = MessageBlockType.PlainText
+        val projectStructure = DirectoryUtil.getDirectoryContents(e.project!!)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            GenerateDiffAgent.apply(e.project!!, ShireSettingsState.getLlmConfig(), projectStructure, messageView.answer, messageView)
         }
-
-        fun layoutAll(message: CompletableMessage): List<MessageBlock> {
-            val messageText: String = message.displayText
-            val contextTypeRef = Ref.ObjectRef<MessageBlockType>()
-            contextTypeRef.element = MessageBlockType.PlainText
-
-            val blockStart: Ref.IntRef = Ref.IntRef()
-
-            val parts = mutableListOf<MessageBlock>()
-
-            for ((index, item) in messageText.withIndex()) {
-                val param = Parameters(item, index, messageText)
-                val processor = MessageCodeBlockCharProcessor()
-                val suggestTypeChange =
-                    processor.suggestTypeChange(param, contextTypeRef.element, blockStart.element) ?: continue
-
-                when {
-                    suggestTypeChange.contextType == contextTypeRef.element -> {
-                        if (suggestTypeChange.borderType == BorderType.START) {
-                            logger.error("suggestTypeChange return ${contextTypeRef.element} START while there is already ${contextTypeRef.element} opened")
-                        } else {
-                            pushPart(blockStart, messageText, contextTypeRef, message, parts, index)
-                        }
-                    }
-
-                    suggestTypeChange.borderType == BorderType.START -> {
-                        if (index > blockStart.element) {
-                            pushPart(blockStart, messageText, contextTypeRef, message, parts, index - 1)
-                        }
-
-                        blockStart.element = index
-                        contextTypeRef.element = suggestTypeChange.contextType
-                    }
-
-                    else -> {
-                        logger.error("suggestTypeChange return ${contextTypeRef.element} END when there wasn't open tag")
-                    }
-                }
-            }
-
-            if (blockStart.element < messageText.length) {
-                pushPart(blockStart, messageText, contextTypeRef, message, parts, messageText.length - 1)
-            }
-
-            return parts
-        }
-
     }
 }

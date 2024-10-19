@@ -1,12 +1,14 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o.
+// Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.github.zjh7890.gpttools.toolWindow.chat.block
 
-import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
+import CodeChangeBlockView2
 import com.github.zjh7890.gpttools.utils.Code
+import com.github.zjh7890.gpttools.utils.ParseUtils.parseCodeChanges
 import com.intellij.lang.Language
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.editor.Document
@@ -39,13 +41,14 @@ class CodeBlockView(
     private val block: CodeBlock,
     private val project: Project,
     private val disposable: Disposable,
-) :
-    MessageBlockView {
+) : MessageBlockView {
+
     private var editorInfo: CodePartEditorInfo? = null
+    private var codeChangeBlockView: CodeChangeBlockView2? = null
 
     init {
         block.addTextListener {
-            if (editorInfo == null) return@addTextListener
+            if (editorInfo == null && codeChangeBlockView == null) return@addTextListener
             updateOrCreateCodeView()
         }
     }
@@ -55,7 +58,9 @@ class CodeBlockView(
     }
 
     override fun getComponent(): JComponent {
-        return editorInfo?.component ?: return updateOrCreateCodeView()!!.component
+        return codeChangeBlockView?.getComponent() as? JComponent
+            ?: editorInfo?.component
+            ?: updateOrCreateCodeView()
     }
 
     val codeContent: String
@@ -64,29 +69,31 @@ class CodeBlockView(
         }
 
     override fun initialize() {
-        if (editorInfo == null) {
+        if (editorInfo == null && codeChangeBlockView == null) {
             updateOrCreateCodeView()
         }
     }
 
-    private fun updateOrCreateCodeView(): CodePartEditorInfo? {
-        val code: Code = getBlock().code
-        if (editorInfo == null) {
-            val graphProperty = PropertyGraph(null, false).property(code.text)
-            val editorInfo: CodePartEditorInfo = createCodeViewer(
-                project, graphProperty, disposable, code.language, getBlock().getMessage()
-            )
-            this.editorInfo = editorInfo
-        } else {
-            val codePartEditorInfo = editorInfo
-            if (codePartEditorInfo!!.language == code.language) {
-                editorInfo!!.language = code.language
+    private fun updateOrCreateCodeView(): JComponent {
+        val code: Code = block.code
+        val language = code.languageId
+
+        // 检查文件类型是否为 patch
+        if (language.equals("diff", ignoreCase = true)) {
+            // 使用 CodeChangeBlockView2
+            if (codeChangeBlockView == null) {
+                val changes = parseCodeChanges(project, code.text)
+                codeChangeBlockView = CodeChangeBlockView2(project, mutableListOf(changes))
             }
-
-            editorInfo!!.code.set(code.text)
+            return codeChangeBlockView!!.getComponent() as JComponent
+        } else {
+            // 使用原始的代码展示逻辑
+            if (editorInfo == null) {
+                val graphProperty = PropertyGraph().property(code.text)
+                editorInfo = createCodeViewer(project, graphProperty, disposable, code.language, getBlock().getMessage(), getBlock())
+            }
+            return editorInfo!!.component
         }
-
-        return editorInfo
     }
 
     companion object {
@@ -102,7 +109,7 @@ class CodeBlockView(
                     .createViewer(document, project, EditorKind.PREVIEW) as EditorEx
             }
 
-            disposable.whenDisposed(disposable) {
+            disposable.whenDisposed {
                 EditorFactory.getInstance().releaseEditor(editor)
             }
 
@@ -149,6 +156,7 @@ class CodeBlockView(
             disposable: Disposable,
             language: Language,
             message: CompletableMessage,
+            block: CodeBlock,
         ): CodePartEditorInfo {
             val forceFoldEditorByDefault = false
             val file = LightVirtualFile(AUTODEV_SNIPPET_NAME, language, graphProperty.get())
@@ -162,30 +170,32 @@ class CodeBlockView(
             val editor: EditorEx =
                 createCodeViewerEditor(project, file, document, disposable)
 
-//            val toolbarActionGroup = ActionUtil.getActionGroup("AutoDev.ToolWindow.Snippet.Toolbar")!!
-//            toolbarActionGroup.let {
-//                val toolbar: ActionToolbarImpl =
-//                    object : ActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, toolbarActionGroup, true) {
-//                        override fun updateUI() {
-//                            super.updateUI()
-//                            editor.component.setBorder(JBUI.Borders.empty())
-//                        }
-//                    }
-//
-//                toolbar.setBackground(editor.backgroundColor)
-//                toolbar.setOpaque(true)
-//                toolbar.targetComponent = editor.contentComponent
-//                editor.headerComponent = toolbar
-//
-//                val connect = project.messageBus.connect(disposable)
-//                val topic: Topic<EditorColorsListener> = EditorColorsManager.TOPIC
-//                connect.subscribe(topic, EditorColorsListener {
-//                    toolbar.setBackground(editor.backgroundColor)
-//                })
-//            }
+            val toolbarActionGroup = DefaultActionGroup().apply {
+                add(AutoDevRunDevInsAction(block))
+            }
+            toolbarActionGroup?.let {
+                val toolbar: ActionToolbarImpl =
+                    object : ActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, toolbarActionGroup, true) {
+                        override fun updateUI() {
+                            super.updateUI()
+                            editor.component.border = JBUI.Borders.empty()
+                        }
+                    }
 
-            editor.scrollPane.setBorder(JBUI.Borders.empty())
-            editor.component.setBorder(JBUI.Borders.empty())
+                toolbar.background = editor.backgroundColor
+                toolbar.isOpaque = true
+                toolbar.targetComponent = editor.contentComponent
+                editor.headerComponent = toolbar
+
+                val connect = project.messageBus.connect(disposable)
+                val topic: Topic<EditorColorsListener> = EditorColorsManager.TOPIC
+                connect.subscribe(topic, EditorColorsListener {
+                    toolbar.background = editor.backgroundColor
+                })
+            }
+
+            editor.scrollPane.border = JBUI.Borders.empty()
+            editor.component.border = JBUI.Borders.empty()
 
             val editorFragment = EditorFragment(project, editor, message)
             editorFragment.setCollapsed(forceFoldEditorByDefault)
