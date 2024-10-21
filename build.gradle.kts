@@ -31,7 +31,7 @@ repositories {
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
     implementation("com.azure:azure-ai-openai:1.0.0-beta.11")
-    implementation("com.squareup.okhttp3:okhttp:4.4.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     implementation("io.reactivex.rxjava3:rxjava:3.1.9")
     implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
