@@ -2,7 +2,6 @@
 // Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.github.zjh7890.gpttools.toolWindow.chat.block
 
-import CodeChangeBlockView2
 import com.github.zjh7890.gpttools.utils.Code
 import com.github.zjh7890.gpttools.utils.ParseUtils.parseCodeChanges
 import com.intellij.lang.Language

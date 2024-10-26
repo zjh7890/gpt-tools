@@ -1,6 +1,5 @@
 package com.github.zjh7890.gpttools.agent
 
-import CodeChangeBlockView2
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.services.ChatContextMessage
@@ -27,29 +26,83 @@ object GenerateDiffAgent {
         llmConfig: LlmConfig,
         projectStructure: String,
         response: String,
-        messageView: MessageView
+        messageView: MessageView,
+        currentSession: ChatSession
     ) {
         val border = FileUtil.determineBorder(response)
         val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply")
+
+        var fileContent = "No files."
+        if (currentSession.fileList.isNotEmpty()) {
+            fileContent = currentSession.fileList.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
+        }
+
         chatSession.add(
             ChatContextMessage(
                 ChatRole.user, """
-你是一个根据代码修改意见改代码的 agent。别的 agent 已经给出了代码的修改意见，所以你的工作就是读取代码仓库的现有代码，然后结合修改意见生成新的代码文件，文件必须完整，文件必须完整，文件必须完整，不要省略内容。
+你是一个改代码的 agent。别的 agent 已经给出了代码的修改意见，根据代码修改意见按照下面的格式返回文件的变更
+以下是你新增文件的返回示例，由于是新增文件，ORIGINAL直接置空即可：
+----- CHANGES START -----
+----- CHANGE START -----
+path: HelloWorld.java
+changeType: CREATE
+<<<< ORIGINAL
+====
+public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello World");
+    }
+}
+>>>> UPDATED
+----- CHANGE END -----
+----- CHANGES END -----
 
-如果你想读取文件，你必须使用下面格式的返回，注意 custom 标识，这是必要的
-```custom
-readFileList {"files": ["src/main/HelloWorld.java", "src/main/SomeService.java"]}
-```
+以下是你更新文件的返回示例，由于最终修改对文件内容进行替换修改，调用这个函数前必须先读取这个文件，这一点很重要很重要很重要，否则你的 ORIGINAL 并不是文件真实内容，是你凭空产生的，导致最终修改文件会失败。另外，ORIGINAL 需要尽量保证在整个文件的唯一性，因为最终是使用 replace 函数修改文件内容，如果 ORIGINAL 在文件有多处的话，会导致错误的多余的修改：
+----- CHANGES START -----
+----- CHANGE START -----
+path: yuer-live-core/src/main/java/com/yupaopao/live/common/constants/KafkaTopic.java
+changeType: MODIFY
+<<<< ORIGINAL
+public static final String SUD_BULLET_NOTIFY = "SUD_BULLET_NOTIFY";
+}
+====
+public static final String SUD_BULLET_NOTIFY = "SUD_BULLET_NOTIFY";
+
+   /**
+    * pc开播中切换品类
+    */
+   public static final String CHANGE_CATEGORY = "CHANGE_CATEGORY";
+}
+>>>> UPDATED
+----- CHANGE END -----
+----- CHANGES END -----
+
+以下是你删除文件的返回示例，由于是删除文件，ORIGINAL，UPDATE 都直接置空即可：
+----- CHANGES START -----
+----- CHANGE START -----
+path: HelloWorld.java
+changeType: DELETE
+<<<< ORIGINAL
+====
+>>>> UPDATED
+----- CHANGE END -----
+----- CHANGES END -----
+
+
+你可以按照需要在 CHANGES START/CHANGES END 里组合多个 CHANGE START/CHANGE END，如：
+----- CHANGES START -----
+[CHANGE 1]
+[CHANGE 2]
+----- CHANGES END -----
+
+
+原文件:
+${FileUtil.wrapBorder(fileContent)}
 
 下面是修改意见：
 ${border}
 ${response}
 ${border}
-
-下面是项目的目录结构：
-```
-${projectStructure}
-```
 """.trimIndent())
         )
 

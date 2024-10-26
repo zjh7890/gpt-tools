@@ -134,16 +134,16 @@ class ChatCodingService(val project: Project) : Disposable{
             val messages: MutableList<ChatMessage> = getCurrentSession().transformMessages()
             exportChatHistory()
             saveSessions()
-            val response = LlmProvider.stream(messages, llmConfig = llmConfig)
+            val responseStream = LlmProvider.stream(messages, llmConfig = llmConfig)
             var result: String = ""
             currentJob = ShireCoroutineScope.scope(project).launch {
-                result = ui.updateMessage(response, messageView!!)
+                result = ui.updateMessage(responseStream, messageView!!)
                 getCurrentSession().add(ChatContextMessage(ChatRole.assistant, result))
                 exportChatHistory()
                 saveSessions()
                 ApplicationManager.getApplication().invokeLater {
                     if (CommonSettings.getInstance(project).generateDiff) {
-                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, result, messageView)
+                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, result, messageView, getCurrentSession())
                     }
 //                    val (actionType, actions) = parseModelReply(result)
 //                    if (actionType == "执行动作") {

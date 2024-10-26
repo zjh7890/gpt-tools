@@ -113,6 +113,51 @@ class ShowChangeViewAction(private val project: Project, private val changesList
         return ActionUpdateThread.BGT
     }
 
+    fun findFileByNameInProject(fileName: String, project: Project): List<VirtualFile> {
+        val files = mutableListOf<VirtualFile>()
+        val projectBasePath = project.basePath ?: return files
+        val baseDir = LocalFileSystem.getInstance().findFileByPath(projectBasePath)
+
+        fun searchFile(dir: VirtualFile) {
+            for (file in dir.children) {
+                if (file.isDirectory) {
+                    searchFile(file)
+                } else if (file.name == fileName) {
+                    files.add(file)
+                }
+            }
+        }
+
+        baseDir?.let { searchFile(it) }
+        return files
+    }
+
+    fun getOriginalFile(data: CodeChangeFile, project: Project): VirtualFile? {
+        // 先尝试用完整路径查找
+        val fullPathFile = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + data.path)
+        if (fullPathFile != null) {
+            return fullPathFile
+        }
+
+        // 如果完整路径找不到，尝试只用文件名查找
+        val files = findFileByNameInProject(data.filename, project)
+        return when {
+            files.isEmpty() -> null
+            files.size == 1 -> files[0]
+            else -> {
+                // 如果找到多个同名文件，显示警告但不阻塞
+                ApplicationManager.getApplication().invokeLater {
+                    Messages.showWarningDialog(
+                        project,
+                        "Found multiple files named '${data.filename}'. Using the first match.",
+                        "Multiple Files Found"
+                    )
+                }
+                files[0]
+            }
+        }
+    }
+
     private fun showDiffFor(data: CodeChangeFile, project: Project) {
         val content1: DocumentContent
         val content2: DocumentContent
@@ -120,39 +165,34 @@ class ShowChangeViewAction(private val project: Project, private val changesList
         val originalFile: VirtualFile?
         if (data.changeType == "CREATE") {
             content1 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
-
             val createContent = EditorFactory.getInstance().createDocument(data.changeItems[0].updatedChunk)
             content2 = diffContentFactory.create(project, createContent)
             originalFile = null
         } else if (data.changeType == "MODIFY") {
             try {
-                originalFile = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + data.path)
-                val document: String
-                if (originalFile != null) {
-                    document = FileDocumentManager.getInstance().getDocument(originalFile)!!.text
+                originalFile = getOriginalFile(data, project)
+                val document: String = if (originalFile != null) {
+                    FileDocumentManager.getInstance().getDocument(originalFile)?.text ?: ""
                 } else {
-                    // 日志告警
                     Messages.showMessageDialog(
                         project,
                         "Original file not found: ${data.path}",
                         "Error",
                         Messages.getErrorIcon()
                     )
-                    document = ""
+                    ""
                 }
 
                 val updated = getUpdatedFileContent(document, data.changeItems)
                 val updatedDocument = EditorFactory.getInstance().createDocument(updated)
 
-//                val documentManager = FileDocumentManager.getInstance().get
-
                 content1 = diffContentFactory.create(document, PlainTextFileType.INSTANCE)
                 content2 = diffContentFactory.create(project, updatedDocument)
             } catch (e: Exception) {
-                TODO("Not yet implemented")
+                throw RuntimeException("Failed to process MODIFY operation", e)
             }
         } else if (data.changeType == "DELETE") {
-            originalFile = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + data.path)
+            originalFile = getOriginalFile(data, project)
             if (originalFile == null) {
                 Messages.showMessageDialog(
                     project,
@@ -164,14 +204,14 @@ class ShowChangeViewAction(private val project: Project, private val changesList
             content1 = diffContentFactory.create(data.changeItems[0].originalChunk, PlainTextFileType.INSTANCE)
             content2 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
         } else {
-            throw RuntimeException("unknown type")
+            throw RuntimeException("Unknown change type: ${data.changeType}")
         }
-        val request = SimpleDiffRequest("Diff - ${data.filename}", content1, content2, "Original", "Updated")
 
-        // 获取 DiffManager 实例并创建请求面板
+        // 后续代码保持不变...
+        val request = SimpleDiffRequest("Diff - ${data.filename}", content1, content2, "Original", "Updated")
         val diffPanel = DiffManager.getInstance().createRequestPanel(this.project, {}, null)
         diffPanel.setRequest(request)
-        // 使用 DialogBuilder 来展示面板
+
         val dialogBuilder = DialogBuilder(this.project).apply {
             setTitle("Diff: ${data.filename}")
             setCenterPanel(diffPanel.component)

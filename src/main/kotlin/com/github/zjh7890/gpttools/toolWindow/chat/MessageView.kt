@@ -198,8 +198,17 @@ class ApplyResponseAction(val messageView: MessageView) : AnAction("Apply", "App
             return
         }
         val projectStructure = DirectoryUtil.getDirectoryContents(e.project!!)
+        val chatCodingService = ChatCodingService.getInstance(e.project!!)
+
         ApplicationManager.getApplication().executeOnPooledThread {
-            GenerateDiffAgent.apply(e.project!!, ShireSettingsState.getLlmConfig(), projectStructure, messageView.answer, messageView)
+            GenerateDiffAgent.apply(
+                e.project!!,
+                ShireSettingsState.getLlmConfig(),
+                projectStructure,
+                messageView.message,
+                messageView,
+                chatCodingService.getCurrentSession()
+            )
         }
     }
 }

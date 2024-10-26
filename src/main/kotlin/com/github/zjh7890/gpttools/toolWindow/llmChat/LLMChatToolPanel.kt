@@ -278,7 +278,6 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
         myList.add(messageView)
         updateLayout()
         scrollToBottom()
-//        progressBar.isIndeterminate = true
         updateUI()
         return messageView
     }
@@ -293,10 +292,11 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
 
     suspend fun updateMessage(content: Flow<String>, messageView: MessageView): String {
         progressBar.isVisible = true
+        progressBar.isIndeterminate = true  // 设置为不确定状态
 
         val result = updateMessageInUi(content, messageView)
 
-        progressBar.isIndeterminate = false
+        progressBar.isIndeterminate = false // 处理完成后恢复确定状态
         progressBar.isVisible = false
         updateUI()
 
@@ -350,17 +350,6 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
             messageView.updateContent(text)
             messageView.scrollToBottom()
         }
-
-//        if (delaySeconds.isNotEmpty()) {
-//            val elapsedTime = System.currentTimeMillis() - startTime
-//            // waiting for the last message to be rendered, like sleep 5 ms?
-//            // 此处的 20s 出自 openAI 免费账户访问 3/min
-//            withContext(Dispatchers.IO) {
-//                val delaySec = delaySeconds.toLong()
-//                val remainingTime = maxOf(delaySec * 1000 - elapsedTime, 0)
-//                delay(remainingTime)
-//            }
-//        }
 
         messageView.reRender()
 
