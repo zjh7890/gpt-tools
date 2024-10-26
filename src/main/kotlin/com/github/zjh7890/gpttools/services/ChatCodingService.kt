@@ -2,8 +2,9 @@ package com.github.zjh7890.gpttools.services
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.zjh7890.gpttools.ShireCoroutineScope
-import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.agent.ContextCollectAgent
+import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
+import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
@@ -141,9 +142,9 @@ class ChatCodingService(val project: Project) : Disposable{
                 exportChatHistory()
                 saveSessions()
                 ApplicationManager.getApplication().invokeLater {
-//                    val messageView = ui.addMessage("")
-//                    GenerateDiffAgent.apply(project, llmConfig, projectStructure, result, messageView)
-//
+                    if (CommonSettings.getInstance(project).generateDiff) {
+                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, result, messageView)
+                    }
 //                    val (actionType, actions) = parseModelReply(result)
 //                    if (actionType == "执行动作") {
 //                        confirmAndExecuteActions(actions, ui)
@@ -187,9 +188,6 @@ action2 {"projectName": "xxxProject"}
         val context = """
 相关文件内容：
 ${FileUtil.wrapBorder(fileContent)}
-
-项目信息：
-${FileUtil.wrapBorder(projectInfo)}
 """.trimIndent()
 
         message.context = context
@@ -322,35 +320,35 @@ ${FileUtil.wrapBorder(projectInfo)}
         val sessionId = UUID.randomUUID().toString()
         val newSession = ChatSession(id = sessionId, type = "chat")
         if (currentSessionId.isNotEmpty() && keepContext) {
-            newSession.fileList = getCurrentSession().fileList
+//            newSession.fileList = getCurrentSession().fileList
         }
 
         currentSessionId = sessionId
         sessions[sessionId] = newSession
         saveSessions()
 
-        // init system prompt
-        val message = appendLocalMessage(
-            ChatRole.user, """
-你是一个专业的后端程序员，你会根据我后续提出的需求编辑我电脑本地的项目，你的回答尽量简洁，仅返回变更代码，省略文件无关内容。
-在提出需求的时候，我会附上相关的上下文，上下文的信息非常非常重要，在整个对话过程你都应该参考上下文进行作答，上下文包括以下内容：
-1. 需求相关的文件内容。包含了文件名及文件里的内容。
-2. 项目信息，包含了目录结构和目录下的文件名。
-
-**注意**：
-1. 如果上下文中的文件信息不够，你可向我询问。
-2. 任何时候，你都不应该假设项目内容，而是想我询问。
-""".trimIndent()
-        )
-        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-        contentPanel?.addMessage(message.content, true, render = true, chatMessage = message)
-
-        val message2 = appendLocalMessage(
-            ChatRole.user, """
-下面开始是我的需求。
-""".trimIndent()
-        )
-        contentPanel?.addMessage(message2.content, true, render = true, chatMessage = message2)
+//        // init system prompt
+//        val message = appendLocalMessage(
+//            ChatRole.user, """
+//你是一个专业的后端程序员，你会根据我后续提出的需求编辑我电脑本地的项目，你的回答尽量简洁，仅返回变更代码，省略文件无关内容。
+//在提出需求的时候，我会附上相关的上下文，上下文的信息非常非常重要，在整个对话过程你都应该参考上下文进行作答，上下文包括以下内容：
+//1. 需求相关的文件内容。包含了文件名及文件里的内容。
+//2. 项目信息，包含了目录结构和目录下的文件名。
+//
+//**注意**：
+//1. 如果上下文中的文件信息不够，你可向我询问。
+//2. 任何时候，你都不应该假设项目内容，而是想我询问。
+//""".trimIndent()
+//        )
+//        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+//        contentPanel?.addMessage(message.content, true, render = true, chatMessage = message)
+//
+//        val message2 = appendLocalMessage(
+//            ChatRole.user, """
+//下面开始是我的需求。
+//""".trimIndent()
+//        )
+//        contentPanel?.addMessage(message2.content, true, render = true, chatMessage = message2)
     }
 
     fun exportChatHistory(): String {

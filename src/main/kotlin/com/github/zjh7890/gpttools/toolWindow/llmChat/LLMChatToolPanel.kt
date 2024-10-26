@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
+import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
 import com.intellij.icons.AllIcons
@@ -46,6 +47,7 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
     private val myList = JPanel(VerticalLayout(JBUI.scale(10)))
     private var inputSection: AutoDevInputSection
     private val withContextCheckbox = JCheckBox("WithContext", true)
+    private val generateDiffCheckbox = JCheckBox("Generate Diff", CommonSettings.getInstance(project).generateDiff)
     private val focusMouseListener: MouseAdapter
     private var panelContent: DialogPanel
     private val myScrollPane: JBScrollPane
@@ -180,12 +182,22 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
             chatCodingService.updateWithContext(withContextCheckbox.isSelected)
         }
 
+        generateDiffCheckbox.addActionListener {
+            CommonSettings.getInstance(project).generateDiff = generateDiffCheckbox.isSelected
+            CommonSettings.getInstance(project).getState()?.let { state ->
+                CommonSettings.getInstance(project).loadState(state)
+            }
+        }
+
         panelContent = panel {
             row { cell(myScrollPane).fullWidth().fullHeight() }.resizableRow()
             row { cell(suggestionPanel).fullWidth() }
             row { cell(editingPanel).fullWidth() }
             row { cell(progressBar).fullWidth() }
-            row { cell(withContextCheckbox).fullWidth() }
+            row {
+                cell(withContextCheckbox)
+                cell(generateDiffCheckbox)
+            }
             row {
                 border = JBUI.Borders.empty(8)
                 cell(inputSection).fullWidth()
