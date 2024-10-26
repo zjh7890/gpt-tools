@@ -198,11 +198,19 @@ class MessageCodeBlockCharProcessor {
     }
 
     private fun isChangeBlockStart(fullMessage: String, index: Int): Boolean {
+        // 检查是否为行首
+        val isLineStart = index == 0 || fullMessage[index - 1] == '\n'
+        if (!isLineStart) return false
+
         if (index + changeStartBlock.length > fullMessage.length) return false
         return fullMessage.regionMatches(index, changeStartBlock, 0, changeStartBlock.length, ignoreCase = true)
     }
 
     private fun isChangeBlockEnd(fullMessage: String, index: Int): Boolean {
+        // 检查是否为行首
+        val isLineStart = index == 0 || fullMessage[index - 1] == '\n'
+        if (!isLineStart) return false
+
         if (index + changeEndBlock.length > fullMessage.length) return false
         return fullMessage.regionMatches(index, changeEndBlock, 0, changeEndBlock.length, ignoreCase = true)
     }

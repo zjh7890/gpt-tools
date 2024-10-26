@@ -350,7 +350,7 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
             messageView.updateContent(text)
             messageView.scrollToBottom()
         }
-
+        messageView.message = text
         messageView.reRender()
 
         return text

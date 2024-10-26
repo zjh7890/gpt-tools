@@ -1,12 +1,17 @@
 package com.github.zjh7890.gpttools.agent
 
+import CodeChangeBlockView
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
+import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.chat.MessageView
 import com.github.zjh7890.gpttools.toolWindow.chat.block.CodeBlock
+import com.github.zjh7890.gpttools.toolWindow.chat.block.MessageCodeBlockCharProcessor
+import com.github.zjh7890.gpttools.toolWindow.chat.block.SimpleMessage
+import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.CmdUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.ParseUtils
@@ -106,53 +111,44 @@ ${border}
 """.trimIndent())
         )
 
-        while (true) {
-            val applyFlow = LlmProvider.stream(chatSession, llmConfig)
-            var responseText = ""
-            runBlocking {
-                applyFlow.onCompletion {
-                    logger.warn("onCompletion ${it?.message}")
-                }.catch {
-                    it.printStackTrace()
-                }.collect {
-                    responseText += it
-                }
+        val applyFlow = LlmProvider.stream(chatSession, llmConfig)
+        var responseText = ""
+        runBlocking {
+            applyFlow.onCompletion {
+                logger.warn("onCompletion ${it?.message}")
+            }.catch {
+                it.printStackTrace()
+            }.collect {
+                responseText += it
             }
-            chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
-            val parsedResponse = ParseUtils.processResponse(responseText)
-            // 完成后处理最终结果
-            try {
-                val sb = StringBuilder()
-                when {
-                    parsedResponse.isCustomCommand -> {
-                        parsedResponse.customCommands?.forEach { command ->
-                            val result = CmdUtils.executeCmd(command, "custom", project)
-                            sb.append(result + "\n\n")
-                        }
-                    }
-                }
-                if (sb.isNotEmpty()){
-                    chatSession.add(ChatContextMessage(ChatRole.user, sb.toString()))
-                    continue
-                }
-            } catch (e: Exception) {
-                logger.error("处理响应时出错: ${e.message}", e)
-                throw e
-            }
+        }
+        chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
+//            val parsedResponse = ParseUtils.processResponse(responseText)
+//            // 完成后处理最终结果
+//            try {
+//                val sb = StringBuilder()
+//                when {
+//                    parsedResponse.isCustomCommand -> {
+//                        parsedResponse.customCommands?.forEach { command ->
+//                            val result = CmdUtils.executeCmd(command, "custom", project)
+//                            sb.append(result + "\n\n")
+//                        }
+//                    }
+//                }
+//                if (sb.isNotEmpty()){
+//                    chatSession.add(ChatContextMessage(ChatRole.user, sb.toString()))
+//                    continue
+//                }
+//            } catch (e: Exception) {
+//                logger.error("处理响应时出错: ${e.message}", e)
+//                throw e
+//            }
 
-            // 处理响应，提取文件修改信息
-            val codeChanges = ParseUtils.parse(responseText)
-                .filter { it is CodeBlock }
-                .map { it as CodeBlock }
-                .filter { it.code.languageId.equals("diff", ignoreCase = true) }
-                .map { ParseUtils.parseCodeChanges(project, it.getTextContent()) }
-                .toList()
-
-            ApplicationManager.getApplication().invokeLater() {
-                messageView.centerPanel.add(CodeChangeBlockView2(project, codeChanges).getComponent())
-                messageView.updateUI()
-            }
-            break;
+        ApplicationManager.getApplication().invokeLater {
+            val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+            val chatCodingService = ChatCodingService.getInstance(project)
+            val chatMessage = chatCodingService.appendLocalMessage(ChatRole.assistant, responseText)
+            contentPanel?.addMessage(responseText, true, render = true, chatMessage = chatMessage)
         }
     }
 

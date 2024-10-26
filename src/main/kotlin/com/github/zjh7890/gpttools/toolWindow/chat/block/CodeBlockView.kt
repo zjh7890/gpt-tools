@@ -2,8 +2,8 @@
 // Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.github.zjh7890.gpttools.toolWindow.chat.block
 
+import CodeChangeBlockView
 import com.github.zjh7890.gpttools.utils.Code
-import com.github.zjh7890.gpttools.utils.ParseUtils.parseCodeChanges
 import com.intellij.lang.Language
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -43,7 +43,7 @@ class CodeBlockView(
 ) : MessageBlockView {
 
     private var editorInfo: CodePartEditorInfo? = null
-    private var codeChangeBlockView: CodeChangeBlockView2? = null
+    private var codeChangeBlockView: CodeChangeBlockView? = null
 
     init {
         block.addTextListener {
@@ -75,24 +75,13 @@ class CodeBlockView(
 
     private fun updateOrCreateCodeView(): JComponent {
         val code: Code = block.code
-        val language = code.languageId
 
-        // 检查文件类型是否为 patch
-        if (language.equals("diff", ignoreCase = true)) {
-            // 使用 CodeChangeBlockView2
-            if (codeChangeBlockView == null) {
-                val changes = parseCodeChanges(project, code.text)
-                codeChangeBlockView = CodeChangeBlockView2(project, mutableListOf(changes))
-            }
-            return codeChangeBlockView!!.getComponent() as JComponent
-        } else {
-            // 使用原始的代码展示逻辑
-            if (editorInfo == null) {
-                val graphProperty = PropertyGraph().property(code.text)
-                editorInfo = createCodeViewer(project, graphProperty, disposable, code.language, getBlock().getMessage(), getBlock())
-            }
-            return editorInfo!!.component
+        // 使用原始的代码展示逻辑
+        if (editorInfo == null) {
+            val graphProperty = PropertyGraph().property(code.text)
+            editorInfo = createCodeViewer(project, graphProperty, disposable, code.language, getBlock().getMessage(), getBlock())
         }
+        return editorInfo!!.component
     }
 
     companion object {

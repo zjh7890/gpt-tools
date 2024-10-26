@@ -28,7 +28,7 @@ import java.awt.*
 import javax.swing.*
 
 class MessageView(
-    val message: String,
+    var message: String,
     val role: ChatRole,
     private val displayText: String,
     val project: Project,
@@ -133,6 +133,7 @@ class MessageView(
 
     fun updateContent(content: String) {
         this.answer = content
+
         MessageWorker(content).execute()
     }
 

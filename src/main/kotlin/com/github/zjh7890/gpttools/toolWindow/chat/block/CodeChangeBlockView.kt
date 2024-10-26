@@ -50,43 +50,104 @@ class CodeChangeBlockView(private val codeChangeBlock: CodeChange,
     }
 
     private fun parseCodeChanges(textContent: String): List<CodeChangeFile> {
-        val changes = mutableListOf<CodeChangeFile>()
-        // 外层匹配 CHANGES START/END
-        val outerBlockRegex = """----- CHANGES START -----(.*?)----- CHANGES END -----""".toRegex(
-            setOf(RegexOption.DOT_MATCHES_ALL)
-        )
-        // 内层匹配 CHANGE START/END
-        val innerBlockRegex = """----- CHANGE START -----(.*?)----- CHANGE END -----""".toRegex(
-            setOf(RegexOption.DOT_MATCHES_ALL)
-        )
-        val pathRegex = """path: (.+?)\n""".toRegex()
-        val changeTypeRegex = """changeType: (.+?)\n""".toRegex()
-        val changeRegex = """<<<< ORIGINAL\n(.*?)====\n(.*?)>>>> UPDATED""".toRegex(
-            setOf(RegexOption.DOT_MATCHES_ALL)
-        )
+        val changesByPath = mutableMapOf<String, MutableList<CodeChangeFile>>()
+        val changeOrder = mutableListOf<String>() // 保存path的出现顺序
+        val lines = textContent.lines()
+        var i = 0
+        val n = lines.size
 
-        outerBlockRegex.findAll(textContent).forEach { outerBlockMatch ->
-            val outerBlockContent = outerBlockMatch.groups[1]?.value ?: ""
-            innerBlockRegex.findAll(outerBlockContent).forEach { blockMatch ->
-                val blockContent = blockMatch.groups[1]?.value ?: ""
-                val fullPath = pathRegex.find(blockContent)?.groups?.get(1)?.value ?: "Unknown path"
-                val pathParts = fullPath.split("/").let {
-                    it.last() to it.dropLast(1).reversed().joinToString("/")
-                }
-                val changeType = changeTypeRegex.find(blockContent)?.groups?.get(1)?.value ?: "Unknown"
+        while (i < n) {
+            var line = lines[i].trim()
+            if (line == "----- CHANGES START -----") {
+                i++
+                while (i < n && lines[i].trim() != "----- CHANGES END -----") {
+                    line = lines[i].trim()
+                    if (line == "----- CHANGE START -----") {
+                        i++
+                        val blockLines = mutableListOf<String>()
+                        while (i < n && lines[i].trim() != "----- CHANGE END -----") {
+                            blockLines.add(lines[i])
+                            i++
+                        }
+                        // Process the collected blockLines
+                        val blockContent = blockLines.joinToString("\n")
+                        // Extract path and changeType
+                        val fullPath = blockLines.find { it.startsWith("path: ") }?.substringAfter("path: ") ?: "Unknown path"
+                        val changeType = blockLines.find { it.startsWith("changeType: ") }?.substringAfter("changeType: ") ?: "Unknown"
+                        val filename = fullPath.substringAfterLast('/')
+                        val dirPath = fullPath.substringBeforeLast('/', missingDelimiterValue = "")
 
-                val fileChangeItems = mutableListOf<FileChangeItem>()
-                changeRegex.findAll(blockContent).forEach { changeMatch ->
-                    val original = changeMatch.groups[1]?.value?.trim() ?: "No original content"
-                    val updated = changeMatch.groups[2]?.value?.trim() ?: "No updated content"
-                    fileChangeItems.add(FileChangeItem(original, updated))
+                        // Extract changes between <<<< ORIGINAL and >>>> UPDATED
+                        val fileChangeItems = mutableListOf<FileChangeItem>()
+                        var j = 0
+                        while (j < blockLines.size) {
+                            val blkLine = blockLines[j].trim()
+                            if (blkLine == "<<<< ORIGINAL") {
+                                j++
+                                val originalLines = mutableListOf<String>()
+                                while (j < blockLines.size && blockLines[j].trim() != "====") {
+                                    originalLines.add(blockLines[j])
+                                    j++
+                                }
+                                j++ // Skip "===="
+                                val updatedLines = mutableListOf<String>()
+                                while (j < blockLines.size && blockLines[j].trim() != ">>>> UPDATED") {
+                                    updatedLines.add(blockLines[j])
+                                    j++
+                                }
+                                // Create FileChangeItem
+                                val originalChunk = originalLines.joinToString("\n")
+                                val updatedChunk = updatedLines.joinToString("\n")
+                                fileChangeItems.add(FileChangeItem(originalChunk, updatedChunk))
+                            } else {
+                                j++
+                            }
+                        }
+                        if (fileChangeItems.isNotEmpty()) {
+                            val codeChangeFile = CodeChangeFile(
+                                path = fullPath,
+                                dirPath = dirPath,
+                                filename = filename,
+                                changeItems = fileChangeItems,
+                                isMerged = false,
+                                changeType = changeType
+                            )
+
+                            // 将相同path的变更添加到同一个列表中
+                            if (!changesByPath.containsKey(fullPath)) {
+                                changesByPath[fullPath] = mutableListOf()
+                                changeOrder.add(fullPath) // 记录path的首次出现顺序
+                            }
+                            changesByPath[fullPath]?.add(codeChangeFile)
+                        }
+                        i++ // Skip "----- CHANGE END -----"
+                    } else {
+                        i++
+                    }
                 }
-                if (fileChangeItems.isNotEmpty()) {
-                    changes.add(CodeChangeFile(fullPath, pathParts.second, pathParts.first, fileChangeItems, isMerged = false, changeType = changeType))
+            } else {
+                i++
+            }
+        }
+
+        // 合并相同path的CodeChangeFile，并按原始顺序返回
+        return changeOrder.mapNotNull { path ->
+            changesByPath[path]?.let { changes ->
+                if (changes.size == 1) {
+                    changes[0]
+                } else {
+                    // 合并多个CodeChangeFile
+                    CodeChangeFile(
+                        path = changes[0].path,
+                        dirPath = changes[0].dirPath,
+                        filename = changes[0].filename,
+                        changeItems = changes.flatMap { it.changeItems },
+                        isMerged = false,
+                        changeType = changes[0].changeType
+                    )
                 }
             }
         }
-        return changes
     }
 
     private fun setupToolbar() {
