@@ -19,6 +19,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import org.apache.commons.text.similarity.LevenshteinDistance
 import java.awt.Component
+import java.awt.event.ActionEvent
 import java.io.IOException
 import javax.swing.*
 
@@ -276,23 +277,24 @@ class ShowChangeViewAction(private val project: Project, private val changesList
         val dialogBuilder = DialogBuilder(this.project).apply {
             setTitle("Diff: ${data.filename}")
             setCenterPanel(diffPanel.component)
-            addOkAction()
-            setOkOperation {
-                WriteCommandAction.runWriteCommandAction(project) {
-                    when (data.changeType) {
-                        "CREATE" -> {
-                            createFileWithParents(project.basePath!!, data.path, content2.document.text)
+            addAction(object : AbstractAction("Accept") {
+                override fun actionPerformed(e: ActionEvent) {
+                    WriteCommandAction.runWriteCommandAction(project) {
+                        when (data.changeType) {
+                            "CREATE" -> {
+                                createFileWithParents(project.basePath!!, data.path, content2.document.text)
+                            }
+                            "MODIFY" -> originalFile?.let {
+                                FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
+                            }
+                            "DELETE" -> originalFile?.delete(this)
                         }
-                        "MODIFY" -> originalFile?.let {
-                            FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
-                        }
-                        "DELETE" -> originalFile?.delete(this)
+                        dialogWrapper.close(0)
                     }
                     dialogWrapper.close(0)
+                    data.isMerged = true
                 }
-                dialogWrapper.close(0)
-                data.isMerged = true
-            }
+            })
         }
         dialogBuilder.show()
     }
