@@ -126,6 +126,7 @@ class ChatCodingService(val project: Project) : Disposable{
             getCurrentSession().add(message)
         }
         val messageView = ui.addMessage("Loading", chatMessage = null)
+        messageView.scrollToBottom()
 
         ApplicationManager.getApplication().executeOnPooledThread {
             if (searchContext) {
@@ -158,7 +159,6 @@ class ChatCodingService(val project: Project) : Disposable{
                 }.collect {
                     text += it
                     messageView.updateContent(text)
-                    messageView.scrollToBottom()
                 }
 
                 logger.warn("LLM response: ${JsonUtils.toJson(text)}")
