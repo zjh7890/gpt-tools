@@ -1,15 +1,19 @@
 package com.github.zjh7890.gpttools.toolWindow.llmChat
 
+import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
+import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.impl.ActionButton
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
@@ -194,6 +198,17 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
             row {
                 cell(withContextCheckbox)
                 cell(generateDiffCheckbox)
+                // 添加生成 diff 的按钮
+                cell(ActionButton(
+                    GenerateDiffAction(project, progressBar, inputSection, chatCodingService),
+                    Presentation().apply {
+                        icon = AllIcons.Actions.ToggleVisibility
+                        text = "Generate diff based on this chat"
+                        description = "Generate diff based on this chat"
+                    },
+                    "",
+                    JBUI.size(16)
+                ))
             }
             row {
                 border = JBUI.Borders.empty(8)
@@ -419,3 +434,31 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         }
     }
 }
+
+private class GenerateDiffAction(
+    private val project: Project,
+    private val progressBar: JProgressBar,
+    private val inputSection: AutoDevInputSection,
+    private val chatCodingService: ChatCodingService
+) : AnAction("Generate diff based on this chat", "Generate diff based on this chat", AllIcons.Actions.ToggleVisibility) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val projectStructure = DirectoryUtil.getDirectoryContents(project)
+        val chatHistory = chatCodingService.exportChatHistory(true)
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            progressBar.isVisible = true
+            progressBar.isIndeterminate = true
+            GenerateDiffAgent.apply(
+                project,
+                ShireSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
+                projectStructure,
+                chatHistory,
+                chatCodingService.getCurrentSession()
+            )
+            progressBar.isIndeterminate = false
+            progressBar.isVisible = false
+        }
+    }
+}
+

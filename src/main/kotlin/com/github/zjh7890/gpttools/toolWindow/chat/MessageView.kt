@@ -193,7 +193,7 @@ class EditMessageAction(private val messageView: MessageView, val chatToolPanel:
     }
 }
 
-class ApplyResponseAction(val messageView: MessageView) : AnAction("Apply", "Apply", AllIcons.Actions.ToggleVisibility) {
+class ApplyResponseAction(val messageView: MessageView) : AnAction("Generate diff based on this message", "Generate diff according to this message", AllIcons.Actions.ToggleVisibility) {
     override fun actionPerformed(e: AnActionEvent) {
         if (e.project == null) {
             return
@@ -207,7 +207,6 @@ class ApplyResponseAction(val messageView: MessageView) : AnAction("Apply", "App
                 ShireSettingsState.getLlmConfig(),
                 projectStructure,
                 messageView.message,
-                messageView,
                 chatCodingService.getCurrentSession()
             )
         }

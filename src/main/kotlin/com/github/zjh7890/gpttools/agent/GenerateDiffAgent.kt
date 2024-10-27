@@ -1,21 +1,14 @@
 package com.github.zjh7890.gpttools.agent
 
-import CodeChangeBlockView
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
-import com.github.zjh7890.gpttools.toolWindow.chat.MessageView
-import com.github.zjh7890.gpttools.toolWindow.chat.block.CodeBlock
-import com.github.zjh7890.gpttools.toolWindow.chat.block.MessageCodeBlockCharProcessor
-import com.github.zjh7890.gpttools.toolWindow.chat.block.SimpleMessage
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
-import com.github.zjh7890.gpttools.utils.CmdUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.JsonUtils
-import com.github.zjh7890.gpttools.utils.ParseUtils
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
@@ -32,7 +25,6 @@ object GenerateDiffAgent {
         llmConfig: LlmConfig,
         projectStructure: String,
         response: String,
-        messageView: MessageView,
         currentSession: ChatSession
     ) {
         val border = FileUtil.determineBorder(response)

@@ -167,7 +167,7 @@ class ChatCodingService(val project: Project) : Disposable{
                     ApplicationManager.getApplication().executeOnPooledThread {
                         ui.progressBar.isVisible = true
                         ui.progressBar.isIndeterminate = true  // 设置为不确定状态
-                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, messageView, getCurrentSession())
+                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession())
                         ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
                         ui.progressBar.isVisible = false
                     }
@@ -177,10 +177,11 @@ class ChatCodingService(val project: Project) : Disposable{
     }
 
     private fun addContextToMessages(message: ChatContextMessage, project: Project) {
-        var fileContent = "No files."
-        if (getCurrentSession().fileList.isNotEmpty()) {
-            fileContent = getCurrentSession().fileList.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
+        if (getCurrentSession().fileList.isEmpty()) {
+            return
         }
+
+        val fileContent = getCurrentSession().fileList.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
 
         val projectInfo = """
 当前项目名称：${project.name}
@@ -351,8 +352,8 @@ ${FileUtil.wrapBorder(fileContent)}
         contentPanel?.refreshFileList()
     }
 
-    fun exportChatHistory(): String {
-        return getCurrentSession().exportChatHistory()
+    fun exportChatHistory(invalidContext: Boolean = false): String {
+        return getCurrentSession().exportChatHistory(invalidContext)
     }
 
     companion object {
@@ -424,8 +425,8 @@ data class ChatSession(
     }
 
     // 导出聊天历史记录
-    fun exportChatHistory(): String {
-        val chatHistory = transformMessages().joinToString("\n\n") {
+    fun exportChatHistory(invalidContext: Boolean = false): String {
+        val chatHistory = transformMessages(invalidContext).joinToString("\n\n") {
             val border = FileUtil.determineBorder(it.content)
             """
 ${it.role}:
@@ -466,7 +467,7 @@ ${border}
         return "$userHome/.gpttools"
     }
 
-    fun transformMessages(): MutableList<ChatMessage> {
+    fun transformMessages(invalidContext: Boolean = false): MutableList<ChatMessage> {
         val chatMessages: MutableList<ChatMessage>
         if (withContext) {
             // 找到最后一个用户消息的索引
@@ -478,21 +479,8 @@ ${border}
                     // 1. 没有 context
                     it.context.isEmpty() -> ChatMessage(it.role, it.content)
 
-                    // 3. 有 context 且是最后一个用户消息
-                    it.role == ChatRole.user && index == lastUserMessageIndex -> {
-                        ChatMessage(
-                            it.role,
-                            """
-${it.content}
----
-上下文信息：
-${FileUtil.wrapBorder(it.context)}
-                        """.trimIndent()
-                        )
-                    }
-
                     // 2. 有 context 但不是最后一个用户消息
-                    it.role == ChatRole.user -> {
+                    index != lastUserMessageIndex || invalidContext -> {
                         ChatMessage(
                             it.role,
                             """
@@ -505,9 +493,18 @@ ${it.content}
                         """.trimIndent()
                         )
                     }
-
-                    // 其他消息（如 assistant 角色的消息）
-                    else -> ChatMessage(it.role, it.content)
+                    // 3. 有 context 且是最后一个用户消息
+                    else -> {
+                        ChatMessage(
+                            it.role,
+                            """
+${it.content}
+---
+上下文信息：
+${FileUtil.wrapBorder(it.context)}
+                        """.trimIndent()
+                        )
+                    }
                 }
             }.toMutableList()
         } else {
