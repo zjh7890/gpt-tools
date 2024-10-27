@@ -6,9 +6,7 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage
 class Code(val language: Language, val languageId: String, val text: String, val isComplete: Boolean) {
     companion object {
         fun parse(content: String): Code {
-            // 将内容中的 \\n 转换为 \n
-            val lines = content.replace("\\n", "\n").lines()
-
+            val lines = content.lines()
             var codeStarted = false
             var codeClosed = false
             var languageId = ""
