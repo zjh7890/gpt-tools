@@ -25,7 +25,7 @@ suspend fun main() {
         maxTokens = null
     )
 
-    val result = llm.stream(mutableListOf(ChatMessage(
+    val result = llm.call(mutableListOf(ChatMessage(
         ChatRole.user,
         """
 

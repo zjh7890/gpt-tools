@@ -18,7 +18,7 @@ class AzureAIProvider : LlmProvider {
 
     private val logger = org.slf4j.LoggerFactory.getLogger(AzureAIProvider::class.java)
 
-    override fun stream(messages: MutableList<ChatMessage>, llmConfig: LlmConfig): Flow<String> = flow {
+    override fun call(messages: MutableList<ChatMessage>, llmConfig: LlmConfig): Flow<String> = flow {
         try {
             // 构建 Azure OpenAI 客户端
             val client: OpenAIClient = OpenAIClientBuilder()

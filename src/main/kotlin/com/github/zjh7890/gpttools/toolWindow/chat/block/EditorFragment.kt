@@ -59,7 +59,7 @@ class EditorFragment(private val project: Project, private val editor: EditorEx,
     private val editorLineThreshold = 6
     private val expandCollapseTextLabel: AIAssistantFoldLabel
     private val content: BorderLayoutPanel
-    private var collapsed = true
+    private var collapsed = false
 
     init {
         expandCollapseTextLabel = AIAssistantFoldLabel(message.getRole())

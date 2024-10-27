@@ -1,8 +1,7 @@
 package com.github.zjh7890.gpttools.utils
 
-import com.github.zjh7890.gpttools.services.Action
 import com.github.zjh7890.gpttools.services.ChatCodingService
-import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
@@ -10,7 +9,7 @@ import com.intellij.openapi.project.Project
 
 fun sendToChatWindow(
     project: Project,
-    runnable: (LLMChatToolPanel, ChatCodingService) -> Unit,
+    runnable: (ChatToolPanel, ChatCodingService) -> Unit,
 ) {
     val chatCodingService = ChatCodingService.getInstance(project)
 
@@ -32,7 +31,7 @@ fun sendToChatWindow(
     }
 }
 
-fun sendToChatPanel(project: Project, runnable: (LLMChatToolPanel, ChatCodingService) -> Unit) {
+fun sendToChatPanel(project: Project, runnable: (ChatToolPanel, ChatCodingService) -> Unit) {
     sendToChatWindow(project, runnable)
 }
 

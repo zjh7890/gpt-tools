@@ -9,13 +9,10 @@ import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
-import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.toolWindow.llmChat.SessionListener
-import com.github.zjh7890.gpttools.utils.CmdUtils
-import com.github.zjh7890.gpttools.utils.Desc
-import com.github.zjh7890.gpttools.utils.DirectoryUtil
-import com.github.zjh7890.gpttools.utils.FileUtil
+import com.github.zjh7890.gpttools.utils.*
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -25,6 +22,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
@@ -95,11 +94,12 @@ class ChatCodingService(val project: Project) : Disposable{
     }
 
     fun updateWithContext(withContext: Boolean) {
+        CommonSettings.getInstance(project).withContext = withContext
         getCurrentSession().withContext = withContext
     }
 
     fun handlePromptAndResponse(
-        ui: LLMChatToolPanel,
+        ui: ChatToolPanel,
         prompter: String,
         searchContext: Boolean,
         editingMessage: ChatContextMessage?,
@@ -134,21 +134,43 @@ class ChatCodingService(val project: Project) : Disposable{
             val messages: MutableList<ChatMessage> = getCurrentSession().transformMessages()
             exportChatHistory()
             saveSessions()
+            ui.progressBar.isVisible = true
+            ui.progressBar.isIndeterminate = true  // 设置为不确定状态
+            ui.updateUI()
             val responseStream = LlmProvider.stream(messages, llmConfig = llmConfig)
-            var result: String = ""
             currentJob = ShireCoroutineScope.scope(project).launch {
-                result = ui.updateMessage(responseStream, messageView!!)
-                getCurrentSession().add(ChatContextMessage(ChatRole.assistant, result))
+                var text = ""
+                responseStream.onCompletion {
+                    logger.warn("onCompletion ${it?.message}")
+                }.catch {
+                    logger.error("exception happens: ", it)
+                    text = "exception happens: " + it.message.toString()
+                }.collect {
+                    text += it
+                    messageView.updateContent(text)
+                    messageView.scrollToBottom()
+                }
+
+                logger.warn("LLM response: ${JsonUtils.toJson(text)}")
+                messageView.message = text
+                messageView.reRender()
+
+                ui.inputSection.showSendButton()
+                ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
+                ui.progressBar.isVisible = false
+                ui.updateUI()
+
+                getCurrentSession().add(ChatContextMessage(ChatRole.assistant, text))
                 exportChatHistory()
                 saveSessions()
-                ApplicationManager.getApplication().invokeLater {
-                    if (CommonSettings.getInstance(project).generateDiff) {
-                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, result, messageView, getCurrentSession())
+                if (CommonSettings.getInstance(project).generateDiff) {
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        ui.progressBar.isVisible = true
+                        ui.progressBar.isIndeterminate = true  // 设置为不确定状态
+                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, messageView, getCurrentSession())
+                        ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
+                        ui.progressBar.isVisible = false
                     }
-//                    val (actionType, actions) = parseModelReply(result)
-//                    if (actionType == "执行动作") {
-//                        confirmAndExecuteActions(actions, ui)
-//                    }
                 }
             }
         }
@@ -193,7 +215,7 @@ ${FileUtil.wrapBorder(fileContent)}
         message.context = context
     }
 
-    private fun confirmAndExecuteActions(actions: List<Action>, ui: LLMChatToolPanel) {
+    private fun confirmAndExecuteActions(actions: List<Action>, ui: ChatToolPanel) {
         ApplicationManager.getApplication().invokeLater {
             actions.forEachIndexed { idx, action ->
                 val (actionDesc, commandType, cmd) = action
@@ -319,36 +341,14 @@ ${FileUtil.wrapBorder(fileContent)}
     fun newSession(keepContext: Boolean = false) {
         val sessionId = UUID.randomUUID().toString()
         val newSession = ChatSession(id = sessionId, type = "chat")
-        if (currentSessionId.isNotEmpty() && keepContext) {
-//            newSession.fileList = getCurrentSession().fileList
-        }
 
         currentSessionId = sessionId
         sessions[sessionId] = newSession
         saveSessions()
 
-//        // init system prompt
-//        val message = appendLocalMessage(
-//            ChatRole.user, """
-//你是一个专业的后端程序员，你会根据我后续提出的需求编辑我电脑本地的项目，你的回答尽量简洁，仅返回变更代码，省略文件无关内容。
-//在提出需求的时候，我会附上相关的上下文，上下文的信息非常非常重要，在整个对话过程你都应该参考上下文进行作答，上下文包括以下内容：
-//1. 需求相关的文件内容。包含了文件名及文件里的内容。
-//2. 项目信息，包含了目录结构和目录下的文件名。
-//
-//**注意**：
-//1. 如果上下文中的文件信息不够，你可向我询问。
-//2. 任何时候，你都不应该假设项目内容，而是想我询问。
-//""".trimIndent()
-//        )
-//        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-//        contentPanel?.addMessage(message.content, true, render = true, chatMessage = message)
-//
-//        val message2 = appendLocalMessage(
-//            ChatRole.user, """
-//下面开始是我的需求。
-//""".trimIndent()
-//        )
-//        contentPanel?.addMessage(message2.content, true, render = true, chatMessage = message2)
+        // 获取并刷新 panel 的 file list
+        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+        contentPanel?.refreshFileList()
     }
 
     fun exportChatHistory(): String {
@@ -530,7 +530,7 @@ ${it.content}
                 startTime = data.startTime,
                 type = data.type,
                 fileList = virtualFiles,  // 新增
-                withContext = data.withContext
+                withContext = CommonSettings.getInstance(project).withContext
             )
         }
     }

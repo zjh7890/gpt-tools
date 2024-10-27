@@ -14,6 +14,7 @@ import com.github.zjh7890.gpttools.toolWindow.chat.block.SimpleMessage
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.CmdUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
+import com.github.zjh7890.gpttools.utils.JsonUtils
 import com.github.zjh7890.gpttools.utils.ParseUtils
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
@@ -122,7 +123,9 @@ ${border}
                 responseText += it
             }
         }
+        logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
         chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
+        chatSession.exportChatHistory()
 //            val parsedResponse = ParseUtils.processResponse(responseText)
 //            // 完成后处理最终结果
 //            try {

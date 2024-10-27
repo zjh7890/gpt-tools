@@ -2,7 +2,6 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
-import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
@@ -20,7 +19,6 @@ import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.ui.dsl.builder.panel
@@ -28,8 +26,6 @@ import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.onCompletion
 import org.jetbrains.annotations.Nls
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -37,26 +33,26 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
 
-class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
+class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
     NullableComponent {
-    private val logger = logger<LLMChatToolPanel>()
+    private val logger = logger<ChatToolPanel>()
 
-    private var progressBar: JProgressBar
-    private val myTitle = JBLabel("Conversation")
-    private val myList = JPanel(VerticalLayout(JBUI.scale(10)))
-    private var inputSection: AutoDevInputSection
-    private val withContextCheckbox = JCheckBox("WithContext", true)
-    private val generateDiffCheckbox = JCheckBox("Generate Diff", CommonSettings.getInstance(project).generateDiff)
-    private val focusMouseListener: MouseAdapter
-    private var panelContent: DialogPanel
-    private val myScrollPane: JBScrollPane
+    var progressBar: JProgressBar
+    val myTitle = JBLabel("Conversation")
+    val myList = JPanel(VerticalLayout(JBUI.scale(10)))
+    var inputSection: AutoDevInputSection
+    val withContextCheckbox = JCheckBox("WithContext", true)
+    val generateDiffCheckbox = JCheckBox("Generate Diff", CommonSettings.getInstance(project).generateDiff)
+    val focusMouseListener: MouseAdapter
+    var panelContent: DialogPanel
+    val myScrollPane: JBScrollPane
 
-    private var suggestionPanel: JPanel = JPanel(BorderLayout())
+    var suggestionPanel: JPanel = JPanel(BorderLayout())
 
-    private val chatCodingService: ChatCodingService = ChatCodingService.getInstance(project)
+    val chatCodingService: ChatCodingService = ChatCodingService.getInstance(project)
 
-    private var editingMessageView: MessageView? = null
+    var editingMessageView: MessageView? = null
     private val editingLabel = JLabel()
     // 定义退出编辑模式的动作
     val exitEditingAction = object : AnAction("Exit Editing", "Exit editing mode", AllIcons.Actions.Close) {
@@ -111,6 +107,7 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
         editingPanel.isVisible = false
 
         progressBar = JProgressBar()
+        progressBar.isVisible = false
 
         inputSection = AutoDevInputSection(chatCodingService.project, disposable)
         inputSection.addListener(object : AutoDevInputListener {
@@ -159,7 +156,7 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
 
                     // 重新处理该消息
                     chatCodingService.handlePromptAndResponse(
-                        this@LLMChatToolPanel,
+                        this@ChatToolPanel,
                         prompt,
                         trigger == AutoDevInputTrigger.SearchContext,
                         editingMessage,
@@ -167,7 +164,7 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
                     )
                 } else {
                     chatCodingService.handlePromptAndResponse(
-                        this@LLMChatToolPanel,
+                        this@ChatToolPanel,
                         prompt,
                         trigger == AutoDevInputTrigger.SearchContext,
                         null,
@@ -290,19 +287,6 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
         }
     }
 
-    suspend fun updateMessage(content: Flow<String>, messageView: MessageView): String {
-        progressBar.isVisible = true
-        progressBar.isIndeterminate = true  // 设置为不确定状态
-
-        val result = updateMessageInUi(content, messageView)
-
-        progressBar.isIndeterminate = false // 处理完成后恢复确定状态
-        progressBar.isVisible = false
-        updateUI()
-
-        return result
-    }
-
     private fun scrollToBottom() {
         SwingUtilities.invokeLater {
             val verticalScrollBar = myScrollPane.verticalScrollBar
@@ -330,30 +314,6 @@ class LLMChatToolPanel(val disposable: Disposable?, val project: Project) :
 //        updateUI()
 //
 //        postAction(text)
-    }
-
-    private suspend fun updateMessageInUi(content: Flow<String>, messageView: MessageView): String {
-        val startTime = System.currentTimeMillis() // 记录代码开始执行的时间
-
-        var text = ""
-        content.onCompletion {
-            logger.warn("onCompletion ${it?.message}")
-            inputSection.showSendButton()
-        }.catch {
-            it.printStackTrace()
-        }.collect {
-            text += it
-
-//            val verticalScrollBar = myScrollPane.verticalScrollBar
-//            val isAtBottom = verticalScrollBar.value + verticalScrollBar.visibleAmount >= verticalScrollBar.maximum
-
-            messageView.updateContent(text)
-            messageView.scrollToBottom()
-        }
-        messageView.message = text
-        messageView.reRender()
-
-        return text
     }
 
     fun setInput(trimMargin: String) {

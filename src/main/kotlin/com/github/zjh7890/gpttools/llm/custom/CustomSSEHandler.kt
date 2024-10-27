@@ -7,7 +7,6 @@ import com.intellij.openapi.diagnostic.logger
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.extension.read
 import com.github.zjh7890.gpttools.llm.custom.sse.ChatCompletionResult
-import com.github.zjh7890.gpttools.llm.custom.sse.JSONBodyResponseCallback
 import com.github.zjh7890.gpttools.llm.custom.sse.ResponseBodyCallback
 import com.github.zjh7890.gpttools.llm.custom.sse.SSE
 import com.github.zjh7890.gpttools.console.CustomFlowWrapper
@@ -40,24 +39,7 @@ import org.jetbrains.annotations.VisibleForTesting
 open class CustomSSEHandler {
     open var hasSuccessRequest: Boolean = false
     private var parseFailedResponses: MutableList<String> = mutableListOf()
-
-    open val requestFormat: String = ""
-    open var responseFormat: String = "\$.choices[0].delta.content" // 新增字段
-
-
     private val logger = logger<CustomSSEHandler>()
-
-    fun streamJson(call: Call, messages: MutableList<ChatMessage>, responseFormat: String): Flow<String> = callbackFlow {
-        call.enqueue(JSONBodyResponseCallback(responseFormat) {
-            withContext(Dispatchers.IO) {
-                send(it)
-            }
-
-            messages.add(ChatMessage(ChatRole.assistant, it))
-            close()
-        })
-        awaitClose()
-    }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun streamSSE(call: Call, messages: MutableList<ChatMessage>, responseFormat: String): Flow<String> {
@@ -118,8 +100,6 @@ open class CustomSSEHandler {
                         // don't use trySend, it may be ignored by 'close()` op
                         send(errorMsg)
                         }
-
-                    messages.add(ChatMessage(ChatRole.assistant, output))
                     close()
                 }
                 awaitClose()

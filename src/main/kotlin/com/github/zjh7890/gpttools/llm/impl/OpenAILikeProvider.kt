@@ -9,6 +9,8 @@ import com.intellij.openapi.diagnostic.logger
 import com.github.zjh7890.gpttools.llm.custom.CustomSSEHandler
 import com.github.zjh7890.gpttools.llm.custom.appendCustomHeaders
 import com.github.zjh7890.gpttools.llm.custom.updateCustomFormat
+import com.nfeld.jsonpathkt.JsonPath
+import com.nfeld.jsonpathkt.extension.read
 import kotlinx.coroutines.flow.Flow
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -38,14 +40,17 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
 
     private var client = OkHttpClient()
 
-    override fun stream(
+    override fun call(
         messages: MutableList<ChatMessage>,
         llmConfig: LlmConfig
     ): Flow<String> {
+        // 根据 responseType 决定 stream 的值
+        val isStream = llmConfig.responseType == ShireSettingsState.ResponseType.SSE
+
         val requestFormat: String = if (llmConfig.maxTokens != null) {
-            """{ "customFields": {"model": "${llmConfig.model}", "temperature": ${llmConfig.temperature}, "max_tokens": ${llmConfig.maxTokens}, "stream": false} }"""
+            """{ "customFields": {"model": "${llmConfig.model}", "temperature": ${llmConfig.temperature}, "max_tokens": ${llmConfig.maxTokens}, "stream": $isStream} }"""
         } else {
-            """{ "customFields": {"model": "${llmConfig.model}", "temperature": ${llmConfig.temperature}, "stream": false} }"""
+            """{ "customFields": {"model": "${llmConfig.model}", "temperature": ${llmConfig.temperature}, "stream": $isStream} }"""
         }
 
         val customRequest = CustomRequest(messages)
@@ -60,7 +65,7 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
         }
         builder.appendCustomHeaders(requestFormat)
 
-        logger<OpenAILikeProvider>().warn("Requesting form: $requestContent $body")
+        logger<OpenAILikeProvider>().warn("Requesting form: $requestContent")
 
         client = client.newBuilder().readTimeout(timeout).build()
         val call = client.newCall(builder.url(llmConfig.apiBase).post(body).build())
@@ -68,7 +73,13 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
         return if (llmConfig.responseType == ShireSettingsState.ResponseType.SSE) {
             streamSSE(call, messages, llmConfig.responseFormat)
         } else {
-            streamJson(call, messages, llmConfig.responseFormat)
+            val response = call.execute()
+            val responseBody: String? = response.body?.string()
+            logger<OpenAILikeProvider>().warn("LLM response body non stream: $responseBody")
+            val responseContent: String = JsonPath.parse(responseBody)?.read(llmConfig.responseFormat) ?: ""
+            kotlinx.coroutines.flow.flow {
+                emit(responseContent)
+            }
         }
     }
 }

@@ -118,7 +118,7 @@ class CodeBlockView(
                 it.isFoldingOutlineShown = false
                 it.isRightMarginShown = false
                 it.isShowIntentionBulb = false
-                it.isUseSoftWraps = true
+                it.isUseSoftWraps = false
                 it.isRefrainFromScrolling = true
                 it.isAdditionalPageAtBottom = false
                 it.isCaretRowShown = false
@@ -146,7 +146,6 @@ class CodeBlockView(
             message: CompletableMessage,
             block: CodeBlock,
         ): CodePartEditorInfo {
-            val forceFoldEditorByDefault = false
             val file = LightVirtualFile(AUTODEV_SNIPPET_NAME, language, graphProperty.get())
             if (file.fileType == UnknownFileType.INSTANCE) {
                 file.fileType = PlainTextFileType.INSTANCE
@@ -186,7 +185,6 @@ class CodeBlockView(
             editor.component.border = JBUI.Borders.empty()
 
             val editorFragment = EditorFragment(project, editor, message)
-            editorFragment.setCollapsed(forceFoldEditorByDefault)
             editorFragment.updateExpandCollapseLabel()
 
             return CodePartEditorInfo(graphProperty, editorFragment.getContent(), editor, file)

@@ -20,10 +20,12 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
     }
 
     data class State(
-        var generateDiff: Boolean = false
+        var generateDiff: Boolean = false,
+        var withContext: Boolean = true
     )
 
     private var state = State()
+    
 
     override fun getState(): State {
         return state
@@ -37,5 +39,11 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
         get() = state.generateDiff
         set(value) {
             state.generateDiff = value
+        }
+
+    var withContext: Boolean
+        get() = state.withContext
+        set(value) {
+            state.withContext = value
         }
 }

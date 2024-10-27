@@ -40,16 +40,16 @@ class LLMChatToolWindowFactory : ToolWindowFactory, DumbAware {
         }
         
 
-        fun getPanel(project: Project): LLMChatToolPanel? {
+        fun getPanel(project: Project): ChatToolPanel? {
             return LLMChatToolWindowFactory.getToolWindow(project)
-                ?.contentManager?.getContent(0)?.component as? LLMChatToolPanel
+                ?.contentManager?.getContent(0)?.component as? ChatToolPanel
         }
 
         fun createToolWindowContentStatic(project: Project, toolWindow: ToolWindow, reloadSession: Boolean = false) {
             val contentManager = toolWindow.contentManager
 
             // 创建 Chat Panel
-            val chatPanel = LLMChatToolPanel(toolWindow.disposable, project)
+            val chatPanel = ChatToolPanel(toolWindow.disposable, project)
             val chatContent = ContentFactory.getInstance()
                 .createContent(chatPanel, MyBundle.message("chat.title"), false)
             contentManager.addContent(chatContent)
@@ -70,7 +70,7 @@ class LLMNewChatAction : AnAction("New Chat", "New Chat", AllIcons.Actions.Edit)
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val contentPanel = LLMChatToolWindowFactory.getToolWindow(project)
-            ?.contentManager?.getContent(0)?.component as? LLMChatToolPanel
+            ?.contentManager?.getContent(0)?.component as? ChatToolPanel
         if (contentPanel == null) {
             throw IllegalStateException("Content panel is null")
         }
