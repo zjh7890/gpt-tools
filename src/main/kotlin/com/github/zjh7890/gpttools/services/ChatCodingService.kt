@@ -75,13 +75,23 @@ class ChatCodingService(val project: Project) : Disposable{
         val filePath = getSessionsFilePath()
         val sessionsData: List<SerializableChatSession>? = FileUtil.readJsonFromFile(filePath)
         sessionsData?.forEach { data ->
-            val session = data.toChatSession(project)  // 修改
+            val session = data.toChatSession(project)
             sessions[session.id] = session
         }
-        if (sessions.isEmpty()) {
+        // 获取当前项目的会话列表
+        val currentProjectSessions = sessions.values
+            .filter { it.project == project.name }
+
+        if (currentProjectSessions.isEmpty()) {
+            // 如果当前项目没有会话，创建新会话
             newSession()
+        } else {
+            // 设置当前项目最新的会话为当前会话
+            currentSessionId = currentProjectSessions
+                .maxByOrNull { it.startTime }
+                ?.id
+                ?: currentProjectSessions.first().id
         }
-        currentSessionId = sessions.keys.lastOrNull() ?: ""
     }
 
     private fun getSessionsFilePath(): String {
@@ -341,7 +351,11 @@ ${FileUtil.wrapBorder(fileContent)}
 
     fun newSession(keepContext: Boolean = false) {
         val sessionId = UUID.randomUUID().toString()
-        val newSession = ChatSession(id = sessionId, type = "chat")
+        val newSession = ChatSession(
+            id = sessionId, 
+            type = "chat",
+            project = project.name
+        )
 
         currentSessionId = sessionId
         sessions[sessionId] = newSession
@@ -379,7 +393,12 @@ ${FileUtil.wrapBorder(fileContent)}
     }
 
     private fun notifySessionListChanged() {
-        sessionListeners.forEach { it.sessionListChanged() }
+        if (sessionListeners == null) {
+            return
+        }
+        sessionListeners.forEach { listener ->
+            listener.sessionListChanged()
+        }
     }
 
     fun addFileToCurrentSession(virtualFile: VirtualFile) {
@@ -401,7 +420,8 @@ data class ChatSession(
     val startTime: Long = System.currentTimeMillis(),
     val type: String,
     var fileList: MutableList<VirtualFile> = mutableListOf(),
-    var withContext: Boolean = true
+    var withContext: Boolean = true,
+    val project: String
 ) {
     // 添加序列化方法
     fun toSerializable(): SerializableChatSession {
@@ -411,7 +431,8 @@ data class ChatSession(
             startTime = startTime,
             type = type,
             withContext = withContext,
-            filePaths = fileList.map { it.path }.toMutableList()  // 新增
+            filePaths = fileList.map { it.path }.toMutableList(),
+            projectName = project
         )
     }
 
@@ -527,7 +548,8 @@ ${FileUtil.wrapBorder(it.context)}
                 startTime = data.startTime,
                 type = data.type,
                 fileList = virtualFiles,  // 新增
-                withContext = CommonSettings.getInstance(project).withContext
+                withContext = CommonSettings.getInstance(project).withContext,
+                data.projectName
             )
         }
     }
@@ -547,7 +569,8 @@ data class SerializableChatSession @JvmOverloads constructor(
     val startTime: Long = 0L,
     val type: String = "",
     val withContext: Boolean = true,
-    val filePaths: MutableList<String> = mutableListOf()  // 新增
+    val filePaths: MutableList<String> = mutableListOf(),
+    val projectName: String = ""
 ) {
     fun toChatSession(project: Project): ChatSession {
         return ChatSession.fromSerializable(this, project)

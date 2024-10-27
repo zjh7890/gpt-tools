@@ -28,7 +28,7 @@ object GenerateDiffAgent {
         currentSession: ChatSession
     ) {
         val border = FileUtil.determineBorder(response)
-        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply")
+        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply", project = project.name)
 
         var fileContent = "No files."
         if (currentSession.fileList.isNotEmpty()) {

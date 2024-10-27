@@ -24,7 +24,7 @@ object ContextCollectAgent {
         projectStructure: String,
         project: Project
     ) : List<String> {
-        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "collect")
+        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "collect", project = project.name)
         chatSession.add(
             ChatContextMessage(ChatRole.user, """
 你是一个代码上下文收集 agent，我会给你提供代码仓库的结构，你的目标是根据我的需求在代码仓库收集相关的文件，你完全不负责开发，开发会有别的 agent 负责，你不需要关心，但是你必须要收集完整的上下文文件：包括需求开发过程中需要参考查看的文件，需要改动的文件。
