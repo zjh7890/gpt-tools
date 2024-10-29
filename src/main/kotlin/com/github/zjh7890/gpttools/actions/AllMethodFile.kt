@@ -14,7 +14,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.CommonProcessors
-import fleet.util.cast
 
 
 class AllMethodFile : AnAction() {
@@ -42,8 +41,8 @@ class AllMethodFile : AnAction() {
 //        val callsLinks = generateRpcCallsLinksFromTree(dependency.methodTree)
 //        val message = callsLinks.joinToString("\n")
 
-        val joinToString = dependency.psiElementList.filter { it is PsiMethod }
-            .map { "${it.cast<PsiMethod>().containingClass?.name}\n```\n${it.text}\n```\n" }
+        val joinToString = dependency.psiElementList.filterIsInstance<PsiMethod>()
+            .map { "${it.containingClass?.name}\n```\n${it.text}\n```\n" }
             .joinToString("\n")
 
 //        val element = simplyFileByDependency(method.containingFile!!, dependency, project)

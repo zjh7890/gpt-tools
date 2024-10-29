@@ -15,13 +15,13 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="GptToolsContextToolWindow"
-                    anchor="right"
-                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"
-                    canCloseContent="false"
-                    canWorkInDumbMode="true"
-            icon="/icons/icon.svg">
-        </toolWindow>
+<!--        <toolWindow id="GptToolsContextToolWindow"-->
+<!--                    anchor="right"-->
+<!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"-->
+<!--                    canCloseContent="false"-->
+<!--                    canWorkInDumbMode="true"-->
+<!--            icon="/icons/icon_16px.svg">-->
+<!--        </toolWindow>-->
 
         <!-- mapper.xml文件属性提示 -->
         <dom.fileMetaData id="baomidou.MapperDescription"
@@ -56,11 +56,11 @@
                     anchor="right"
                     factoryClass="com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory"
                     canCloseContents="false"
-                    icon="/icons/iconLLM.svg">
+                    icon="/icons/icon_16px.svg">
             <title>LLm Chat Code</title>
         </toolWindow>
 
-        <toolWindow id="SearchToolWindowFactory" anchor="right" factoryClass="com.github.zjh7890.gpttools.toolWindow.search.SearchToolWindowFactory" />
+<!--        <toolWindow id="SearchToolWindowFactory" anchor="right" factoryClass="com.github.zjh7890.gpttools.toolWindow.search.SearchToolWindowFactory" />-->
 
         <projectConfigurable instance="com.github.zjh7890.gpttools.settings.actionPrompt.TemplateConfigurable"/>
 
