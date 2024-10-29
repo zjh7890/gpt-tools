@@ -54,7 +54,7 @@ class ResponseBodyCallback(private val emitter: FlowableEmitter<SSE>, private va
             var line: String? = null
             var sse: SSE? = null
             while (!emitter.isCancelled && reader.readLine().also { line = it } != null) {
-                logger<ResponseBodyCallback>().warn("SSE Read line: $line")
+//                logger<ResponseBodyCallback>().warn("SSE Read line: $line")
                 sse = when {
                     line!!.startsWith("data:") -> {
                         val data = line!!.substring(5).trim { it <= ' ' }

@@ -82,7 +82,7 @@ class ChangesListView(
                 }
                 panel.isOpaque = true
                 if (isSelected) {
-                    panel.background = list?.selectionBackground
+                    panel.background = Color.decode("#d8e4fc")  // 使用新的选中颜色
                     panel.foreground = list?.selectionForeground
                 } else {
                     panel.background = list?.background
