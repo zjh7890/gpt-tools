@@ -10,11 +10,10 @@ import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
-import com.intellij.openapi.actionSystem.toolbarLayout.ToolbarLayoutStrategy
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
@@ -100,11 +99,11 @@ class MessageView(
             }
         }
 
-        val toolbar = ActionToolbarImpl(javaClass.name, group, true)
-        toolbar.layoutStrategy = ToolbarLayoutStrategy.NOWRAP_STRATEGY
+        val toolbar = ActionManager.getInstance()
+            .createActionToolbar("MessageViewToolbar", group, true)
         toolbar.component.isOpaque = false
         toolbar.component.border = JBUI.Borders.empty()
-        toolbar.setTargetComponent(this)
+        toolbar.targetComponent = this
         panel.addToRight(toolbar.component)
 
         panel.isOpaque = false

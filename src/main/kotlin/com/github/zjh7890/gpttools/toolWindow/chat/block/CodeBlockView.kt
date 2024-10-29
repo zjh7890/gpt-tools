@@ -6,7 +6,9 @@ import CodeChangeBlockView
 import com.github.zjh7890.gpttools.utils.Code
 import com.intellij.lang.Language
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.application.ReadAction
@@ -161,23 +163,18 @@ class CodeBlockView(
                 add(AutoDevRunDevInsAction(block))
             }
             toolbarActionGroup?.let {
-                val toolbar: ActionToolbarImpl =
-                    object : ActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, toolbarActionGroup, true) {
-                        override fun updateUI() {
-                            super.updateUI()
-                            editor.component.border = JBUI.Borders.empty()
-                        }
-                    }
+                val toolbar: ActionToolbar = ActionManager.getInstance()
+                    .createActionToolbar(ActionPlaces.MAIN_TOOLBAR, toolbarActionGroup, true)
 
-                toolbar.background = editor.backgroundColor
-                toolbar.isOpaque = true
+                toolbar.component.background = editor.backgroundColor
+                toolbar.component.isOpaque = true
                 toolbar.targetComponent = editor.contentComponent
-                editor.headerComponent = toolbar
+                editor.headerComponent = toolbar.component
 
                 val connect = project.messageBus.connect(disposable)
                 val topic: Topic<EditorColorsListener> = EditorColorsManager.TOPIC
                 connect.subscribe(topic, EditorColorsListener {
-                    toolbar.background = editor.backgroundColor
+                    toolbar.component.background = editor.backgroundColor
                 })
             }
 
