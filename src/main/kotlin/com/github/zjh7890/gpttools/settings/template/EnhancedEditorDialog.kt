@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.settings.actionPrompt
+package com.github.zjh7890.gpttools.settings.template
 
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
@@ -8,7 +8,6 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Splitter
 import javax.swing.*
 import java.awt.BorderLayout
-import java.awt.Dimension
 
 class EnhancedEditorDialog(val project: Project, private var template: PromptTemplate?) : DialogWrapper(project) {
     private var editor: Editor? = null

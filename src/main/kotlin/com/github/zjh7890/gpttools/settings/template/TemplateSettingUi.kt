@@ -1,8 +1,8 @@
-package com.github.zjh7890.gpttools.settings.actionPrompt
+package com.github.zjh7890.gpttools.settings.template
 
 import com.fasterxml.jackson.core.type.TypeReference
-import com.github.zjh7890.gpttools.components.JsonLanguageField
 import com.github.zjh7890.gpttools.components.LeftRightComponent
+import com.github.zjh7890.gpttools.settings.GptToolsConfigurable
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.JsonUtils
 import com.google.common.reflect.TypeToken
@@ -11,7 +11,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.ToolbarDecorator
@@ -22,35 +21,13 @@ import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
-class TemplateConfigurable(private val project: Project) : Configurable {
-    private var myComponent: CodeTemplateUi? = null
-    private val appSettings: CodeTemplateApplicationSettingsService = CodeTemplateApplicationSettingsService.instance
-    private val projectSettings: CodeTemplateProjectSetting
-        get() = CodeTemplateProjectSetting.getInstance(project)
-
-    override fun createComponent(): JComponent? {
-        myComponent = CodeTemplateUi(project, appSettings, this)
-        return myComponent?.panel
-    }
-
-    override fun isModified(): Boolean = myComponent?.isModified(appSettings.state, projectSettings.state) ?: false
-    override fun apply(): Unit = myComponent!!.applyTo(appSettings.state, projectSettings.state)
-    override fun reset(): Unit = myComponent!!.resetFrom(appSettings.state, projectSettings.state)
-    override fun getDisplayName(): String = "gpt-tools"
-    override fun disposeUIResources() {
-        myComponent = null
-    }
-}
-
-class CodeTemplateUi(
+class TemplateSettingUi(
     val project: Project,
-    val appSettings: CodeTemplateApplicationSettingsService,
-    val templateConfigurable: TemplateConfigurable
+    val templateSettings: CodeTemplateApplicationSettingsService,
+    val gptToolsConfigurable: GptToolsConfigurable
 ) {
-    val panel = JTabbedPane()
+    val panel = JPanel(BorderLayout())
     private val templateList = JBList<PromptTemplate>(DefaultListModel<PromptTemplate>())
-    val jsonTextArea = JsonLanguageField(project, "", "Context", "projectTreeConfig.json")
-//    var selectedItem : PromptTemplate? = null
     private val combinedPanel = JPanel(BorderLayout())
 
     init {
@@ -70,7 +47,6 @@ class CodeTemplateUi(
             }
         }
 
-//        selected = selectedTemplate
         templateList.addListSelectionListener {
             if (!it.valueIsAdjusting) {
                 val selectedTemplate = templateList.selectedValue
@@ -100,13 +76,9 @@ class CodeTemplateUi(
             })
 
         updateCombinedPanelDisplay(project, null)
-        val jsonPanel = JPanel(BorderLayout())
-        jsonPanel.add(JScrollPane(jsonTextArea), BorderLayout.CENTER)
 
         val templatePanel = LeftRightComponent(templatesDecorator.createPanel(), combinedPanel).mainPanel
-
-        panel.addTab("Templates", templatePanel)
-        panel.addTab("JSON Data", jsonPanel)
+        panel.add(templatePanel, BorderLayout.CENTER)
     }
 
     private fun updateCombinedPanelDisplay(project: Project, selectedItem: PromptTemplate?) {
@@ -121,12 +93,10 @@ class CodeTemplateUi(
             val input4 = JTextField()
             val input5 = JTextField()
 
-
             val formBuilder: FormBuilder = FormBuilder.createFormBuilder()
             // 如果 desc 以 * 开头，添加警告标签
             if (selectedItem.desc.startsWith("*")) {
                 val warningLabel = JLabel("* 开头的模板修改将不生效，请复制模板后去掉 * 号再进行修改").apply {
-//                    foreground = Color.ORANGE
                     isOpaque = true
                     background = Color(255, 255, 204)  // 浅黄色背景
                 }
@@ -141,7 +111,6 @@ class CodeTemplateUi(
                     JButton("Open Editor").apply {
                         addActionListener {
                             val popup = EnhancedEditorDialog(project, selectedItem)
-//                popup.setLocationRelativeTo(panel)
                             popup.show()
                         }
                     }
@@ -154,8 +123,6 @@ class CodeTemplateUi(
                 .addLabeledComponent("Input5:", input5)
                 .addComponentFillVertically(JPanel(), 0)
                 .panel
-
-
 
             keyTextField.text = selectedItem.key ?: ""
             keyTextField.document.addDocumentListener(object : DocumentListener {
@@ -255,7 +222,6 @@ class CodeTemplateUi(
         combinedPanel.repaint()
     }
 
-    // 导出模型到剪切板
     private fun exportTemplatesToJson() {
         val model = templateList.model as DefaultListModel<PromptTemplate>
         val newTemplatesList = model.elements().toList()
@@ -266,26 +232,24 @@ class CodeTemplateUi(
         Messages.showInfoMessage("Options exported to clipboard.", "Export Successful")
     }
 
-    // 从剪切板导入模型
     private fun importTemplatesFromJson() {
         val jsonInput = Messages.showMultilineInputDialog(
             project,
             "Paste the JSON here:",
             "Import Options",
-            "",  // 图标可以传 `null`，如果没有自定义图标的需求
+            "",
             null,
             null
         )
         if (jsonInput != null) {
             try {
-                // 校验下是 json 格式
                 val type = object : TypeToken<List<PromptTemplate>>() {}.type
                 val importedTemplates = Gson().fromJson<List<PromptTemplate>>(jsonInput, type)
 
-                appSettings.state.templates = jsonInput
+                templateSettings.state.templates = jsonInput
 
                 ApplicationManager.getApplication().invokeLater {
-                    templateConfigurable.reset()
+                    gptToolsConfigurable.reset()
                 }
             } catch (ex: Exception) {
                 Messages.showErrorDialog("Failed to import options: " + ex.message, "Import Error")
@@ -324,7 +288,6 @@ class CodeTemplateUi(
 
     private fun showPromptTemplateDialog(template: PromptTemplate? = null): PromptTemplate? {
         val keyField = JTextField(10).apply { text = template?.key ?: "" }
-//        val valueTextArea = JTextArea(5, 20).apply { text = template?.value ?: ""; lineWrap = true; wrapStyleWord = true }
         val descField = JTextField(10).apply { text = template?.desc ?: "" }
 
         val panel = JPanel(GridBagLayout()).apply {
@@ -336,8 +299,6 @@ class CodeTemplateUi(
             }
             add(JLabel("Key:"), gbc)
             add(keyField, gbc.clone().apply {  })
-//            add(JLabel("Value:"), gbc)
-//            add(valueTextArea, gbc.clone().apply { })
             add(JLabel("Description:"), gbc)
             add(descField, gbc.clone().apply {  })
         }
@@ -395,10 +356,7 @@ class CodeTemplateUi(
         }
     }
 
-    fun isModified(
-        appSetting: CodeTemplateApplicationSettings,
-        settings: CodeTemplateProjectSettings
-    ): Boolean {
+    fun isModified(appSetting: CodeTemplateApplicationSettings): Boolean {
         val model = templateList.model as DefaultListModel<PromptTemplate>
         val listOptions = model.elements().asSequence().toList()
 
@@ -418,27 +376,17 @@ class CodeTemplateUi(
             }
         }
 
-        // Check if the JSON data in the settings has been modified
-        val isJsonModified = jsonTextArea.text != settings.jsonData
-
-        return isJsonModified
+        return false
     }
 
-    fun resetFrom(
-        appSetting: CodeTemplateApplicationSettings,
-        settings: CodeTemplateProjectSettings
-    ) {
+    fun resetFrom(appSetting: CodeTemplateApplicationSettings) {
         val model = templateList.model as DefaultListModel<PromptTemplate>
         model.clear()
         JsonUtils.parse(appSetting.templates, object : TypeReference<List<PromptTemplate>>() {})
             .forEach(model::addElement)
-        jsonTextArea.text = settings.jsonData ?: "{}"
     }
 
-    fun applyTo(
-        appSetting: CodeTemplateApplicationSettings,
-        settings: CodeTemplateProjectSettings
-    ) {
+    fun applyTo(appSetting: CodeTemplateApplicationSettings) {
         val model = templateList.model as DefaultListModel<PromptTemplate>
         val newTemplatesList = model.elements().toList()
 
@@ -446,8 +394,5 @@ class CodeTemplateUi(
 
         // 替换旧的列表与新的列表
         appSetting.templates = JsonUtils.toJson(templateList1)
-
-        // 更新JSON数据
-        settings.jsonData = jsonTextArea.text
     }
 }

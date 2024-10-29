@@ -1,9 +1,6 @@
 package com.github.zjh7890.gpttools.llm
 
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
-import com.intellij.json.psi.JsonObject
-import com.github.zjh7890.gpttools.index.findNumber
-import com.github.zjh7890.gpttools.index.findString
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.settings.llmSetting.Provider
 
 class LlmConfig(
@@ -17,7 +14,7 @@ class LlmConfig(
     val requestFormat: Map<String, String> = mapOf(),
     val responseFormat: String = "\$.choices[0].delta.content", // 默认值
     val messageKeys: Map<String, String> = mapOf(),
-    val responseType: ShireSettingsState.ResponseType, // 新增的 responseType 参数
+    val responseType: LLMSettingsState.ResponseType, // 新增的 responseType 参数
 
     // 新增 Azure 相关字段
     var azureEndpoint: String = "",

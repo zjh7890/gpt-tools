@@ -1,6 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.settings.template.PromptTemplate
 import com.github.zjh7890.gpttools.utils.*
 import com.intellij.dvcs.repo.VcsRepositoryManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -19,7 +19,6 @@ import com.intellij.openapi.vcs.changes.BinaryContentRevision
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
-import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
 import com.intellij.util.containers.stream
 import com.intellij.vcs.log.VcsFullCommitDetails

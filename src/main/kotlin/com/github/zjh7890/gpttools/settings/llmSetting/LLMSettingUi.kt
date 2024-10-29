@@ -5,7 +5,6 @@ import com.github.zjh7890.gpttools.components.LeftRightComponent
 import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
-import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.google.gson.Gson
@@ -33,15 +32,13 @@ import java.awt.event.ItemEvent
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
-import javax.swing.event.ListSelectionEvent
-import javax.swing.event.ListSelectionListener
 
-class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
+class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
 
-    private var mainPanel: JTabbedPane? = null
+    private var mainPanel: JComponent? = null
 
     // 使用 DefaultListModel 管理 ShireSetting 项目
-    private val listModel = DefaultListModel<ShireSetting>()
+    private val listModel = DefaultListModel<LLMSetting>()
 
     // 创建一个 JBList 并设置模型
     private val settingsList = JBList(listModel).apply {
@@ -56,7 +53,7 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
                 cellHasFocus: Boolean
             ): Component {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
-                if (value is ShireSetting) {
+                if (value is LLMSetting) {
                     val provider = value.provider.name
                     if (value.isDefault) {
                         text = "${value.modelName} [$provider] ✅" // 显示 Provider 信息
@@ -118,13 +115,10 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
         val combinedPanel = LeftRightComponent(listPanel, detailPanel).mainPanel
 
         // 初始化主选项卡
-        mainPanel = JTabbedPane().apply {
-            addTab("Configurations", combinedPanel)
-            // 可以根据需要添加其他选项卡
-        }
+        mainPanel = combinedPanel
     }
 
-    override fun reset(settings: ShireSettingsState) {
+    override fun reset(settings: LLMSettingsState) {
         // 清空当前列表和配置项
         listModel.clear()
 
@@ -141,7 +135,7 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
         }
     }
 
-    override fun isModified(settings: ShireSettingsState): Boolean {
+    override fun isModified(settings: LLMSettingsState): Boolean {
         if (listModel.size != settings.settings.size) return true
         for (i in 0 until listModel.size) {
             val current = listModel.getElementAt(i)
@@ -163,14 +157,14 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
         return false
     }
 
-    override fun apply(settings: ShireSettingsState) {
+    override fun apply(settings: LLMSettingsState) {
         // 清空现有设置并应用列表中的配置项
-        val newSettings = mutableListOf<ShireSetting>()
+        val newSettings = mutableListOf<LLMSetting>()
         for (i in 0 until listModel.size) {
             newSettings.add(listModel.getElementAt(i).copy())
         }
         settings.settings = newSettings
-        ShireSettingsState.getInstance().notifySettingsChanged()
+        LLMSettingsState.getInstance().notifySettingsChanged()
     }
 
     override fun getComponent(): JComponent {
@@ -224,7 +218,7 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
 
     // 导出配置项到 JSON 并复制到剪贴板
     private fun exportConfigurationsToJson() {
-        val configurationsList = mutableListOf<ShireSetting>()
+        val configurationsList = mutableListOf<LLMSetting>()
         for (i in 0 until listModel.size) {
             configurationsList.add(listModel.getElementAt(i))
         }
@@ -245,9 +239,9 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
         )
         if (jsonInput != null) {
             try {
-                val importedSettings: List<ShireSetting> = Gson().fromJson(
+                val importedSettings: List<LLMSetting> = Gson().fromJson(
                     jsonInput,
-                    object : com.google.gson.reflect.TypeToken<List<ShireSetting>>() {}.type
+                    object : com.google.gson.reflect.TypeToken<List<LLMSetting>>() {}.type
                 )
                 listModel.clear()
                 importedSettings.forEach { setting ->
@@ -275,7 +269,7 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
     }
 
     // 显示配置项编辑对话框
-    private fun showShireSettingDialog(setting: ShireSetting? = null): ShireSetting? {
+    private fun showShireSettingDialog(setting: LLMSetting? = null): LLMSetting? {
         val nameField = JTextField(20).apply { text = setting?.modelName ?: "" }
         // 根据 ShireSetting 的字段添加更多输入框
 
@@ -297,7 +291,7 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
         )
 
         return if (result == JOptionPane.OK_OPTION) {
-            ShireSetting(
+            LLMSetting(
                 modelName = nameField.text.trim(),
                 // 初始化其他字段为默认值，用户需要在详细面板中进行编辑
             )
@@ -307,7 +301,7 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
     }
 
     // 更新右侧详细面板
-    private fun updateDetailPanel(setting: ShireSetting?) {
+    private fun updateDetailPanel(setting: LLMSetting?) {
         detailPanel.removeAll()
         if (setting != null) {
             // 查找现有的配置项组件或创建新的
@@ -342,8 +336,8 @@ class ShireSettingUi : ConfigurableUi<ShireSettingsState> {
 }
 
 class ShireConfigItemComponent(
-    var setting: ShireSetting,
-    shireSettingUi: ShireSettingUi,
+    var setting: LLMSetting,
+    LLMSettingUi: LLMSettingUi,
 ) {
     private val panel: JPanel
     private val defaultCheckBox = JBCheckBox("默认配置")
@@ -361,7 +355,7 @@ class ShireConfigItemComponent(
 
     // 公共字段
     private val temperatureField = JBTextField(setting.temperature.toString())
-    private val responseTypeComboBox = JComboBox(ShireSettingsState.ResponseType.values())
+    private val responseTypeComboBox = JComboBox(LLMSettingsState.ResponseType.values())
     private val responseFormatField = JBTextField(setting.responseFormat)
 
     // Test Connection 相关组件
@@ -432,14 +426,14 @@ class ShireConfigItemComponent(
             setting.isDefault = event.stateChange == ItemEvent.SELECTED
             if (setting.isDefault) {
                 // 如果被设置为默认，取消其他配置的默认状态
-                shireSettingUi.unsetOtherDefaults(this)
+                LLMSettingUi.unsetOtherDefaults(this)
             }
         }
 
         // 设置 ResponseType 下拉框监听器
         responseTypeComboBox.selectedItem = setting.responseType
         responseTypeComboBox.addActionListener {
-            setting.responseType = responseTypeComboBox.selectedItem as ShireSettingsState.ResponseType
+            setting.responseType = responseTypeComboBox.selectedItem as LLMSettingsState.ResponseType
         }
 
         // 初始化字段值
@@ -499,7 +493,7 @@ class ShireConfigItemComponent(
     /**
      * 应用当前配置到 setting 对象
      */
-    fun apply(): ShireSetting {
+    fun apply(): LLMSetting {
         setting.provider = providerComboBox.selectedItem as Provider
 
         // 根据 provider 设置独有字段
@@ -521,7 +515,7 @@ class ShireConfigItemComponent(
 
         // 设置公共字段
         setting.temperature = temperatureField.text.toDoubleOrNull() ?: 0.0
-        setting.responseType = responseTypeComboBox.selectedItem as ShireSettingsState.ResponseType
+        setting.responseType = responseTypeComboBox.selectedItem as LLMSettingsState.ResponseType
         setting.responseFormat = responseFormatField.text
         setting.isDefault = defaultCheckBox.isSelected
 
@@ -546,7 +540,7 @@ class ShireConfigItemComponent(
     /**
      * 重置字段值为指定的 setting 对象
      */
-    fun reset(setting: ShireSetting) {
+    fun reset(setting: LLMSetting) {
         providerComboBox.selectedItem = setting.provider
         showProviderFields(setting.provider)
 

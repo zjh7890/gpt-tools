@@ -4,7 +4,7 @@ import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.intellij.icons.AllIcons
@@ -134,7 +134,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 // 从 inputSection 获取选定的配置项
                 val selectedSetting = inputSection.getSelectedSetting()
                 // 将其转换为 LlmConfig
-                val llmConfig = ShireSettingsState.toLlmConfig(selectedSetting)
+                val llmConfig = LLMSettingsState.toLlmConfig(selectedSetting)
 
                 val withContext = withContextCheckbox.isSelected
 
@@ -468,7 +468,7 @@ private class GenerateDiffAction(
             progressBar.isIndeterminate = true
             GenerateDiffAgent.apply(
                 project,
-                ShireSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
+                LLMSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
                 projectStructure,
                 chatHistory,
                 chatCodingService.getCurrentSession(),

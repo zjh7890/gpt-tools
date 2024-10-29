@@ -1,7 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
-import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.settings.template.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
 import com.github.zjh7890.gpttools.utils.TemplateUtils

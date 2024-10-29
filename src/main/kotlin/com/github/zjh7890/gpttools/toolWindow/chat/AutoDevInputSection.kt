@@ -1,7 +1,7 @@
 package com.github.zjh7890.gpttools.toolWindow.chat
 
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSetting
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSetting
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.block.AutoDevCoolBorder
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
@@ -15,34 +15,28 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
-import com.intellij.openapi.ui.ComponentValidator
-import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.impl.InternalDecorator
 import com.intellij.ui.MutableCollectionComboBoxModel
 import com.intellij.ui.SimpleListCellRenderer
-import com.intellij.ui.components.JBLabel
 import com.intellij.util.EventDispatcher
 import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.components.BorderLayoutPanel
-import kotlinx.serialization.json.Json
 import java.awt.CardLayout
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.util.function.Supplier
 import kotlin.math.max
 import kotlin.math.min
-import kotlinx.serialization.decodeFromString
 import javax.swing.*
 
 /**
  *
  */
-class AutoDevInputSection(private val project: Project, val disposable: Disposable?) : BorderLayoutPanel(), ShireSettingsState.SettingsChangeListener {
+class AutoDevInputSection(private val project: Project, val disposable: Disposable?) : BorderLayoutPanel(), LLMSettingsState.SettingsChangeListener {
     private val input: AutoDevInput
     private val documentListener: DocumentListener
     private val sendButtonPresentation: Presentation
@@ -57,7 +51,7 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
     val editorListeners = EventDispatcher.create(AutoDevInputListener::class.java)
     var messageView : MessageView? = null
 
-    private val configComboBox: ComboBox<ShireSetting>
+    private val configComboBox: ComboBox<LLMSetting>
 
     var text: String
         get() {
@@ -132,14 +126,14 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         layoutPanel.setOpaque(false)
 
         // 获取 ShireSettingsState 实例
-        val shireSettingsState = ShireSettingsState.getInstance()
+        val LLMSettingsState = LLMSettingsState.getInstance()
 
         // 将自身添加为设置变化的监听器
-        shireSettingsState.addSettingsChangeListener(this)
+        LLMSettingsState.addSettingsChangeListener(this)
 
 
         // 获取 ShireSettings 列表
-        val settingsList = ShireSettingsState.getInstance().settings
+        val settingsList = LLMSettingsState.settings
 
 // 查找默认的配置项（isDefault 为 true）
         val defaultSetting = settingsList.find { it.isDefault } ?: settingsList.firstOrNull()
@@ -149,10 +143,10 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
 
 // 初始化 ComboBox
         configComboBox = ComboBox(comboBoxModel).apply {
-            renderer = object : SimpleListCellRenderer<ShireSetting>() {
+            renderer = object : SimpleListCellRenderer<LLMSetting>() {
                 override fun customize(
-                    list: JList<out ShireSetting>,
-                    value: ShireSetting?,
+                    list: JList<out LLMSetting>,
+                    value: LLMSetting?,
                     index: Int,
                     selected: Boolean,
                     hasFocus: Boolean
@@ -178,8 +172,8 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         })
     }
 
-    fun getSelectedSetting(): ShireSetting? {
-        return configComboBox.selectedItem as? ShireSetting
+    fun getSelectedSetting(): LLMSetting? {
+        return configComboBox.selectedItem as? LLMSetting
     }
 
     fun showStopButton() {
@@ -248,10 +242,10 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
 
     override fun onSettingsChanged() {
         SwingUtilities.invokeLater {
-            val settingsList = ShireSettingsState.getInstance().settings
+            val settingsList = LLMSettingsState.getInstance().settings
 
             // 获取当前选中的模型
-            val currentSelection = configComboBox.selectedItem as? ShireSetting
+            val currentSelection = configComboBox.selectedItem as? LLMSetting
 
             // 检查当前选中的模型是否仍然存在于新的设置列表中
             val newSelection = if (currentSelection != null && settingsList.contains(currentSelection)) {

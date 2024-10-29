@@ -1,18 +1,13 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.fasterxml.jackson.core.type.TypeReference
-import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
-import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.settings.template.CodeTemplateApplicationSettingsService
+import com.github.zjh7890.gpttools.settings.template.PromptTemplate
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.github.zjh7890.gpttools.utils.JsonUtils
-import com.intellij.codeInsight.intention.IntentionAction
-import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Iconable
-import com.intellij.psi.PsiFile
 import javax.swing.Icon
 
 class PromptGeneratorGroup : ActionGroup(), Iconable {

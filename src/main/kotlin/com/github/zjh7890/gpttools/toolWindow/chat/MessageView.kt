@@ -4,7 +4,7 @@ import CodeChangeBlockView
 import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.block.*
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
@@ -210,7 +210,7 @@ class ApplyResponseAction(val messageView: MessageView) : AnAction("Generate dif
         ApplicationManager.getApplication().executeOnPooledThread {
             GenerateDiffAgent.apply(
                 e.project!!,
-                ShireSettingsState.getLlmConfig(),
+                LLMSettingsState.getLlmConfig(),
                 projectStructure,
                 messageView.message,
                 chatCodingService.getCurrentSession(),

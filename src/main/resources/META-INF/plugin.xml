@@ -62,15 +62,11 @@
 
 <!--        <toolWindow id="SearchToolWindowFactory" anchor="right" factoryClass="com.github.zjh7890.gpttools.toolWindow.search.SearchToolWindowFactory" />-->
 
-        <projectConfigurable instance="com.github.zjh7890.gpttools.settings.actionPrompt.TemplateConfigurable"/>
+        <projectConfigurable instance="com.github.zjh7890.gpttools.settings.GptToolsConfigurable"/>
 
 <!--        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
 <!--                                 id="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
 <!--                                 displayName="GptToolLlm"/>-->
-
-        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSetting.LlmSettingsConfigurable"
-                                 id="llmSettingsConfigurable"
-                                 displayName="GptLLM"/>
 
 <!--        <applicationConfigurable instance="com.example.plugin.MyPluginConfigurable"/>-->
 

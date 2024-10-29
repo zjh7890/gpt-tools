@@ -1,6 +1,6 @@
 package com.github.zjh7890.gpttools.settings.llmSetting
 
-data class ShireSetting(
+data class LLMSetting(
     var temperature: Double = 0.0,
 
     // OpenAI 相关字段
@@ -13,7 +13,7 @@ data class ShireSetting(
     var azureApiKey: String = "",
     var azureModel: String = "",
 
-    var responseType: ShireSettingsState.ResponseType = ShireSettingsState.ResponseType.SSE,
+    var responseType: LLMSettingsState.ResponseType = LLMSettingsState.ResponseType.SSE,
     var responseFormat: String = "\$.choices[0].delta.content",
     var isDefault: Boolean = false, // 新增字段，标记为默认配置
 

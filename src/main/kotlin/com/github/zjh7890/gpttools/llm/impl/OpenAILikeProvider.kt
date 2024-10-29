@@ -4,7 +4,7 @@ import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.CustomRequest
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.intellij.openapi.diagnostic.logger
 import com.github.zjh7890.gpttools.llm.custom.CustomSSEHandler
 import com.github.zjh7890.gpttools.llm.custom.appendCustomHeaders
@@ -45,7 +45,7 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
         llmConfig: LlmConfig
     ): Flow<String> {
         // 根据 responseType 决定 stream 的值
-        val isStream = llmConfig.responseType == ShireSettingsState.ResponseType.SSE
+        val isStream = llmConfig.responseType == LLMSettingsState.ResponseType.SSE
 
         val requestFormat: String = if (llmConfig.maxTokens != null) {
             """{ "customFields": {"model": "${llmConfig.model}", "temperature": ${llmConfig.temperature}, "max_tokens": ${llmConfig.maxTokens}, "stream": $isStream} }"""
@@ -70,7 +70,7 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
         client = client.newBuilder().readTimeout(timeout).build()
         val call = client.newCall(builder.url(llmConfig.apiBase).post(body).build())
 
-        return if (llmConfig.responseType == ShireSettingsState.ResponseType.SSE) {
+        return if (llmConfig.responseType == LLMSettingsState.ResponseType.SSE) {
             streamSSE(call, messages, llmConfig.responseFormat)
         } else {
             val response = call.execute()

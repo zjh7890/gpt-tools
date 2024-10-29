@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.settings.actionPrompt
+package com.github.zjh7890.gpttools.settings.template
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.github.zjh7890.gpttools.utils.FileUtil

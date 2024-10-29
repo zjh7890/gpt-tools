@@ -6,7 +6,6 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
-import com.intellij.openapi.ui.Messages
 import com.intellij.util.xmlb.XmlSerializerUtil
 
 @Service(Service.Level.APP)
@@ -14,9 +13,9 @@ import com.intellij.util.xmlb.XmlSerializerUtil
     name = "com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState",
     storages = [Storage("ShireSettings.xml")]
 )
-class ShireSettingsState : PersistentStateComponent<ShireSettingsState> {
-    var settings: MutableList<ShireSetting> = mutableListOf(
-        ShireSetting()
+class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
+    var settings: MutableList<LLMSetting> = mutableListOf(
+        LLMSetting()
     )
 
     // 添加监听器列表
@@ -39,22 +38,22 @@ class ShireSettingsState : PersistentStateComponent<ShireSettingsState> {
 
 
     @Synchronized
-    override fun getState(): ShireSettingsState = this
+    override fun getState(): LLMSettingsState = this
 
     @Synchronized
-    override fun loadState(state: ShireSettingsState) = XmlSerializerUtil.copyBean(state, this)
+    override fun loadState(state: LLMSettingsState) = XmlSerializerUtil.copyBean(state, this)
 
     /**
      * 获取默认的配置项
-     * @return 默认的 [ShireSetting]，如果没有设置默认项则返回第一项，列表为空时返回 null
+     * @return 默认的 [LLMSetting]，如果没有设置默认项则返回第一项，列表为空时返回 null
      */
-    fun getDefaultSetting(): ShireSetting? {
+    fun getDefaultSetting(): LLMSetting? {
         return settings.find { it.isDefault } ?: settings.firstOrNull()
     }
 
     companion object {
-        fun getInstance(): ShireSettingsState {
-            return ApplicationManager.getApplication().getService(ShireSettingsState::class.java)
+        fun getInstance(): LLMSettingsState {
+            return ApplicationManager.getApplication().getService(LLMSettingsState::class.java)
         }
 
         fun getLlmConfig(): LlmConfig {
@@ -66,7 +65,7 @@ class ShireSettingsState : PersistentStateComponent<ShireSettingsState> {
             return toLlmConfig(defaultSetting)
         }
 
-        fun toLlmConfig(setting: ShireSetting?): LlmConfig {
+        fun toLlmConfig(setting: LLMSetting?): LlmConfig {
             val defaultSetting = setting ?: getInstance().getDefaultSetting()
             ?: throw IllegalStateException("No default setting found")
             return LlmConfig(

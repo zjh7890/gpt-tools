@@ -3,7 +3,7 @@ package com.github.zjh7890.gpttools
 import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.impl.OpenAILikeProvider
-import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
+import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 
 /**
@@ -20,7 +20,7 @@ suspend fun main() {
         apiKey = "",
         model = "o1-mini",
         temperature = 1.0,
-        responseType = ShireSettingsState.ResponseType.JSON,
+        responseType = LLMSettingsState.ResponseType.JSON,
         responseFormat = "\$.choices[0].message.content",
         maxTokens = null
     )

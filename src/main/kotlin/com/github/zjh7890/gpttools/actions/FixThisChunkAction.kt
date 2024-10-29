@@ -1,7 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.settings.actionPrompt.CodeTemplateApplicationSettingsService
-import com.github.zjh7890.gpttools.settings.actionPrompt.PromptTemplate
+import com.github.zjh7890.gpttools.settings.template.CodeTemplateApplicationSettingsService
+import com.github.zjh7890.gpttools.settings.template.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.github.zjh7890.gpttools.utils.TemplateUtils
@@ -13,11 +13,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Iconable
 import com.intellij.openapi.util.TextRange
-import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiMethod
-import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.IncorrectOperationException
 import org.apache.commons.collections.CollectionUtils
 import org.apache.commons.lang3.StringUtils
