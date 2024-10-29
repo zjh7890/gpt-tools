@@ -33,7 +33,7 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
         // New Action to copy files
         val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
             override fun actionPerformed(e: AnActionEvent) {
-                panel.copyAllFiles()
+                panel.copyAllFiles(e.project!!)
             }
 
             override fun getActionUpdateThread(): ActionUpdateThread {

@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.NullableComponent
@@ -245,16 +246,31 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         chatCodingService.getCurrentSession().fileList.forEach { file ->
             val filePanel = JPanel(BorderLayout()).apply {
                 maximumSize = Dimension(Int.MAX_VALUE, 30)
-                add(JLabel(file.name), BorderLayout.WEST)
+                
+                // 创建文件名标签
+                val fileLabel = JLabel(file.name)
+                add(fileLabel, BorderLayout.WEST)
 
-                // 定义退出编辑模式的动作
+                // 添加鼠标监听器处理双击事件
+                fileLabel.addMouseListener(object : MouseAdapter() {
+                    override fun mouseClicked(e: MouseEvent) {
+                        if (e.clickCount == 2) {
+                            // 双击时打开文件
+                            ApplicationManager.getApplication().invokeLater {
+                                FileEditorManager.getInstance(project).openFile(file, true)
+                            }
+                        }
+                    }
+                })
+
+                // 定义移除文件的动作
                 val removeAction = object : AnAction("Remove File", "Remove File", AllIcons.Actions.Close) {
                     override fun actionPerformed(e: AnActionEvent) {
                         chatCodingService.getCurrentSession().fileList.remove(file)
                         refreshFileList()
                     }
                 }
-                // 创建退出编辑模式的按钮
+                // 创建移除按钮
                 val removeButton = ActionButton(removeAction, removeAction.templatePresentation.clone(), "", JBUI.size(16))
 
                 add(removeButton, BorderLayout.EAST)
@@ -445,6 +461,7 @@ private class GenerateDiffAction(
     override fun actionPerformed(e: AnActionEvent) {
         val projectStructure = DirectoryUtil.getDirectoryContents(project)
         val chatHistory = chatCodingService.exportChatHistory(true)
+        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
 
         ApplicationManager.getApplication().executeOnPooledThread {
             progressBar.isVisible = true
@@ -454,7 +471,8 @@ private class GenerateDiffAction(
                 ShireSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
                 projectStructure,
                 chatHistory,
-                chatCodingService.getCurrentSession()
+                chatCodingService.getCurrentSession(),
+                contentPanel!!
             )
             progressBar.isIndeterminate = false
             progressBar.isVisible = false

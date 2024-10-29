@@ -21,6 +21,33 @@ class ChangesListView(
 
     private fun initialize() {
         changesList.setListData(changes.toTypedArray())
+        
+        // 添加鼠标监听器处理双击事件
+        changesList.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                if (e.clickCount == 2) {  // 检查是否是双击
+                    val selectedFile = changesList.selectedValue
+                    selectedFile?.let {
+                        val projectBasePath = project.basePath
+                        // 构建完整的文件路径
+                        val filePath = if (StringUtils.isNotEmpty(it.dirPath)) {
+                            "$projectBasePath/${it.dirPath}/${it.filename}"
+                        } else {
+                            "$projectBasePath/${it.filename}"
+                        }
+                        
+                        // 使用 VirtualFileManager 查找并打开文件
+                        com.intellij.openapi.vfs.LocalFileSystem.getInstance()
+                            .findFileByPath(filePath)?.let { virtualFile ->
+                                com.intellij.openapi.fileEditor.FileEditorManager
+                                    .getInstance(project)
+                                    .openFile(virtualFile, true)
+                            }
+                    }
+                }
+            }
+        })
+
         changesList.cellRenderer = object : ListCellRenderer<CodeChangeFile> {
             override fun getListCellRendererComponent(
                 list: JList<out CodeChangeFile>?,

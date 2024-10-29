@@ -277,6 +277,7 @@ class ShowChangeViewAction(private val project: Project, private val changesList
         val dialogBuilder = DialogBuilder(this.project).apply {
             setTitle("Diff: ${data.filename}")
             setCenterPanel(diffPanel.component)
+            addCancelAction() // 添加这一行来支持 ESC 关闭窗口
             addAction(object : AbstractAction("Accept") {
                 override fun actionPerformed(e: ActionEvent) {
                     WriteCommandAction.runWriteCommandAction(project) {

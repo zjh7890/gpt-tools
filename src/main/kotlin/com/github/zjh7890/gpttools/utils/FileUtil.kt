@@ -26,21 +26,31 @@ object FileUtil {
         } ?: "未找到文件默认内容"
     }
 
-    fun readFileInfoForLLM(virtualFile: VirtualFile?): String? {
+    fun readFileInfoForLLM(virtualFile: VirtualFile?, project: Project): String? {
         virtualFile ?: return null
         var document: Document? = null
         ApplicationManager.getApplication().runReadAction {
             document = FileDocumentManager.getInstance().getDocument(virtualFile)
         }
         val text = document?.text ?: "未找到文件默认内容"
-            val border = determineBorder(text)
-            return """
-${virtualFile.name}:
+        val border = determineBorder(text)
+        
+        // 获取项目根目录的路径
+        val projectPath = project?.basePath
+        // 获取文件相对于项目根目录的路径
+        val relativePath = if (projectPath != null) {
+            VfsUtil.getRelativePath(virtualFile, VfsUtil.findFileByIoFile(File(projectPath), true)!!) ?: virtualFile.name
+        } else {
+            virtualFile.name
+        }
+        
+        return """
+${relativePath}:
 ${border}
 ${text}
 ${border}
         """.trimIndent()
-        }
+    }
 
     fun determineBorder(virtualFile: VirtualFile?): String {
         virtualFile ?: return "```"
@@ -81,7 +91,7 @@ ${border}
     fun readFileInfoForLLM(project: Project, fileList: List<String>): String {
         return fileList.mapNotNull { filePath ->
             val virtualFile = LocalFileSystem.getInstance().findFileByPath(project.basePath + "/" + filePath)
-            readFileInfoForLLM(virtualFile)
+            readFileInfoForLLM(virtualFile, project)
         }.joinToString("\n\n")
     }
 

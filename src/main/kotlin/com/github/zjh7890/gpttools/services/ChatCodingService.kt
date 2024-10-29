@@ -175,11 +175,7 @@ class ChatCodingService(val project: Project) : Disposable{
                 saveSessions()
                 if (CommonSettings.getInstance(project).generateDiff) {
                     ApplicationManager.getApplication().executeOnPooledThread {
-                        ui.progressBar.isVisible = true
-                        ui.progressBar.isIndeterminate = true  // 设置为不确定状态
-                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession())
-                        ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
-                        ui.progressBar.isVisible = false
+                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession(), ui)
                     }
                 }
             }
@@ -191,7 +187,7 @@ class ChatCodingService(val project: Project) : Disposable{
             return
         }
 
-        val fileContent = getCurrentSession().fileList.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
+        val fileContent = getCurrentSession().fileList.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString("\n\n")
 
         val projectInfo = """
 当前项目名称：${project.name}

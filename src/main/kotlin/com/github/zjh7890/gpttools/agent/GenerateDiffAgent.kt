@@ -6,6 +6,7 @@ import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.JsonUtils
@@ -25,14 +26,17 @@ object GenerateDiffAgent {
         llmConfig: LlmConfig,
         projectStructure: String,
         response: String,
-        currentSession: ChatSession
+        currentSession: ChatSession,
+        ui: ChatToolPanel
     ) {
+        ui.progressBar.isVisible = true
+        ui.progressBar.isIndeterminate = true  // 设置为不确定状态
         val border = FileUtil.determineBorder(response)
         val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply", project = project.name)
 
         var fileContent = "No files."
         if (currentSession.fileList.isNotEmpty()) {
-            fileContent = currentSession.fileList.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
+            fileContent = currentSession.fileList.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString("\n\n")
         }
 
         chatSession.add(
@@ -116,7 +120,7 @@ ${border}
             }
         }
         logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
-        chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
+//        chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
         chatSession.exportChatHistory()
 //            val parsedResponse = ParseUtils.processResponse(responseText)
 //            // 完成后处理最终结果
@@ -142,9 +146,11 @@ ${border}
         ApplicationManager.getApplication().invokeLater {
             val contentPanel = LLMChatToolWindowFactory.getPanel(project)
             val chatCodingService = ChatCodingService.getInstance(project)
-            val chatMessage = chatCodingService.appendLocalMessage(ChatRole.assistant, responseText)
-            contentPanel?.addMessage(responseText, true, render = true, chatMessage = chatMessage)
+            val chatMessage = ChatContextMessage(ChatRole.assistant, responseText)
+            contentPanel?.addMessage(responseText, false, render = true, chatMessage = chatMessage)
         }
+        ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
+        ui.progressBar.isVisible = false
     }
 
 

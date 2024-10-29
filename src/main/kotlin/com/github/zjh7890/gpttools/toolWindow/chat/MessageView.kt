@@ -7,6 +7,7 @@ import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.block.*
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
@@ -204,6 +205,7 @@ class ApplyResponseAction(val messageView: MessageView) : AnAction("Generate dif
         }
         val projectStructure = DirectoryUtil.getDirectoryContents(e.project!!)
         val chatCodingService = ChatCodingService.getInstance(e.project!!)
+        val contentPanel = LLMChatToolWindowFactory.getPanel(e.project!!)
 
         ApplicationManager.getApplication().executeOnPooledThread {
             GenerateDiffAgent.apply(
@@ -211,7 +213,8 @@ class ApplyResponseAction(val messageView: MessageView) : AnAction("Generate dif
                 ShireSettingsState.getLlmConfig(),
                 projectStructure,
                 messageView.message,
-                chatCodingService.getCurrentSession()
+                chatCodingService.getCurrentSession(),
+                contentPanel!!
             )
         }
     }

@@ -130,8 +130,8 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         }
     }
 
-    fun copyAllFiles() {
-        val files = addedFiles.map { FileUtil.readFileInfoForLLM(it) }.joinToString ("\n\n")
+    fun copyAllFiles(project: Project) {
+        val files = addedFiles.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString ("\n\n")
 
         val sb: StringBuilder = StringBuilder()
         sb.append("下面是提供的信息：\n" + FileUtil.wrapBorder(files))

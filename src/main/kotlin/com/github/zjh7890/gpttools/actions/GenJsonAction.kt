@@ -42,7 +42,7 @@ class GenJsonAction(val promptTemplate: PromptTemplate) : AnAction() {
             val newClasses = listOf(clazz.containingFile.virtualFile) + classes
             val classInfos =
                 newClasses.stream().map { x -> x.name }.collect(Collectors.toList()).joinToString("\n")
-            val GPT_methodInfo = newClasses.map { FileUtil.readFileInfoForLLM(it) }.joinToString("\n\n")
+            val GPT_methodInfo = newClasses.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString("\n\n")
             val GPT_className = clazz.name!!
 
             val map = mapOf(

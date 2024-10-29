@@ -39,36 +39,11 @@ class ChatWithThisAction : IntentionAction, Iconable {
         // 将当前文件添加到会话
         val chatCodingService = ChatCodingService.getInstance(project)
 
-        val caretModel: CaretModel = editor.caretModel
-        val document = editor.document
-
-        // Get the current cursor position
-        val currentOffset = caretModel.offset
-        val lineNumber = document.getLineNumber(currentOffset)
-
-        val fileName = file.virtualFile.name
-
-// 获取光标所在行的文本，并插入占位符
-        val lineStartOffset = document.getLineStartOffset(lineNumber)
-        val lineEndOffset = document.getLineEndOffset(lineNumber)
-        val lineText = document.getText(com.intellij.openapi.util.TextRange(lineStartOffset, lineEndOffset))
-        val positionInLine = currentOffset - lineStartOffset
-        val lineWithCursor =
-            lineText.substring(0, positionInLine) + "${'$'}{GPT_CURSOR_HERE}" + lineText.substring(positionInLine)
-
-// 更新发送到聊天窗口的内容
+        // 更新发送到聊天窗口的内容
         sendToChatWindow(project, { contentPanel, chatCodingService ->
             chatCodingService.newSession(true)
             chatCodingService.addFileToCurrentSession(virtualFile)
-            val inputText = "\n" + """
-在光标处实现以上需求。
-光标位置：文件 $fileName，行号：$lineNumber
-光标所在行 (${'$'}{GPT_CURSOR_HERE} 是光标所在处占位符，在代码中并不存在)：
-```
-$lineWithCursor
-```
-""".trim()
-            contentPanel.setInput(inputText)
+            contentPanel.setInput("")
         })
     }
 
