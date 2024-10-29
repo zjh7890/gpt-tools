@@ -2,6 +2,7 @@ package com.github.zjh7890.gpttools.actions
 
 import com.baomidou.plugin.idea.mybatisx.dom.model.IdDomElement
 import com.baomidou.plugin.idea.mybatisx.service.JavaService
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.AnAction
@@ -17,6 +18,11 @@ import com.intellij.util.CommonProcessors
 
 
 class AllMethodFile : AnAction() {
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        val settings = OtherSettingsState.getInstance()
+        e.presentation.isVisible = settings.showAllMethodFile
+    }
 
     override fun actionPerformed(e: AnActionEvent) {
         // 获取当前编辑的文件

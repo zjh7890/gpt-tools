@@ -14,9 +14,15 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.CommonProcessors
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 
 
 class PsiDependencyByMethodAction : AnAction() {
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        val settings = OtherSettingsState.getInstance()
+        e.presentation.isVisible = settings.showPsiDependencyByMethodAction
+    }
 
     override fun actionPerformed(e: AnActionEvent) {
         // 获取当前编辑的文件

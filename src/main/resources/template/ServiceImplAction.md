@@ -14,11 +14,11 @@
 public class GameService {
     @Resource
     private RedisTemplate<String, String> redisTemplate;
-    
+
     public static final String INTERACTIVE_GAME_APPLY_KEY = "INTERACTIVE_GAME_APPLY_KEY:%s";
-    
+
     public static final int INTERACTIVE_GAME_APPLY_EXPIRE = 10;
-    
+
     public void handleGameApply(Long uid) {
         String lockKey = buildGameApplyKey(uid);
         try {
@@ -31,7 +31,7 @@ public class GameService {
             redisTemplate.delete(lockKey);
         }
     }
-    
+
     public String buildGameApplyKey(Long uid) {
         return String.format(INTERACTIVE_GAME_APPLY_KEY, uid);
     }

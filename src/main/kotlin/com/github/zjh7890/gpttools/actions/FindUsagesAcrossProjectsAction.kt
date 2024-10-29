@@ -23,8 +23,15 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
+
 
 class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        val settings = OtherSettingsState.getInstance()
+        e.presentation.isVisible = settings.showFindUsagesAcrossProjectsAction
+    }
     private val logger = Logger.getInstance(FindUsagesAcrossProjectsAction::class.java)
 
     override fun actionPerformed(event: AnActionEvent) {

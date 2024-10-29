@@ -1,6 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -22,6 +23,12 @@ class AddRecursiveFileAction : AnAction() {
                 }
             }
         }
+    }
+
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        val settings = OtherSettingsState.getInstance()
+        e.presentation.isVisible = settings.showAddRecursiveFileAction
     }
 
     override fun getActionUpdateThread(): ActionUpdateThread {

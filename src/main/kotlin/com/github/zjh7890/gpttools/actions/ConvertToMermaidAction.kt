@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.DrawioToMermaidConverter
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
@@ -16,6 +17,11 @@ import javax.swing.JScrollPane
 import javax.swing.JTextArea
 
 class ConvertToMermaidAction : AnAction(), Iconable {
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        val settings = OtherSettingsState.getInstance()
+        e.presentation.isVisible = settings.showConvertToMermaidAction
+    }
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
         val umlFunctionDialog = UMLDialog(project!!)
