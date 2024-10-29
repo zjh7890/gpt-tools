@@ -42,8 +42,15 @@ object GenerateDiffAgent {
         chatSession.add(
             ChatContextMessage(
                 ChatRole.user, """
-你是一个改代码的 agent。别的 agent 已经给出了代码的修改意见，根据代码修改意见按照下面的格式返回文件的变更
-以下是你新增文件的返回示例，由于是新增文件，ORIGINAL直接置空即可：
+你是一个改代码的 agent。别的 agent 已经给出了代码的修改意见，根据代码修改意见按照下面的格式返回文件的变更。
+
+支持以下几种变更类型：
+1. CREATE: 新建文件
+2. MODIFY: 修改文件的部分内容
+3. DELETE: 删除文件
+4. REWRITE: 完全重写文件内容（当文件改动超过 50% 或需要大规模重构时使用）
+
+以下是新增文件的返回示例（CREATE），由于是新增文件，ORIGINAL直接置空即可：
 ----- CHANGES START -----
 ----- CHANGE START -----
 path: HelloWorld.java
@@ -59,7 +66,7 @@ public class HelloWorld {
 ----- CHANGE END -----
 ----- CHANGES END -----
 
-以下是你更新文件的返回示例，由于最终修改对文件内容进行替换修改，调用这个函数前必须先读取这个文件，这一点很重要很重要很重要，否则你的 ORIGINAL 并不是文件真实内容，是你凭空产生的，导致最终修改文件会失败。另外，ORIGINAL 需要尽量保证在整个文件的唯一性，因为最终是使用 replace 函数修改文件内容，如果 ORIGINAL 在文件有多处的话，会导致错误的多余的修改：
+以下是更新文件的返回示例（MODIFY），由于最终修改对文件内容进行替换修改，调用这个函数前必须先读取这个文件，这一点很重要很重要很重要，否则你的 ORIGINAL 并不是文件真实内容，是你凭空产生的，导致最终修改文件会失败。另外，ORIGINAL 需要尽量保证在整个文件的唯一性，因为最终是使用 replace 函数修改文件内容，如果 ORIGINAL 在文件有多处的话，会导致错误的多余的修改：
 ----- CHANGES START -----
 ----- CHANGE START -----
 path: yuer-live-core/src/main/java/com/yupaopao/live/common/constants/KafkaTopic.java
@@ -79,7 +86,31 @@ public static final String SUD_BULLET_NOTIFY = "SUD_BULLET_NOTIFY";
 ----- CHANGE END -----
 ----- CHANGES END -----
 
-以下是你删除文件的返回示例，由于是删除文件，ORIGINAL，UPDATE 都直接置空即可：
+以下是完全重写文件的返回示例（REWRITE），适用于文件改动较大（超过50%）或需要重构的情况。ORIGINAL 直接置空，直接使用 UPDATED 的内容替换整个文件：
+----- CHANGES START -----
+----- CHANGE START -----
+path: HelloWorld.java
+changeType: REWRITE
+<<<< ORIGINAL
+====
+public class HelloWorld {
+    private final Logger logger = LoggerFactory.getLogger(HelloWorld.class);
+    
+    public static void main(String[] args) {
+        HelloWorld app = new HelloWorld();
+        app.start();
+    }
+    
+    public void start() {
+        logger.info("New implementation with proper logging");
+        // ... more new code
+    }
+}
+>>>> UPDATED
+----- CHANGE END -----
+----- CHANGES END -----
+
+以下是删除文件的返回示例（DELETE），由于是删除文件，ORIGINAL，UPDATE 都直接置空即可：
 ----- CHANGES START -----
 ----- CHANGE START -----
 path: HelloWorld.java
@@ -90,13 +121,17 @@ changeType: DELETE
 ----- CHANGE END -----
 ----- CHANGES END -----
 
-
 你可以按照需要在 CHANGES START/CHANGES END 里组合多个 CHANGE START/CHANGE END，如：
 ----- CHANGES START -----
 [CHANGE 1]
 [CHANGE 2]
 ----- CHANGES END -----
 
+注意事项：
+1. 对于小范围修改（改动不超过50%），使用 MODIFY 类型
+2. 对于大范围修改（改动超过50%）或需要重构的情况，使用 REWRITE 类型
+3. MODIFY 类型时，ORIGINAL 必须是文件中实际存在的内容
+4. REWRITE 类型时，会直接使用 UPDATED 的内容替换整个文件，使用时 ORIGINAL 直接置空，UPDATED 块直接重写文件，所以 UPDATED 块要包含文件所有数据，如要使用，一个文件只会有一个 REWRITE 块
 
 原文件:
 ${FileUtil.wrapBorder(fileContent)}
@@ -120,7 +155,7 @@ ${border}
             }
         }
         logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
-//        chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
+        chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
         chatSession.exportChatHistory()
 //            val parsedResponse = ParseUtils.processResponse(responseText)
 //            // 完成后处理最终结果

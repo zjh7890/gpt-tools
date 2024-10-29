@@ -225,51 +225,79 @@ class ShowChangeViewAction(private val project: Project, private val changesList
         val content2: DocumentContent
         val diffContentFactory = DiffContentFactory.getInstance()
         val originalFile: VirtualFile?
-        if (data.changeType == "CREATE") {
-            content1 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
-            val createContent = EditorFactory.getInstance().createDocument(data.changeItems[0].updatedChunk)
-            content2 = diffContentFactory.create(project, createContent)
-            originalFile = null
-        } else if (data.changeType == "MODIFY") {
-            try {
+        when (data.changeType) {
+            "CREATE" -> {
+                content1 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
+                val createContent = EditorFactory.getInstance().createDocument(data.changeItems[0].updatedChunk)
+                content2 = diffContentFactory.create(project, createContent)
+                originalFile = null
+            }
+            "MODIFY" -> {
+                try {
+                    originalFile = getOriginalFile(data, project)
+                    val document: String = if (originalFile != null) {
+                        FileDocumentManager.getInstance().getDocument(originalFile)?.text ?: ""
+                    } else {
+                        Messages.showMessageDialog(
+                            project,
+                            "Original file not found: ${data.path}",
+                            "Error",
+                            Messages.getErrorIcon()
+                        )
+                        ""
+                    }
+
+                    val updated = getUpdatedFileContent(document, data.changeItems)
+                    val updatedDocument = EditorFactory.getInstance().createDocument(updated)
+
+                    content1 = diffContentFactory.create(document, PlainTextFileType.INSTANCE)
+                    content2 = diffContentFactory.create(project, updatedDocument)
+                } catch (e: Exception) {
+                    throw RuntimeException("Failed to process MODIFY operation", e)
+                }
+            }
+            "REWRITE" -> {
+                try {
+                    originalFile = getOriginalFile(data, project)
+                    val document: String = if (originalFile != null) {
+                        FileDocumentManager.getInstance().getDocument(originalFile)?.text ?: ""
+                    } else {
+                        Messages.showMessageDialog(
+                            project,
+                            "Original file not found: ${data.path}",
+                            "Error",
+                            Messages.getErrorIcon()
+                        )
+                        ""
+                    }
+
+                    // REWRITE 类型直接使用 updatedChunk 作为新内容
+                    val updatedDocument = EditorFactory.getInstance().createDocument(data.changeItems[0].updatedChunk)
+
+                    content1 = diffContentFactory.create(document, PlainTextFileType.INSTANCE)
+                    content2 = diffContentFactory.create(project, updatedDocument)
+                } catch (e: Exception) {
+                    throw RuntimeException("Failed to process REWRITE operation", e)
+                }
+            }
+            "DELETE" -> {
                 originalFile = getOriginalFile(data, project)
-                val document: String = if (originalFile != null) {
-                    FileDocumentManager.getInstance().getDocument(originalFile)?.text ?: ""
-                } else {
+                if (originalFile == null) {
                     Messages.showMessageDialog(
                         project,
                         "Original file not found: ${data.path}",
                         "Error",
                         Messages.getErrorIcon()
                     )
-                    ""
                 }
-
-                val updated = getUpdatedFileContent(document, data.changeItems)
-                val updatedDocument = EditorFactory.getInstance().createDocument(updated)
-
-                content1 = diffContentFactory.create(document, PlainTextFileType.INSTANCE)
-                content2 = diffContentFactory.create(project, updatedDocument)
-            } catch (e: Exception) {
-                throw RuntimeException("Failed to process MODIFY operation", e)
+                content1 = diffContentFactory.create(data.changeItems[0].originalChunk, PlainTextFileType.INSTANCE)
+                content2 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
             }
-        } else if (data.changeType == "DELETE") {
-            originalFile = getOriginalFile(data, project)
-            if (originalFile == null) {
-                Messages.showMessageDialog(
-                    project,
-                    "Original file not found: ${data.path}",
-                    "Error",
-                    Messages.getErrorIcon()
-                )
+            else -> {
+                throw RuntimeException("Unknown change type: ${data.changeType}")
             }
-            content1 = diffContentFactory.create(data.changeItems[0].originalChunk, PlainTextFileType.INSTANCE)
-            content2 = diffContentFactory.create("", PlainTextFileType.INSTANCE)
-        } else {
-            throw RuntimeException("Unknown change type: ${data.changeType}")
         }
 
-        // 后续代码保持不变...
         val request = SimpleDiffRequest("Diff - ${data.filename}", content1, content2, "Original", "Updated")
         val diffPanel = DiffManager.getInstance().createRequestPanel(this.project, {}, null)
         diffPanel.setRequest(request)
