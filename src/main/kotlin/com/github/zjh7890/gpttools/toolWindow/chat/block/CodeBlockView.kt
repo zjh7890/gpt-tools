@@ -105,6 +105,7 @@ class CodeBlockView(
 
             editor.setFile(file)
             editor.setCaretEnabled(true)
+
             val highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(project, file)
 
             editor.highlighter = highlighter

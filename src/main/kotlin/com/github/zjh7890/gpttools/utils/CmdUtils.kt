@@ -88,7 +88,7 @@ object CmdUtils {
                     args.add(typedValue)
                 }
 
-                val service = project.service<ToolsService>()
+                val service = project.getService(ToolsService::class.java)
                 // 调用函数
                 val call = function.call(service, *args.toTypedArray())
                 // 如果 call 是 string 类型，直接返回，否则 toJson

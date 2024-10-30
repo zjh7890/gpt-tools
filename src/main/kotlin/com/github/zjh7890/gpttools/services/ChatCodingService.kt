@@ -369,7 +369,9 @@ ${FileUtil.wrapBorder(fileContent)}
     }
 
     companion object {
-        fun getInstance(project: Project): ChatCodingService = project.service()
+        fun getInstance(project: Project): ChatCodingService {
+            return project.getService(ChatCodingService::class.java)
+        }
 
         private val logger = logger<ChatCodingService>()
     }

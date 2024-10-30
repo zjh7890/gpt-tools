@@ -5,7 +5,7 @@ import com.github.zjh7890.gpttools.settings.template.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.github.zjh7890.gpttools.utils.TemplateUtils
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
+//import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.intention.impl.BaseIntentionAction
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.Editor
@@ -86,31 +86,31 @@ class FixThisChunkAction : BaseIntentionAction(), Iconable
     }
 
     private fun hasErrorAt(project: Project, element: PsiElement?, editor: Editor): Boolean {
-        val range = getCodeRange(editor)
-        val highlightInfos = DaemonCodeAnalyzerImpl.getHighlights(editor.document, HighlightSeverity.WEAK_WARNING, project)
-        if (CollectionUtils.isEmpty(highlightInfos)) {
-            return false
-        }
-        for (info in highlightInfos) {
-            val infoStartOffset = info.startOffset
-            val infoEndOffset = info.endOffset
-            if (range.intersectsStrict(infoStartOffset, infoEndOffset)) {
-                return true
-            }
-        }
+//        val range = getCodeRange(editor)
+//        val highlightInfos = DaemonCodeAnalyzerImpl.getHighlights(editor.document, HighlightSeverity.WEAK_WARNING, project)
+//        if (CollectionUtils.isEmpty(highlightInfos)) {
+//            return false
+//        }
+//        for (info in highlightInfos) {
+//            val infoStartOffset = info.startOffset
+//            val infoEndOffset = info.endOffset
+//            if (range.intersectsStrict(infoStartOffset, infoEndOffset)) {
+//                return true
+//            }
+//        }
         return false
     }
 
     private fun listErrorMessages(project: Project, editor: Editor, range: TextRange): List<String> {
-        val highlightInfos = DaemonCodeAnalyzerImpl.getHighlights(editor.document, HighlightSeverity.WEAK_WARNING, project)
+//        val highlightInfos = DaemonCodeAnalyzerImpl.getHighlights(editor.document, HighlightSeverity.WEAK_WARNING, project)
         val errorMessageList = mutableListOf<String>()
-        for (info in highlightInfos) {
-            val infoStartOffset = info.startOffset
-            val infoEndOffset = info.endOffset
-            if (range.intersectsStrict(infoStartOffset, infoEndOffset) && StringUtils.isNotBlank(info.description)) {
-                errorMessageList.add(info.description)
-            }
-        }
+//        for (info in highlightInfos) {
+//            val infoStartOffset = info.startOffset
+//            val infoEndOffset = info.endOffset
+//            if (range.intersectsStrict(infoStartOffset, infoEndOffset) && StringUtils.isNotBlank(info.description)) {
+//                errorMessageList.add(info.description)
+//            }
+//        }
         return errorMessageList
     }
 

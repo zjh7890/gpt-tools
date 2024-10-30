@@ -22,6 +22,11 @@ class ChangesListView(
     private fun initialize() {
         changesList.setListData(changes.toTypedArray())
         
+        // 设置 JList 的对齐方式
+        changesList.alignmentX = Component.LEFT_ALIGNMENT
+        changesList.layoutOrientation = JList.VERTICAL
+        changesList.visibleRowCount = -1
+        
         // 添加鼠标监听器处理双击事件
         changesList.addMouseListener(object : java.awt.event.MouseAdapter() {
             override fun mouseClicked(e: java.awt.event.MouseEvent) {
@@ -58,36 +63,56 @@ class ChangesListView(
             ): Component {
                 val panel = JPanel().apply {
                     layout = BoxLayout(this, BoxLayout.X_AXIS)
+                    // 添加左边距
+                    add(Box.createHorizontalStrut(5))
+                    
                     val mergeStatus = if (value?.isMerged == true) "✅" else "❗"
-                    val statusLabel = JLabel(mergeStatus)
+                    val statusLabel = JLabel(mergeStatus).apply {
+                        // 设置状态图标的对齐方式
+                        alignmentX = Component.LEFT_ALIGNMENT 
+                    }
                     add(statusLabel)
+                    
+                    // 添加状态图标和文件名之间的间距
+                    add(Box.createHorizontalStrut(5))
 
                     val filenameColor = when (value?.changeType) {
                         "CREATE" -> Color.decode("#067D17")
-                        "MODIFY" -> Color.decode("#0033B3")
+                        "MODIFY" -> Color.decode("#0033B3") 
                         "DELETE" -> Color.decode("#6C707E")
                         else -> list?.foreground
                     }
 
-                    val labelValue: String
-                    if (StringUtils.isNotEmpty(value?.dirPath)) {
-                        labelValue = "${value?.filename} (${value?.dirPath})"
+                    val labelValue: String = if (StringUtils.isNotEmpty(value?.dirPath)) {
+                        "${value?.filename} (${value?.dirPath})"
                     } else {
-                        labelValue = "${value?.filename}"
+                        "${value?.filename}"
                     }
+                    
                     val label = JLabel(labelValue).apply {
                         foreground = filenameColor
+                        // 设置文件名的对齐方式
+                        alignmentX = Component.LEFT_ALIGNMENT
                     }
                     add(label)
+                    
+                    // 添加右边距
+                    add(Box.createHorizontalStrut(5))
+                    
+                    // 添加弹性空间,将内容推到左侧
+                    add(Box.createHorizontalGlue())
                 }
+                
                 panel.isOpaque = true
+                panel.maximumSize = Dimension(list?.width ?: 300, panel.preferredSize.height)
                 if (isSelected) {
-                    panel.background = Color.decode("#d8e4fc")  // 使用新的选中颜色
+                    panel.background = Color.decode("#d8e4fc")
                     panel.foreground = list?.selectionForeground
                 } else {
                     panel.background = list?.background
                     panel.foreground = list?.foreground
                 }
+                
                 return panel
             }
         }
@@ -112,7 +137,8 @@ class ChangesListView(
 //            changesList.preferredSize = Dimension(this.width, 0)
         }
 
-        // Set layout and add changesList to this panel
+        // Set panel and list alignment
+        this.alignmentX = Component.LEFT_ALIGNMENT
         this.layout = BoxLayout(this, BoxLayout.Y_AXIS)
         this.add(changesList)
     }

@@ -20,7 +20,7 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
     }
 
     data class State(
-        var generateDiff: Boolean = false,
+        var generateDiff: Boolean = true,
         var withContext: Boolean = true
     )
 
