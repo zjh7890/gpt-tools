@@ -310,14 +310,14 @@ class ShowChangeViewAction(private val project: Project, private val changesList
                 override fun actionPerformed(e: ActionEvent) {
                     WriteCommandAction.runWriteCommandAction(project) {
                         when (data.changeType) {
-                            "CREATE" -> {
-                                createFileWithParents(project.basePath!!, data.path, content2.document.text)
+                                "CREATE" -> {
+                                    createFileWithParents(project.basePath!!, data.path, content2.document.text)
+                                }
+                                "MODIFY", "REWRITE" -> originalFile?.let {
+                                    FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
+                                }
+                                "DELETE" -> originalFile?.delete(this)
                             }
-                            "MODIFY" -> originalFile?.let {
-                                FileDocumentManager.getInstance().getDocument(originalFile)?.setText(content2.document.text)
-                            }
-                            "DELETE" -> originalFile?.delete(this)
-                        }
                         dialogWrapper.close(0)
                     }
                     dialogWrapper.close(0)

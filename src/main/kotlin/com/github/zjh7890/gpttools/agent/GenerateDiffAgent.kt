@@ -6,6 +6,7 @@ import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
+import com.github.zjh7890.gpttools.toolWindow.chat.MessageView
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.FileUtil
@@ -143,47 +144,35 @@ ${border}
 """.trimIndent())
         )
 
+        var messageView: MessageView? = null
+        // 添加一个空的消息视图用于流式更新
+        ApplicationManager.getApplication().invokeAndWait {
+            messageView = ui.addMessage("Generating Diff", chatMessage = null)
+            messageView!!.scrollToBottom()
+        }
+
         val applyFlow = LlmProvider.stream(chatSession, llmConfig)
         var responseText = ""
         runBlocking {
             applyFlow.onCompletion {
                 logger.warn("onCompletion ${it?.message}")
             }.catch {
-                it.printStackTrace()
+                logger.error("exception happens: ", it)
+                responseText = "exception happens: " + it.message.toString()
             }.collect {
                 responseText += it
+                messageView!!.updateContent(responseText)
             }
         }
+        
         logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
+        
+        // 更新最终内容
+        messageView!!.message = responseText
+        messageView!!.reRender()
+        
         chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
         chatSession.exportChatHistory()
-//            val parsedResponse = ParseUtils.processResponse(responseText)
-//            // 完成后处理最终结果
-//            try {
-//                val sb = StringBuilder()
-//                when {
-//                    parsedResponse.isCustomCommand -> {
-//                        parsedResponse.customCommands?.forEach { command ->
-//                            val result = CmdUtils.executeCmd(command, "custom", project)
-//                            sb.append(result + "\n\n")
-//                        }
-//                    }
-//                }
-//                if (sb.isNotEmpty()){
-//                    chatSession.add(ChatContextMessage(ChatRole.user, sb.toString()))
-//                    continue
-//                }
-//            } catch (e: Exception) {
-//                logger.error("处理响应时出错: ${e.message}", e)
-//                throw e
-//            }
-
-        ApplicationManager.getApplication().invokeLater {
-            val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-            val chatCodingService = ChatCodingService.getInstance(project)
-            val chatMessage = ChatContextMessage(ChatRole.assistant, responseText)
-            contentPanel?.addMessage(responseText, false, render = true, chatMessage = chatMessage)
-        }
         ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
         ui.progressBar.isVisible = false
     }
