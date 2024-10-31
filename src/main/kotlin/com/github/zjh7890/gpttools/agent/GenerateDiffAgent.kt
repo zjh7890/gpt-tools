@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.agent
 
+import com.github.zjh7890.gpttools.ShireCoroutineScope
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.services.ChatCodingService
@@ -16,6 +17,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.UUID
 
@@ -32,6 +34,7 @@ object GenerateDiffAgent {
     ) {
         ui.progressBar.isVisible = true
         ui.progressBar.isIndeterminate = true  // 设置为不确定状态
+        ui.inputSection.showStopButton()
         val border = FileUtil.determineBorder(response)
         val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply", project = project.name)
 
@@ -152,8 +155,11 @@ ${border}
         }
 
         val applyFlow = LlmProvider.stream(chatSession, llmConfig)
+        val chatCodingService = ChatCodingService.getInstance(project)
+
         var responseText = ""
-        runBlocking {
+
+        chatCodingService.currentJob = ShireCoroutineScope.scope(project).launch {
             applyFlow.onCompletion {
                 logger.warn("onCompletion ${it?.message}")
             }.catch {
@@ -163,18 +169,19 @@ ${border}
                 responseText += it
                 messageView!!.updateContent(responseText)
             }
+
+            chatCodingService.currentJob = null
+            logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
+
+            // 更新最终内容
+            messageView!!.message = responseText
+            messageView!!.reRender()
+
+            chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
+            chatSession.exportChatHistory()
+            ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
+            ui.progressBar.isVisible = false
         }
-        
-        logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
-        
-        // 更新最终内容
-        messageView!!.message = responseText
-        messageView!!.reRender()
-        
-        chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
-        chatSession.exportChatHistory()
-        ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
-        ui.progressBar.isVisible = false
     }
 
 

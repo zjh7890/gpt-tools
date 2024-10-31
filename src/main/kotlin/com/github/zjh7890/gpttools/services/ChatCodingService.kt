@@ -37,7 +37,7 @@ import kotlin.reflect.full.valueParameters
 
 @Service(Service.Level.PROJECT)
 class ChatCodingService(val project: Project) : Disposable{
-    private var currentJob: Job? = null
+    var currentJob: Job? = null
     val sessions = mutableMapOf<String, ChatSession>()
     var currentSessionId: String = ""
 
@@ -153,11 +153,13 @@ class ChatCodingService(val project: Project) : Disposable{
             val responseStream = LlmProvider.stream(messages, llmConfig = llmConfig)
             currentJob = ShireCoroutineScope.scope(project).launch {
                 var text = ""
+                var hasError = false  // 添加错误标志
                 responseStream.onCompletion {
                     logger.warn("onCompletion ${it?.message}")
                 }.catch {
                     logger.error("exception happens: ", it)
                     text = "exception happens: " + it.message.toString()
+                    hasError = true  // 设置错误标志
                 }.collect {
                     text += it
                     messageView.updateContent(text)
@@ -175,7 +177,9 @@ class ChatCodingService(val project: Project) : Disposable{
                 getCurrentSession().add(ChatContextMessage(ChatRole.assistant, text))
                 exportChatHistory()
                 saveSessions()
-                if (CommonSettings.getInstance(project).generateDiff) {
+                
+                // 只在没有错误时执行 GenerateDiffAgent
+                if (!hasError && CommonSettings.getInstance(project).generateDiff) {
                     ApplicationManager.getApplication().executeOnPooledThread {
                         GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession(), ui)
                     }

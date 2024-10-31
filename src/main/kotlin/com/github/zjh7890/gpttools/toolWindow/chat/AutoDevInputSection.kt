@@ -68,13 +68,17 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         this.sendButtonPresentation = sendButtonPresentation
 
         val stopButtonPresentation = Presentation("Stop")
-        stopButtonPresentation.setIcon(AllIcons.General.User)
+        stopButtonPresentation.setIcon(AllIcons.Run.Stop)
         this.stopButtonPresentation = stopButtonPresentation
+        input = AutoDevInput(project, listOf(), disposable, this)
 
         sendButton = ActionButton(
             DumbAwareAction.create {
                 object : DumbAwareAction("") {
                     override fun actionPerformed(e: AnActionEvent) {
+                        if (input.text.isBlank()) {
+                            return
+                        }
                         showStopButton()
                         editorListeners.multicaster.onSubmit(this@AutoDevInputSection, AutoDevInputTrigger.Button)
                     }
@@ -98,7 +102,6 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
             Dimension(20, 20)
         )
 
-        input = AutoDevInput(project, listOf(), disposable, this)
 
         documentListener = object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) {

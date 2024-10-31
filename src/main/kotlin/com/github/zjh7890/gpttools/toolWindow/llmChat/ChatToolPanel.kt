@@ -118,6 +118,8 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         inputSection.addListener(object : AutoDevInputListener {
             override fun onStop(component: AutoDevInputSection) {
                 chatCodingService.stop()
+                progressBar.isVisible = false
+                progressBar.isIndeterminate = false
                 inputSection.showSendButton()
             }
 
@@ -125,11 +127,11 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 var prompt = component.text
                 component.text = ""
 
-                inputSection.showStopButton()
-
                 if (prompt.isEmpty() || prompt == "\n") {
                     return
                 }
+
+                inputSection.showStopButton()
 
                 // 从 inputSection 获取选定的配置项
                 val selectedSetting = inputSection.getSelectedSetting()
