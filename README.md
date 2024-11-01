@@ -5,8 +5,9 @@
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/24670.svg)](https://plugins.jetbrains.com/plugin/24670)
 
 <!-- Plugin description -->
-<p>gpt-tools can help you generate templated prompts, such as prompts for generating controller code and prompts for generating MyBatis code.</p>
-<p>gpt-tools 能帮你生成用于代码生成的 prompt，比如用于生成 controller 代码的 prompt，用于生成 mybatis 代码的 prompt.</p>
+插件有两大功能：
+1. chat（通过对话让 AI 实现逻辑，类似 Aider, Cursor）
+2. 模板 prompt（用于生成样板代码，我常用于生成 Apollo 和 RPC 类）
 <!-- Plugin description end -->
 
 ## Installation
