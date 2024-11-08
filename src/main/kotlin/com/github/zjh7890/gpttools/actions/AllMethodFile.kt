@@ -5,6 +5,7 @@ import com.baomidou.plugin.idea.mybatisx.service.JavaService
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.PsiUtils
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -517,5 +518,9 @@ class AllMethodFile : AnAction() {
             "equals", "hashCode", "toString", "canEqual" -> true
             else -> false
         }
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread {
+        return ActionUpdateThread.BGT
     }
 }

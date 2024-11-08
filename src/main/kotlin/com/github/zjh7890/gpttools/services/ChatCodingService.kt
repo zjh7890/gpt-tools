@@ -42,9 +42,9 @@ class ChatCodingService(val project: Project) : Disposable{
     var currentSessionId: String = ""
 
     init {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            loadSessions()
-        }
+        loadSessions()
+//        ApplicationManager.getApplication().executeOnPooledThread {
+//        }
     }
 
     private val sessionListeners = mutableListOf<SessionListener>()

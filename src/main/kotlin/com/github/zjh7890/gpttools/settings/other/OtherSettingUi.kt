@@ -14,6 +14,7 @@ class OtherSettingUi {
     private val showCopyMethodSingleFileCheckBox = JBCheckBox("Show Copy Method Single File")
     private val showAllMethodFileCheckBox = JBCheckBox("Show All Method File")
     private val showOpenChatLogDirectoryActionCheckBox = JBCheckBox("Show Open Chat Log Directory Action")
+    private val showGptToolsContextWindowCheckBox = JBCheckBox("Show GPT File Tree Window (Need Restart)")
 
     val component: JPanel = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -25,6 +26,7 @@ class OtherSettingUi {
         add(showPsiDependencyByMethodActionCheckBox)
         add(showCopyMethodSingleFileCheckBox)
         add(showAllMethodFileCheckBox)
+        add(showGptToolsContextWindowCheckBox)
     }
 
     fun isModified(settings: OtherSettingsState): Boolean {
@@ -36,7 +38,8 @@ class OtherSettingUi {
                 showPsiDependencyByMethodActionCheckBox.isSelected != settings.showPsiDependencyByMethodAction ||
                 showCopyMethodSingleFileCheckBox.isSelected != settings.showCopyMethodSingleFile ||
                 showAllMethodFileCheckBox.isSelected != settings.showAllMethodFile ||
-                showOpenChatLogDirectoryActionCheckBox.isSelected != settings.showOpenChatLogDirectoryAction
+                showOpenChatLogDirectoryActionCheckBox.isSelected != settings.showOpenChatLogDirectoryAction ||
+                showGptToolsContextWindowCheckBox.isSelected != settings.showGptToolsContextWindow
     }
 
     fun apply(settings: OtherSettingsState) {
@@ -49,6 +52,7 @@ class OtherSettingUi {
         settings.showCopyMethodSingleFile = showCopyMethodSingleFileCheckBox.isSelected
         settings.showAllMethodFile = showAllMethodFileCheckBox.isSelected
         settings.showOpenChatLogDirectoryAction = showOpenChatLogDirectoryActionCheckBox.isSelected
+        settings.showGptToolsContextWindow = showGptToolsContextWindowCheckBox.isSelected
     }
 
     fun reset(settings: OtherSettingsState) {
@@ -61,5 +65,6 @@ class OtherSettingUi {
         showCopyMethodSingleFileCheckBox.isSelected = settings.showCopyMethodSingleFile
         showAllMethodFileCheckBox.isSelected = settings.showAllMethodFile
         showOpenChatLogDirectoryActionCheckBox.isSelected = settings.showOpenChatLogDirectoryAction
+        showGptToolsContextWindowCheckBox.isSelected = settings.showGptToolsContextWindow
     }
 }

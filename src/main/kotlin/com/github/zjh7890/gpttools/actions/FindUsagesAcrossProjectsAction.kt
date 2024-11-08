@@ -24,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 
 
 class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
@@ -185,6 +186,10 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
         } else {
             Messages.showErrorDialog(project, "无法打开项目：$targetProjectPath", "项目未打开")
         }
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread {
+        return ActionUpdateThread.BGT
     }
 }
 

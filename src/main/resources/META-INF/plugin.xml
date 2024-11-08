@@ -16,14 +16,6 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-<!--        <toolWindow id="GptToolsContextToolWindow"-->
-<!--                    anchor="right"-->
-<!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"-->
-<!--                    canCloseContent="false"-->
-<!--                    canWorkInDumbMode="true"-->
-<!--            icon="/icons/icon_16px.svg">-->
-<!--        </toolWindow>-->
-
         <!-- mapper.xml文件属性提示 -->
         <dom.fileMetaData id="baomidou.MapperDescription"
                           rootTagName="mapper"
@@ -45,20 +37,20 @@
             <className>com.github.zjh7890.gpttools.actions.CompleteThisAction</className>
         </intentionAction>
 
-<!--        <toolWindow id="ChatTool"-->
-<!--                    anchor="right"-->
-<!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.chat.ChatToolWindowFactory"-->
-<!--                    canCloseContents="false"-->
-<!--                    icon="/icons/icon.svg">-->
-<!--            <title>Plan Code</title>-->
-<!--        </toolWindow>-->
-
         <toolWindow id="LLMChat"
                     anchor="right"
                     factoryClass="com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory"
                     canCloseContents="false"
                     icon="/icons/icon_16px.svg">
             <title>LLm Chat Code</title>
+        </toolWindow>
+        
+        <toolWindow id="GptFileTree"
+                    anchor="right"
+                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"
+                    canCloseContent="false"
+                    canWorkInDumbMode="false"
+                    icon="/icons/icon_dark_16px.svg">
         </toolWindow>
 
 <!--        <toolWindow id="SearchToolWindowFactory" anchor="right" factoryClass="com.github.zjh7890.gpttools.toolWindow.search.SearchToolWindowFactory" />-->
@@ -73,11 +65,6 @@
 <!--                                 displayName="GptToolLlm"/>-->
 
 <!--        <applicationConfigurable instance="com.example.plugin.MyPluginConfigurable"/>-->
-
-<!--        <applicationConfigurable-->
-<!--                id="gptToolsCodeTemplatesConfigurable"-->
-<!--                displayName="Code Templates"-->
-<!--                instanceClass="com.github.zjh7890.gpttools.settings.PluginConfigurable" />-->
     </extensions>
 
     <extensions defaultExtensionNs="com.gpttools">
@@ -140,6 +127,14 @@
             <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
+        <action id="AddToSessionFileListBatchAction"
+                class="com.github.zjh7890.gpttools.actions.AddToSessionFileListBatchAction"
+                text="Add to Session File List"
+                description="Add selected files/directories to the session's file list."
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="ProjectViewPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
         <action id="AddRecursiveFileAction"
                 class="com.github.zjh7890.gpttools.actions.AddRecursiveFileAction"
                 text="Recursively Add Files to ToolWindow"
@@ -180,12 +175,30 @@
             <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
+        
         <action id="OpenChatLogDirectoryAction"
                 class="com.github.zjh7890.gpttools.actions.OpenChatLogDirectoryAction"
                 text="gpt-tools 日志"
                 description="gpt-tools 日志"
                 icon="/icons/icon_16px.svg">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <action id="ChatWithSelectedCodeAction"
+                class="com.github.zjh7890.gpttools.actions.ChatWithSelectedCodeAction"
+                text="Chat with selected code"
+                description="Chat with selected code"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="Floating.CodeToolbar" anchor="first"/>
+        </action>
+
+        <action id="ReviewChangesAction"
+                class="com.github.zjh7890.gpttools.actions.ReviewChangesAction"
+                text="Ask AI to review selected changes"
+                description="Ask AI to review  selected changes"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="ChangesViewToolbar" anchor="last"/>
+            <add-to-group group-id="ChangesViewPopupMenu" relative-to-action="ChangesView.Revert" anchor="after"/>
         </action>
     </actions>
 </idea-plugin>

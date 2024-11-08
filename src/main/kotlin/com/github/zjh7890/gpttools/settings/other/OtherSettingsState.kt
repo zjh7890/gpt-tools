@@ -22,6 +22,7 @@ class OtherSettingsState : PersistentStateComponent<OtherSettingsState> {
     var showCopyMethodSingleFile: Boolean = false
     var showAllMethodFile: Boolean = false
     var showOpenChatLogDirectoryAction: Boolean = false
+    var showGptToolsContextWindow: Boolean = false
 
     @Synchronized
     override fun getState(): OtherSettingsState = this

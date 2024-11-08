@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
@@ -10,6 +11,8 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 
 class GptToolsContextToolWindowFactory : ToolWindowFactory {
+    override fun shouldBeAvailable(project: Project) = OtherSettingsState.getInstance().showGptToolsContextWindow
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val contentFactory = ContentFactory.getInstance()
         val panel = FileTreeListPanel(project)

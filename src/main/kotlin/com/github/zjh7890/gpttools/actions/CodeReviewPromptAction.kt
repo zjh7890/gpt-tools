@@ -31,32 +31,26 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
     override fun actionPerformed(event: AnActionEvent) {
         val project = event.project ?: return
 
-        // Make changes available for diff action
-        val vcsLog = event.getData(VcsLogDataKeys.VCS_LOG)
-        val details: List<VcsFullCommitDetails> = vcsLog?.selectedDetails?.toList() ?: return
         val selectList = event.getData(VcsDataKeys.SELECTED_CHANGES) ?: return
 
-        ProgressManager.getInstance().runProcessWithProgressSynchronously(Runnable {
+        reviewCode(project, selectList)
+    }
 
-            ApplicationManager.getApplication().runReadAction {
-                val repositoryManager: VcsRepositoryManager = VcsRepositoryManager.getInstance(project)
-                val repository = repositoryManager.getRepositoryForFile(project.baseDir)
-
-                if (repository == null) {
-                    Messages.showMessageDialog(project, "Repository not found!", "Error", Messages.getErrorIcon())
-                    return@runReadAction
-                }
-            }
-
-        }, "Prepare Repository", true, project)
-        doReviewWithChanges(project, details, selectList)
+    fun reviewCode(
+        project: Project,
+        selectList: Array<out Change>
+    ) {
+        val result = doReviewWithChanges(project, selectList)
+        sendToChatWindow(project) { contentPanel, chatCodingService ->
+            chatCodingService.newSession(true)
+            contentPanel.setInput(result)
+        }
     }
 
     fun doReviewWithChanges(
         project: Project,
-        details: List<VcsFullCommitDetails>,
         changes: Array<out Change>
-    ) {
+    ): String {
         val basePath = project.basePath ?: throw RuntimeException("Project base path is null.")
         val filteredChanges = changes.stream()
             .filter { change -> !isBinaryOrTooLarge(change!!) }
@@ -67,17 +61,17 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
             .toList()
 
         if (filteredChanges.isEmpty()) {
-            return
+            return "Nothing..."
         }
 
         // Generate patches and map to FileChange objects
         val fileChanges = filteredChanges.subList(0, min(filteredChanges.size, 500)).map { change ->
             val patches = IdeaTextPatchBuilder.buildPatch(
                 project,
-                listOf(change),  // Pass a single Change at a time
+                listOf(change),
                 Path.of(basePath),
                 false,
-                true
+                false
             )
 
             val filePatch = patches.firstOrNull() ?: throw RuntimeException("Failed to create patch for change: $change")
@@ -189,7 +183,7 @@ class CodeReviewPromptAction(val promptTemplate: PromptTemplate) : AnAction() {
         val GPT_diffCode = res.toString()
         val map = mapOf("GPT_diffCode" to GPT_diffCode)
         val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
-        ClipboardUtils.copyToClipboard(result)
+        return result
     }
 
     private fun isBinaryOrTooLarge(@NotNull change: Change): Boolean {

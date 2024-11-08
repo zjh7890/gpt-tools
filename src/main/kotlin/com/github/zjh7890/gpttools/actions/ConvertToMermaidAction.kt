@@ -70,4 +70,5 @@ class UMLDialog(project: Project?) : DialogWrapper(project) {
         input1 = input1Area.text
         super.doOKAction()
     }
+
 }

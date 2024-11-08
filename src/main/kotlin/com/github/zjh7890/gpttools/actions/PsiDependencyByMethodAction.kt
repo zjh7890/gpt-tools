@@ -15,6 +15,7 @@ import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.CommonProcessors
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 
 
 class PsiDependencyByMethodAction : AnAction() {
@@ -512,6 +513,10 @@ class PsiDependencyByMethodAction : AnAction() {
             "equals", "hashCode", "toString", "canEqual" -> true
             else -> false
         }
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread {
+        return ActionUpdateThread.BGT
     }
 }
 

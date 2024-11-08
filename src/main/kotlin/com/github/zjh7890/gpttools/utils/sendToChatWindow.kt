@@ -30,34 +30,3 @@ fun sendToChatWindow(
         }
     }
 }
-
-fun sendToChatPanel(project: Project, runnable: (ChatToolPanel, ChatCodingService) -> Unit) {
-    sendToChatWindow(project, runnable)
-}
-
-//fun sendToContextLess(
-//    project: Project,
-//    actionType: ChatActionType,
-//    runnable: (LLMChatToolPanel, ChatCodingService) -> Unit,
-//) {
-//    val toolWindowManager = PlanCodeToolWindowFactory.getToolWindow(project) ?: run {
-//        logger<ChatCodingService>().warn("Tool window not found")
-//        return
-//    }
-//}
-
-//    val chatCodingService = PlanCodeToolWindowFactory.chatCodingService
-//    val contentPanel = PlanCodeToolWindowFactory.contentPanel
-//
-//    val contentManager = toolWindowManager.contentManager
-//    val content = contentManager.factory.createContent(contentPanel, chatCodingService.getLabel(), false)
-//
-//    ApplicationManager.getApplication().invokeLater {
-//        contentManager.removeAllContents(false)
-//        contentManager.addContent(content)
-//
-//        toolWindowManager.activate {
-//            runnable(contentPanel, chatCodingService)
-//        }
-//    }
-

@@ -30,7 +30,6 @@ class LLMChatToolWindowFactory : ToolWindowFactory, DumbAware {
             LLMNewChatAction(),
             ExportChatHistoryAction(),
             AppendMessageAction()
-
         ))
     }
 

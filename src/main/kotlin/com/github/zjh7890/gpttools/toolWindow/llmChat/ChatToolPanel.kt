@@ -188,9 +188,6 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         generateDiffCheckbox.addActionListener {
             CommonSettings.getInstance(project).generateDiff = generateDiffCheckbox.isSelected
-            CommonSettings.getInstance(project).getState()?.let { state ->
-                CommonSettings.getInstance(project).loadState(state)
-            }
         }
 
         panelContent = panel {
