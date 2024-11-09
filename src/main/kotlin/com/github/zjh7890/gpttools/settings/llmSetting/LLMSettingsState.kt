@@ -71,10 +71,10 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
             return LlmConfig(
                 title = defaultSetting.modelName,
                 provider = defaultSetting.provider,
-                apiKey = if (defaultSetting.provider == Provider.OpenAI) defaultSetting.apiToken else defaultSetting.azureApiKey,
-                model = if (defaultSetting.provider == Provider.OpenAI) defaultSetting.modelName else defaultSetting.azureModel,
+                apiKey = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.apiToken else defaultSetting.azureApiKey,
+                model = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.modelName else defaultSetting.azureModel,
                 temperature = defaultSetting.temperature,
-                apiBase = if (defaultSetting.provider == Provider.OpenAI) defaultSetting.apiHost else defaultSetting.azureEndpoint,
+                apiBase = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.apiHost else defaultSetting.azureEndpoint,
                 responseType = defaultSetting.responseType,
                 responseFormat = defaultSetting.responseFormat,
                 azureEndpoint = defaultSetting.azureEndpoint,

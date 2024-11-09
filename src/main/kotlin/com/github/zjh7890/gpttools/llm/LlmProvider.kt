@@ -22,7 +22,7 @@ interface LlmProvider {
     companion object {
         fun getProvider(llmConfig: LlmConfig): LlmProvider {
             return when (llmConfig.provider) {
-                Provider.OpenAI -> OpenAILikeProvider()
+                Provider.OpenAILike -> OpenAILikeProvider()
                 Provider.Azure -> AzureAIProvider()
             }
         }

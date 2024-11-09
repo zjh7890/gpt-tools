@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools.toolWindow.chat
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSetting
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.block.AutoDevCoolBorder
+import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -24,14 +25,13 @@ import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.components.BorderLayoutPanel
-import java.awt.CardLayout
-import java.awt.Color
-import java.awt.Dimension
+import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import kotlin.math.max
 import kotlin.math.min
 import javax.swing.*
+import javax.swing.plaf.basic.BasicComboBoxUI
 
 /**
  *
@@ -64,13 +64,18 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
 
     init {
         val sendButtonPresentation = Presentation("send")
-        sendButtonPresentation.setIcon(AllIcons.General.User)
+        sendButtonPresentation.setIcon(GptToolsIcon.Send)
         this.sendButtonPresentation = sendButtonPresentation
 
         val stopButtonPresentation = Presentation("Stop")
-        stopButtonPresentation.setIcon(AllIcons.Process.Stop)
+        stopButtonPresentation.setIcon(GptToolsIcon.Stop)
         this.stopButtonPresentation = stopButtonPresentation
-        input = AutoDevInput(project, listOf(), disposable, this)
+
+        input = AutoDevInput(project, listOf(), disposable, this).apply {
+            // Set minimum and preferred size to ensure at least two lines of text
+            minimumSize = Dimension(0, JBUI.scale(48))
+            preferredSize = Dimension(0, JBUI.scale(48))
+        }
 
         sendButton = ActionButton(
             DumbAwareAction.create {
@@ -155,8 +160,11 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
                     hasFocus: Boolean
                 ) {
                     text = "${value?.modelName} - ${value?.provider?.name}" ?: "Unknown"
+                    horizontalAlignment = SwingConstants.RIGHT
                 }
             }
+            // 移除边框
+            border = BorderFactory.createEmptyBorder()
         }
 
 

@@ -386,7 +386,7 @@ class ShireConfigItemComponent(
 
         // 将独有字段面板添加到 uniqueFieldsPanel 中
         uniqueFieldsPanel.layout = CardLayout()
-        uniqueFieldsPanel.add(openAIPanel, Provider.OpenAI.name)
+        uniqueFieldsPanel.add(openAIPanel, Provider.OpenAILike.name)
         uniqueFieldsPanel.add(azurePanel, Provider.Azure.name) // 添加 Azure 面板
         uniqueFieldsPanel.add(emptyPanel, "Other") // 其他 Provider 的面板（可选）
 
@@ -498,7 +498,7 @@ class ShireConfigItemComponent(
 
         // 根据 provider 设置独有字段
         when (setting.provider) {
-            Provider.OpenAI -> {
+            Provider.OpenAILike -> {
                 setting.apiHost = apiHostField.text
                 setting.modelName = modelNameField.text
                 setting.apiToken = apiTokenField.text
@@ -546,7 +546,7 @@ class ShireConfigItemComponent(
 
         // 设置独有字段值
         when (setting.provider) {
-            Provider.OpenAI -> {
+            Provider.OpenAILike -> {
                 apiHostField.text = setting.apiHost
                 modelNameField.text = setting.modelName
                 apiTokenField.text = setting.apiToken
@@ -591,10 +591,10 @@ class ShireConfigItemComponent(
             val llmConfig = LlmConfig(
                 title = setting.modelName,
                 provider = setting.provider, // 设置 provider
-                apiKey = if (setting.provider == Provider.OpenAI) setting.apiToken else setting.azureApiKey,
-                model = if (setting.provider == Provider.OpenAI) setting.modelName else setting.azureModel,
+                apiKey = if (setting.provider == Provider.OpenAILike) setting.apiToken else setting.azureApiKey,
+                model = if (setting.provider == Provider.OpenAILike) setting.modelName else setting.azureModel,
                 temperature = setting.temperature,
-                apiBase = if (setting.provider == Provider.OpenAI) setting.apiHost else setting.azureEndpoint,
+                apiBase = if (setting.provider == Provider.OpenAILike) setting.apiHost else setting.azureEndpoint,
                 responseType = setting.responseType,
                 responseFormat = setting.responseFormat,
                 azureEndpoint = setting.azureEndpoint,

@@ -18,5 +18,5 @@ data class LLMSetting(
     var isDefault: Boolean = false, // 新增字段，标记为默认配置
 
     // 新增 provider 字段
-    var provider: Provider = Provider.OpenAI
+    var provider: Provider = Provider.OpenAILike
 )

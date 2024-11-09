@@ -5,7 +5,7 @@ import com.github.zjh7890.gpttools.settings.llmSetting.Provider
 
 class LlmConfig(
     val title: String = "",
-    val provider: Provider = Provider.OpenAI, // 更新 provider 类型
+    val provider: Provider = Provider.OpenAILike, // 更新 provider 类型
     val apiBase: String = "https://api.openai.com/v1/chat/completions",
     val apiKey: String = "",
     val model: String = "",

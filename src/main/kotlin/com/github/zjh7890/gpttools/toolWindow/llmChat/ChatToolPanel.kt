@@ -21,6 +21,7 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.NullableComponent
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.wm.IdeFocusManager
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -100,6 +101,12 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         myList.isOpaque = true
         myList.background = UIUtil.getListBackground()
+        // 添加鼠标点击监听器来激活工具窗口
+        myList.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent?) {
+                focusInput()
+            }
+        })
 
         myScrollPane = JBScrollPane(
             myList,
