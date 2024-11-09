@@ -4,10 +4,9 @@ import com.github.zjh7890.gpttools.settings.template.CodeTemplateApplicationSett
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.intellij.openapi.options.Configurable
-import com.intellij.openapi.project.Project
 import javax.swing.JComponent
 
-class GptToolsConfigurable(private val project: Project) : Configurable {
+class GptToolsConfigurable() : Configurable {
     private var gptToolConfigUi: GptToolConfigUi? = null
     private val templateSettings: CodeTemplateApplicationSettingsService =
         CodeTemplateApplicationSettingsService.instance
@@ -15,7 +14,7 @@ class GptToolsConfigurable(private val project: Project) : Configurable {
     private val otherSettings: OtherSettingsState = OtherSettingsState.getInstance()
 
     override fun createComponent(): JComponent? {
-        gptToolConfigUi = GptToolConfigUi(project, templateSettings, this)
+        gptToolConfigUi = GptToolConfigUi(templateSettings, this)
         return gptToolConfigUi?.panel
     }
 

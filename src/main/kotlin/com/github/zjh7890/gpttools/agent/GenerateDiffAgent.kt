@@ -52,7 +52,7 @@ object GenerateDiffAgent {
 1. CREATE: 新建文件
 2. MODIFY: 修改文件的部分内容
 3. DELETE: 删除文件
-4. REWRITE: 完全重写文件内容（当文件改动超过 50% 或需要大规模重构时使用）
+4. REWRITE: 完全重写文件内容（当文件改动较大或需要大规模重构时使用）
 
 以下是新增文件的返回示例（CREATE），由于是新增文件，ORIGINAL直接置空即可：
 ----- CHANGES START -----
@@ -90,7 +90,7 @@ public static final String SUD_BULLET_NOTIFY = "SUD_BULLET_NOTIFY";
 ----- CHANGE END -----
 ----- CHANGES END -----
 
-以下是完全重写文件的返回示例（REWRITE），适用于文件改动较大（超过50%）或需要重构的情况。ORIGINAL 直接置空，直接使用 UPDATED 的内容替换整个文件：
+以下是完全重写文件的返回示例（REWRITE），适用于文件改动较大或需要重构的情况。ORIGINAL 直接置空，直接使用 UPDATED 的内容替换整个文件：
 ----- CHANGES START -----
 ----- CHANGE START -----
 path: HelloWorld.java
@@ -132,8 +132,8 @@ changeType: DELETE
 ----- CHANGES END -----
 
 注意事项：
-1. 对于小范围修改（改动不超过50%），使用 MODIFY 类型
-2. 对于大范围修改（改动超过50%）或需要重构的情况，使用 REWRITE 类型
+1. 对于小范围修改，使用 MODIFY 类型
+2. 对于大范围修改或需要重构的情况，使用 REWRITE 类型
 3. MODIFY 类型时，ORIGINAL 必须是文件中实际存在的内容
 4. REWRITE 类型时，会直接使用 UPDATED 的内容替换整个文件，使用时 ORIGINAL 直接置空，UPDATED 块直接重写文件，所以 UPDATED 块要包含文件所有数据，如要使用，一个文件只会有一个 REWRITE 块
 

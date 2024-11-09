@@ -3,13 +3,12 @@ package com.github.zjh7890.gpttools.settings.template
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileTypes.PlainTextFileType
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Splitter
 import javax.swing.*
 import java.awt.BorderLayout
 
-class EnhancedEditorDialog(val project: Project, private var template: PromptTemplate?) : DialogWrapper(project) {
+class EnhancedEditorDialog(private var template: PromptTemplate?) : DialogWrapper(null) {
     private var editor: Editor? = null
 
     init {
@@ -18,12 +17,12 @@ class EnhancedEditorDialog(val project: Project, private var template: PromptTem
         init()
     }
 
-    override fun createCenterPanel(): JComponent? {
+    override fun createCenterPanel(): JComponent {
         val panel = JPanel(BorderLayout())
         val splitter = Splitter(true, 0.8f)
 
         editor = EditorFactory.getInstance().createEditor(
-            EditorFactory.getInstance().createDocument(template?.value ?: ""), project, PlainTextFileType.INSTANCE, false
+            EditorFactory.getInstance().createDocument(template?.value ?: ""), null, PlainTextFileType.INSTANCE, false
         )
 
         splitter.firstComponent = editor?.component

@@ -21,7 +21,7 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
 
     data class State(
         var generateDiff: Boolean = true,
-        var withContext: Boolean = true
+        var withFiles: Boolean = true
     )
 
     private var state = State()
@@ -41,9 +41,9 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
             state.generateDiff = value
         }
 
-    var withContext: Boolean
-        get() = state.withContext
+    var withFiles: Boolean
+        get() = state.withFiles
         set(value) {
-            state.withContext = value
+            state.withFiles = value
         }
 }

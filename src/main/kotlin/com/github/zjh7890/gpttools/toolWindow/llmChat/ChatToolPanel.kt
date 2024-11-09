@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.toolWindow.llmChat
 
+import com.github.zjh7890.gpttools.components.welcome.WelcomePanel
 import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
@@ -21,7 +22,6 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.NullableComponent
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.wm.IdeFocusManager
-import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -48,7 +48,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     val myTitle = JBLabel("Conversation")
     val myList = JPanel(VerticalLayout(JBUI.scale(10)))
     var inputSection: AutoDevInputSection
-    val withContextCheckbox = JCheckBox("WithContext", true)
+    val withFilesCheckbox = JCheckBox("WithFiles", true)
     val generateDiffCheckbox = JCheckBox("Generate Diff", CommonSettings.getInstance(project).generateDiff)
     val focusMouseListener: MouseAdapter
     var panelContent: DialogPanel
@@ -81,13 +81,27 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         isVisible = true
     }
 
-    private val toggleFileListButton = JButton("Hide File List").apply {
-        addActionListener {
-            fileListPanel.isVisible = !fileListPanel.isVisible
-            text = if (fileListPanel.isVisible) "Hide File List" else "Show File List"
-            refreshFileList()
-        }
-    }
+    private val toggleFileListButton = ActionButton(
+        object : AnAction() {
+            override fun actionPerformed(e: AnActionEvent) {
+                fileListPanel.isVisible = !fileListPanel.isVisible
+                // 更新 presentation 的图标
+                e.presentation.icon = if (fileListPanel.isVisible) {
+                    AllIcons.Actions.Collapseall
+                } else {
+                    AllIcons.Actions.Expandall
+                }
+                refreshFileList()
+            }
+        },
+        Presentation().apply {
+            icon = AllIcons.Actions.Collapseall
+            text = "Toggle file list"
+            description = "Toggle file list"
+        },
+        "",
+        JBUI.size(16)
+    )
 
     init {
         focusMouseListener = object : MouseAdapter() {
@@ -96,6 +110,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
             }
         }
 
+        myList.add(WelcomePanel())
         myTitle.foreground = JBColor.namedColor("Label.infoForeground", JBColor(Gray.x80, Gray.x8C))
         myTitle.font = JBFont.label()
 
@@ -145,7 +160,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 // 将其转换为 LlmConfig
                 val llmConfig = LLMSettingsState.toLlmConfig(selectedSetting)
 
-                val withContext = withContextCheckbox.isSelected
+                val withFiles = withFilesCheckbox.isSelected
 
                 val ifEditing = editingMessageView != null
                 if (ifEditing) {
@@ -189,8 +204,8 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         })
 
         // 添加监听器
-        withContextCheckbox.addActionListener {
-            chatCodingService.updateWithContext(withContextCheckbox.isSelected)
+        withFilesCheckbox.addActionListener {
+            chatCodingService.updateWithFiles(withFilesCheckbox.isSelected)
         }
 
         generateDiffCheckbox.addActionListener {
@@ -199,12 +214,18 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         panelContent = panel {
             row { cell(myScrollPane).fullWidth().fullHeight() }.resizableRow()
-            row { cell(suggestionPanel).fullWidth() }
+            row {
+                cell(JSeparator()).fullWidth()
+            }
+            row {
+                cell(fileListPanel)
+            }
             row { cell(editingPanel).fullWidth() }
             row { cell(progressBar).fullWidth() }
             row {
-                cell(withContextCheckbox)
+                cell(withFilesCheckbox)
                 cell(generateDiffCheckbox)
+                cell(toggleFileListButton)
                 // 添加生成 diff 的按钮
                 cell(ActionButton(
                     GenerateDiffAction(project, progressBar, inputSection, chatCodingService),
@@ -221,12 +242,6 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 border = JBUI.Borders.empty(8)
                 cell(inputSection).fullWidth()
             }
-            row {
-                cell(fileListPanel).fullWidth()
-            }
-            row {
-                cell(toggleFileListButton).fullWidth()
-            }
         }
 
         setContent(panelContent)
@@ -236,6 +251,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     // 重新加载当前对话
     fun reloadConversation() {
         myList.removeAll()
+        myList.add(WelcomePanel())
         val chatCodingService = ChatCodingService.getInstance(project)
         val currentSession = chatCodingService.getCurrentSession()
         currentSession.messages.forEach { message ->
@@ -364,6 +380,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     fun newChatSession() {
         progressBar.isVisible = false
         myList.removeAll()
+        myList.add(WelcomePanel())
         chatCodingService.newSession()
         this.hiddenProgressBar()
         chatCodingService.saveSessions()

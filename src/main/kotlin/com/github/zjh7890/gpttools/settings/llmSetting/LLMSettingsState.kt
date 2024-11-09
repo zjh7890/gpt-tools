@@ -75,8 +75,7 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
                 model = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.modelName else defaultSetting.azureModel,
                 temperature = defaultSetting.temperature,
                 apiBase = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.apiHost else defaultSetting.azureEndpoint,
-                responseType = defaultSetting.responseType,
-                responseFormat = defaultSetting.responseFormat,
+                stream = defaultSetting.stream,
                 azureEndpoint = defaultSetting.azureEndpoint,
                 azureApiKey = defaultSetting.azureApiKey,
                 azureModel = defaultSetting.azureModel

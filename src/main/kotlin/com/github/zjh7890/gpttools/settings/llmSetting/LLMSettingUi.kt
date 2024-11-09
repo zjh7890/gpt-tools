@@ -147,8 +147,7 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
                 current.azureModel != original.azureModel ||
                 current.azureEndpoint != original.azureEndpoint ||
                 current.azureApiKey != original.azureApiKey ||
-                current.responseType != original.responseType ||
-                current.responseFormat != original.responseFormat ||
+                current.stream != original.stream ||  // 改用 stream
                 current.isDefault != original.isDefault
             ) {
                 return true
@@ -341,7 +340,10 @@ class ShireConfigItemComponent(
 ) {
     private val panel: JPanel
     private val defaultCheckBox = JBCheckBox("默认配置")
-    private val providerComboBox = JComboBox(Provider.values())
+    private val providerComboBox = JComboBox(Provider.values()).apply {
+        minimumSize = Dimension(130, minimumSize.height)
+        preferredSize = Dimension(130, preferredSize.height)
+    }
 
     // 独有字段
     private val apiHostField = JBTextField(setting.apiHost)
@@ -355,9 +357,9 @@ class ShireConfigItemComponent(
 
     // 公共字段
     private val temperatureField = JBTextField(setting.temperature.toString())
-    private val responseTypeComboBox = JComboBox(LLMSettingsState.ResponseType.values())
-    private val responseFormatField = JBTextField(setting.responseFormat)
-
+    private val streamCheckBox = JBCheckBox("stream").apply {
+        isSelected = setting.stream
+    }
     // Test Connection 相关组件
     private val testConnectionButton = JButton("Test Connection")
     private val testResultField = JTextPane()
@@ -395,8 +397,7 @@ class ShireConfigItemComponent(
             .addLabeledComponent(JLabel("Provider:"), providerComboBox)
             .addComponent(uniqueFieldsPanel)
             .addLabeledComponent(JLabel("Temperature:"), temperatureField)
-            .addLabeledComponent(JLabel("Response Type:"), responseTypeComboBox)
-            .addLabeledComponent(JLabel("Response Format:"), responseFormatField)
+            .addComponent(streamCheckBox)
             .addComponent(defaultCheckBox)
             // 添加 Test Connection 按钮和结果显示
             .addComponent(testConnectionButton)
@@ -430,11 +431,7 @@ class ShireConfigItemComponent(
             }
         }
 
-        // 设置 ResponseType 下拉框监听器
-        responseTypeComboBox.selectedItem = setting.responseType
-        responseTypeComboBox.addActionListener {
-            setting.responseType = responseTypeComboBox.selectedItem as LLMSettingsState.ResponseType
-        }
+        // 初始化字段值
 
         // 初始化字段值
         reset(setting)
@@ -471,7 +468,9 @@ class ShireConfigItemComponent(
         temperatureField.document.addDocumentListener(createDocumentListener {
             setting.temperature = temperatureField.text.toDoubleOrNull() ?: 0.0
         })
-        responseFormatField.document.addDocumentListener(createDocumentListener { setting.responseFormat = responseFormatField.text })
+        streamCheckBox.addItemListener { event ->
+            setting.stream = event.stateChange == ItemEvent.SELECTED
+        }
     }
 
     /**
@@ -515,8 +514,7 @@ class ShireConfigItemComponent(
 
         // 设置公共字段
         setting.temperature = temperatureField.text.toDoubleOrNull() ?: 0.0
-        setting.responseType = responseTypeComboBox.selectedItem as LLMSettingsState.ResponseType
-        setting.responseFormat = responseFormatField.text
+        setting.stream = streamCheckBox.isSelected
         setting.isDefault = defaultCheckBox.isSelected
 
         return setting
@@ -563,8 +561,7 @@ class ShireConfigItemComponent(
 
         // 设置公共字段
         temperatureField.text = setting.temperature.toString()
-        responseTypeComboBox.selectedItem = setting.responseType
-        responseFormatField.text = setting.responseFormat
+        streamCheckBox.isSelected = setting.stream
         defaultCheckBox.isSelected = setting.isDefault
 
         // 重置 Test Connection 结果
@@ -590,13 +587,12 @@ class ShireConfigItemComponent(
         }) {
             val llmConfig = LlmConfig(
                 title = setting.modelName,
-                provider = setting.provider, // 设置 provider
+                provider = setting.provider,
                 apiKey = if (setting.provider == Provider.OpenAILike) setting.apiToken else setting.azureApiKey,
                 model = if (setting.provider == Provider.OpenAILike) setting.modelName else setting.azureModel,
                 temperature = setting.temperature,
                 apiBase = if (setting.provider == Provider.OpenAILike) setting.apiHost else setting.azureEndpoint,
-                responseType = setting.responseType,
-                responseFormat = setting.responseFormat,
+                stream = setting.stream,  // 改用 stream
                 azureEndpoint = setting.azureEndpoint,
                 azureApiKey = setting.azureApiKey,
                 azureModel = setting.azureModel

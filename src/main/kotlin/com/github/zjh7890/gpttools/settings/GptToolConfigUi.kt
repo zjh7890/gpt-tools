@@ -7,22 +7,20 @@ import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingUi
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.settings.other.OtherSettingUi
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
-import com.intellij.openapi.project.Project
 import javax.swing.JTabbedPane
 
 class GptToolConfigUi(
-    val project: Project,
     val templateSettings: CodeTemplateApplicationSettingsService,
     val gptToolsConfigurable: GptToolsConfigurable
 ) {
     val panel = JTabbedPane()
     private val llmSettingUi = LLMSettingUi()
-    private val templateSettingUi = TemplateSettingUi(project, templateSettings, gptToolsConfigurable)
+    private val templateSettingUi = TemplateSettingUi(templateSettings, gptToolsConfigurable)
     private val otherSettingUi = OtherSettingUi()
 
     init {
         panel.addTab("LLM Settings", llmSettingUi.component)
-        panel.addTab("Templates", templateSettingUi.panel)
+        panel.addTab("Template Prompt", templateSettingUi.panel)
         panel.addTab("Others", otherSettingUi.component)
     }
 

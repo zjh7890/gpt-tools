@@ -136,20 +136,21 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         // 获取 ShireSettingsState 实例
         val LLMSettingsState = LLMSettingsState.getInstance()
 
+        layoutPanel.setOpaque(false)
+
         // 将自身添加为设置变化的监听器
         LLMSettingsState.addSettingsChangeListener(this)
-
 
         // 获取 ShireSettings 列表
         val settingsList = LLMSettingsState.settings
 
-// 查找默认的配置项（isDefault 为 true）
+        // 查找默认的配置项（isDefault 为 true）
         val defaultSetting = settingsList.find { it.isDefault } ?: settingsList.firstOrNull()
 
-// 创建 ComboBox 的模型
+        // 创建 ComboBox 的模型
         val comboBoxModel = MutableCollectionComboBoxModel(settingsList, defaultSetting)
 
-// 初始化 ComboBox
+        // 初始化 ComboBox
         configComboBox = ComboBox(comboBoxModel).apply {
             renderer = object : SimpleListCellRenderer<LLMSetting>() {
                 override fun customize(
@@ -171,9 +172,16 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         buttonPanel.add(sendButton, "Send")
         buttonPanel.add(stopButton, "Stop")
 
-        layoutPanel.addToLeft(configComboBox)
+        // 创建一个新的面板用于放置 configComboBox 和 buttonPanel
+        val rightPanel = JPanel(BorderLayout()).apply {
+            isOpaque = false
+            add(configComboBox, BorderLayout.WEST)
+            add(Box.createHorizontalStrut(10), BorderLayout.CENTER) // 添加10像素的间距
+            add(buttonPanel, BorderLayout.EAST)
+        }
+       
         layoutPanel.addToCenter(horizontalGlue)
-        layoutPanel.addToRight(buttonPanel)
+        layoutPanel.addToRight(rightPanel)
         addToBottom(layoutPanel)
 
         addListener(object : AutoDevInputListener {

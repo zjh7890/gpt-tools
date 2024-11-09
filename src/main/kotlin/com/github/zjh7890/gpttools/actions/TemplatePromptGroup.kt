@@ -10,7 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Iconable
 import javax.swing.Icon
 
-class PromptGeneratorGroup : ActionGroup(), Iconable {
+class TemplatePromptGroup : ActionGroup(), Iconable {
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         if (e == null) {

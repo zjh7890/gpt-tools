@@ -11,7 +11,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
@@ -22,7 +21,6 @@ import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
 class TemplateSettingUi(
-    val project: Project,
     val templateSettings: CodeTemplateApplicationSettingsService,
     val gptToolsConfigurable: GptToolsConfigurable
 ) {
@@ -50,7 +48,7 @@ class TemplateSettingUi(
         templateList.addListSelectionListener {
             if (!it.valueIsAdjusting) {
                 val selectedTemplate = templateList.selectedValue
-                updateCombinedPanelDisplay(project, selectedTemplate)
+                updateCombinedPanelDisplay(selectedTemplate)
             }
         }
 
@@ -75,13 +73,13 @@ class TemplateSettingUi(
                 }
             })
 
-        updateCombinedPanelDisplay(project, null)
+        updateCombinedPanelDisplay(null)
 
         val templatePanel = LeftRightComponent(templatesDecorator.createPanel(), combinedPanel).mainPanel
         panel.add(templatePanel, BorderLayout.CENTER)
     }
 
-    private fun updateCombinedPanelDisplay(project: Project, selectedItem: PromptTemplate?) {
+    private fun updateCombinedPanelDisplay(selectedItem: PromptTemplate?) {
         combinedPanel.removeAll()  // 清除所有当前组件
         if (selectedItem != null) {
             val keyTextField = JTextField()
@@ -110,7 +108,7 @@ class TemplateSettingUi(
                 .addComponent(
                     JButton("Open Editor").apply {
                         addActionListener {
-                            val popup = EnhancedEditorDialog(project, selectedItem)
+                            val popup = EnhancedEditorDialog(selectedItem)
                             popup.show()
                         }
                     }
@@ -234,7 +232,7 @@ class TemplateSettingUi(
 
     private fun importTemplatesFromJson() {
         val jsonInput = Messages.showMultilineInputDialog(
-            project,
+            null,
             "Paste the JSON here:",
             "Import Options",
             "",

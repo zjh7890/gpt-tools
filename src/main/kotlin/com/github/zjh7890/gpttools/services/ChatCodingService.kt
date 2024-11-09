@@ -105,9 +105,9 @@ class ChatCodingService(val project: Project) : Disposable{
         currentJob?.cancel()
     }
 
-    fun updateWithContext(withContext: Boolean) {
-        CommonSettings.getInstance(project).withContext = withContext
-        getCurrentSession().withContext = withContext
+    fun updateWithFiles(withFiles: Boolean) {
+        CommonSettings.getInstance(project).withFiles = withFiles
+        getCurrentSession().withFiles = withFiles
     }
 
     fun handlePromptAndResponse(
@@ -424,7 +424,7 @@ data class ChatSession(
     val startTime: Long = System.currentTimeMillis(),
     val type: String,
     var fileList: MutableList<VirtualFile> = mutableListOf(),
-    var withContext: Boolean = true,
+    var withFiles: Boolean = true,
     val project: String
 ) {
     // 添加序列化方法
@@ -434,7 +434,7 @@ data class ChatSession(
             messages = messages,
             startTime = startTime,
             type = type,
-            withContext = withContext,
+            withFiles = withFiles,
             filePaths = fileList.map { it.path }.toMutableList(),
             projectName = project
         )
@@ -494,7 +494,7 @@ ${border}
 
     fun transformMessages(invalidContext: Boolean = false): MutableList<ChatMessage> {
         val chatMessages: MutableList<ChatMessage>
-        if (withContext) {
+        if (withFiles) {
             // 找到最后一个用户消息的索引
             val lastUserMessageIndex = messages.indexOfLast { it.role == ChatRole.user }
 
@@ -552,7 +552,7 @@ ${FileUtil.wrapBorder(it.context)}
                 startTime = data.startTime,
                 type = data.type,
                 fileList = virtualFiles,  // 新增
-                withContext = CommonSettings.getInstance(project).withContext,
+                withFiles = CommonSettings.getInstance(project).withFiles,
                 data.projectName
             )
         }
@@ -572,7 +572,7 @@ data class SerializableChatSession @JvmOverloads constructor(
     val messages: MutableList<ChatContextMessage> = mutableListOf(),
     val startTime: Long = 0L,
     val type: String = "",
-    val withContext: Boolean = true,
+    val withFiles: Boolean = true,
     val filePaths: MutableList<String> = mutableListOf(),
     val projectName: String = ""
 ) {

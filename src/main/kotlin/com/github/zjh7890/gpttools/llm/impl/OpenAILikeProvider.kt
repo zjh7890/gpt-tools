@@ -45,7 +45,8 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
         llmConfig: LlmConfig
     ): Flow<String> {
         // 根据 responseType 决定 stream 的值
-        val isStream = llmConfig.responseType == LLMSettingsState.ResponseType.SSE
+        val isStream = llmConfig.stream
+        val responseFormat: String = if (isStream)  "\$.choices[0].delta.content" else "\$.choices[0].message.content"
 
         val requestFormat: String = if (llmConfig.maxTokens != null) {
             """{ "customFields": {"model": "${llmConfig.model}", "temperature": ${llmConfig.temperature}, "max_tokens": ${llmConfig.maxTokens}, "stream": $isStream} }"""
@@ -70,13 +71,13 @@ class OpenAILikeProvider : CustomSSEHandler(), LlmProvider {
         client = client.newBuilder().readTimeout(timeout).build()
         val call = client.newCall(builder.url(llmConfig.apiBase).post(body).build())
 
-        return if (llmConfig.responseType == LLMSettingsState.ResponseType.SSE) {
-            streamSSE(call, messages, llmConfig.responseFormat)
+        return if (isStream) {
+            streamSSE(call, messages, responseFormat)
         } else {
             val response = call.execute()
             val responseBody: String? = response.body?.string()
             logger<OpenAILikeProvider>().warn("LLM response body non stream: $responseBody")
-            val responseContent: String = JsonPath.parse(responseBody)?.read(llmConfig.responseFormat) ?: ""
+            val responseContent: String = JsonPath.parse(responseBody)?.read(responseFormat) ?: ""
             kotlinx.coroutines.flow.flow {
                 emit(responseContent)
             }

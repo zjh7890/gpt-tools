@@ -58,7 +58,7 @@
         <projectService serviceImplementation="com.github.zjh7890.gpttools.services.ChatCodingService"/>
         <projectService serviceImplementation="com.github.zjh7890.gpttools.utils.LLMCoroutineScope"/>
 
-        <projectConfigurable instance="com.github.zjh7890.gpttools.settings.GptToolsConfigurable"/>
+        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.GptToolsConfigurable" parentId="tools"/>
 
 <!--        <applicationConfigurable instance="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
 <!--                                 id="com.github.zjh7890.gpttools.settings.llmSettings.GptToolSettingsConfigurable"-->
@@ -83,9 +83,9 @@
 
     <actions>
         <group id="PromptGeneratorGroup"
-               class="com.github.zjh7890.gpttools.actions.PromptGeneratorGroup"
-               description="Prompt Generator" popup="true"
-               text="PromptGenerator"
+               class="com.github.zjh7890.gpttools.actions.TemplatePromptGroup"
+               description="Template Prompt" popup="true"
+               text="Template Prompt"
                icon="/icons/icon_16px.svg">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
             <add-to-group group-id="Vcs.Log.ChangesBrowser.Popup" relative-to-action="Vcs.RepositoryChangesBrowserMenu"
