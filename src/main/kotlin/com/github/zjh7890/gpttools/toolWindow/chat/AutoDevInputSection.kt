@@ -71,11 +71,7 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         stopButtonPresentation.setIcon(GptToolsIcon.Stop)
         this.stopButtonPresentation = stopButtonPresentation
 
-        input = AutoDevInput(project, listOf(), disposable, this).apply {
-            // Set minimum and preferred size to ensure at least two lines of text
-            minimumSize = Dimension(0, JBUI.scale(48))
-            preferredSize = Dimension(0, JBUI.scale(48))
-        }
+        input = AutoDevInput(project, listOf(), disposable, this)
 
         sendButton = ActionButton(
             DumbAwareAction.create {

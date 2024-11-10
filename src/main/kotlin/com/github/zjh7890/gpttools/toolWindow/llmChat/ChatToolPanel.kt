@@ -214,14 +214,12 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         panelContent = panel {
             row { cell(myScrollPane).fullWidth().fullHeight() }.resizableRow()
+            row { cell(progressBar).fullWidth() }
             row {
-                cell(JSeparator()).fullWidth()
-            }
-            row {
-                cell(fileListPanel)
+                border = JBUI.Borders.empty(8)
+                cell(inputSection).fullWidth()
             }
             row { cell(editingPanel).fullWidth() }
-            row { cell(progressBar).fullWidth() }
             row {
                 cell(withFilesCheckbox)
                 cell(generateDiffCheckbox)
@@ -239,8 +237,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 ))
             }
             row {
-                border = JBUI.Borders.empty(8)
-                cell(inputSection).fullWidth()
+                cell(fileListPanel)
             }
         }
 
