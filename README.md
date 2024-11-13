@@ -6,7 +6,7 @@
 
 <!-- Plugin description -->
 ## 一个所想即所得的 AI 插件。
-本插件已经可以让我在实际工作中的 AI 生成代码占比达到 100% (作为一名 Java 后端开发）。
+本插件已经可以让我在实际工作中的 AI 生成代码占比达到 100% (作为一名 Java 后端开发）。<br>
 插件有两大功能：
 1. chat（通过对话让 AI 实现逻辑，Code Review，类似 Aider, Cursor）
 2. 模板 prompt（用于生成样板代码，我常用于生成 Apollo 和 RPC 类）
