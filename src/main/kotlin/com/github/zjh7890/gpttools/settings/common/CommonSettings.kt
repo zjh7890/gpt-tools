@@ -1,21 +1,34 @@
 package com.github.zjh7890.gpttools.settings.common
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
-import com.intellij.openapi.project.Project
+
+import com.intellij.util.messages.Topic
+
+// 定义设置变更监听器接口
+interface CommonSettingsListener {
+    companion object {
+        val TOPIC = Topic.create("CommonSettings changed", CommonSettingsListener::class.java)
+    }
+    
+    fun onSettingsChanged()
+}
 
 @State(
     name = "CommonSettings",
     storages = [Storage("com.github.zjh7890.gpttools.settings.common.CommonSettings.xml")]
 )
-@Service(Service.Level.PROJECT)
+@Service(Service.Level.APP)
 class CommonSettings : PersistentStateComponent<CommonSettings.State> {
 
+    private val messageBus = ApplicationManager.getApplication().messageBus
+
     companion object {
-        fun getInstance(project: Project): CommonSettings {
-            return project.getService(CommonSettings::class.java)
+        fun getInstance(): CommonSettings {
+            return ApplicationManager.getApplication().getService(CommonSettings::class.java)
         }
     }
 
@@ -25,7 +38,6 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
     )
 
     private var state = State()
-    
 
     override fun getState(): State {
         return state
@@ -33,17 +45,23 @@ class CommonSettings : PersistentStateComponent<CommonSettings.State> {
 
     override fun loadState(state: State) {
         this.state = state
+        // 通知设置已变更
+        messageBus.syncPublisher(CommonSettingsListener.TOPIC).onSettingsChanged()
     }
 
     var generateDiff: Boolean
         get() = state.generateDiff
         set(value) {
             state.generateDiff = value
+            // 通知设置已变更
+            messageBus.syncPublisher(CommonSettingsListener.TOPIC).onSettingsChanged()
         }
 
     var withFiles: Boolean
         get() = state.withFiles
         set(value) {
             state.withFiles = value
+            // 通知设置已变更
+            messageBus.syncPublisher(CommonSettingsListener.TOPIC).onSettingsChanged()
         }
 }

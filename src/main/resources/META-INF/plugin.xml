@@ -33,9 +33,9 @@
             <className>com.github.zjh7890.gpttools.actions.ChatWithThisAction</className>
         </intentionAction>
 
-        <intentionAction>
-            <className>com.github.zjh7890.gpttools.actions.CompleteThisAction</className>
-        </intentionAction>
+<!--        <intentionAction>-->
+<!--            <className>com.github.zjh7890.gpttools.actions.CompleteThisAction</className>-->
+<!--        </intentionAction>-->
 
         <toolWindow id="LLMChat"
                     anchor="right"

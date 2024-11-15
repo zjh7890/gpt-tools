@@ -16,7 +16,6 @@ import com.github.zjh7890.gpttools.utils.*
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -106,7 +105,7 @@ class ChatCodingService(val project: Project) : Disposable{
     }
 
     fun updateWithFiles(withFiles: Boolean) {
-        CommonSettings.getInstance(project).withFiles = withFiles
+        CommonSettings.getInstance().withFiles = withFiles
         getCurrentSession().withFiles = withFiles
     }
 
@@ -179,7 +178,7 @@ class ChatCodingService(val project: Project) : Disposable{
                 saveSessions()
                 
                 // 只在没有错误时执行 GenerateDiffAgent
-                if (!hasError && CommonSettings.getInstance(project).generateDiff) {
+                if (!hasError && CommonSettings.getInstance().generateDiff) {
                     ApplicationManager.getApplication().executeOnPooledThread {
                         GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession(), ui)
                     }
@@ -552,7 +551,7 @@ ${FileUtil.wrapBorder(it.context)}
                 startTime = data.startTime,
                 type = data.type,
                 fileList = virtualFiles,  // 新增
-                withFiles = CommonSettings.getInstance(project).withFiles,
+                withFiles = CommonSettings.getInstance().withFiles,
                 data.projectName
             )
         }

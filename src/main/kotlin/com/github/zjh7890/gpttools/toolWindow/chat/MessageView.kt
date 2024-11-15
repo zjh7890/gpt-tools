@@ -45,9 +45,9 @@ class MessageView(
         isDoubleBuffered = true
         isOpaque = true
         background = when (role) {
-            ChatRole.system -> JBColor(0xEAEEF7, 0x45494A)
-            ChatRole.assistant -> JBColor(0xEAEEF7, 0x2d2f30)
-            ChatRole.user -> JBColor(0xE0EEF7, 0x2d2f30)
+            ChatRole.system -> JBColor(0xEAEEF7, 0x393b41)
+            ChatRole.assistant -> JBColor(0xEAEEF7, 0x393b41)
+            ChatRole.user -> JBColor(0xE0EEF7, 0x393b41)
         }
 
         val authorLabel = JLabel()

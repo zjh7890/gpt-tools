@@ -5,6 +5,7 @@ import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
+import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
@@ -21,6 +22,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.NullableComponent
 import com.intellij.openapi.ui.SimpleToolWindowPanel
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
@@ -41,15 +43,16 @@ import javax.swing.*
 
 class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
-    NullableComponent {
+    NullableComponent,
+    Disposable {
     private val logger = logger<ChatToolPanel>()
 
     var progressBar: JProgressBar
     val myTitle = JBLabel("Conversation")
     val myList = JPanel(VerticalLayout(JBUI.scale(10)))
     var inputSection: AutoDevInputSection
-    val withFilesCheckbox = JCheckBox("WithFiles", true)
-    val generateDiffCheckbox = JCheckBox("Generate Diff", CommonSettings.getInstance(project).generateDiff)
+    val withFilesCheckbox = JCheckBox("WithFiles", CommonSettings.getInstance().withFiles)
+    val generateDiffCheckbox = JCheckBox("Generate Diff", CommonSettings.getInstance().generateDiff)
     val focusMouseListener: MouseAdapter
     var panelContent: DialogPanel
     val myScrollPane: JBScrollPane
@@ -104,6 +107,22 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     )
 
     init {
+        // 订阅设置变更
+        ApplicationManager.getApplication().messageBus
+            .connect(disposable ?: project)
+            .subscribe(
+                CommonSettingsListener.TOPIC,
+                object : CommonSettingsListener {
+                    override fun onSettingsChanged() {
+                        generateDiffCheckbox.isSelected = CommonSettings.getInstance().generateDiff
+                        withFilesCheckbox.isSelected = CommonSettings.getInstance().withFiles
+                    }
+                }
+            )
+
+        // 注册到 project 的 Disposable 树中
+        project.messageBus.connect(this)
+        
         focusMouseListener = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent?) {
                 focusInput()
@@ -205,11 +224,12 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         // 添加监听器
         withFilesCheckbox.addActionListener {
+            CommonSettings.getInstance().withFiles = withFilesCheckbox.isSelected
             chatCodingService.updateWithFiles(withFilesCheckbox.isSelected)
         }
 
         generateDiffCheckbox.addActionListener {
-            CommonSettings.getInstance(project).generateDiff = generateDiffCheckbox.isSelected
+            CommonSettings.getInstance().generateDiff = generateDiffCheckbox.isSelected
         }
 
         panelContent = panel {
@@ -468,6 +488,29 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
             }
             updateUI()
         }
+    }
+    
+    override fun dispose() {
+        // 清除所有消息视图
+        myList.removeAll()
+        
+        // 停止所有正在进行的操作
+        chatCodingService.stop()
+        
+        // 取消所有订阅
+        if (disposable is Disposable) {
+            Disposer.dispose(disposable)
+        }
+        
+        // 清除引用
+        editingMessageView = null
+        
+        // 移除所有监听器
+        withFilesCheckbox.removeActionListener { }
+        generateDiffCheckbox.removeActionListener { }
+        
+        // 清除文件列表
+        fileListPanel.removeAll()
     }
 }
 

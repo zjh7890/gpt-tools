@@ -40,7 +40,7 @@ class WelcomePanel: JPanel(BorderLayout()) {
                 val linkPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
                     add(JLabel("设置 LLM, 推荐用 claude sonnet 3.5").apply {
                         cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                        foreground = java.awt.Color(0x31, 0x5F, 0xBD) // 设置颜色为 #315fbd
+                        foreground = java.awt.Color(0x6a, 0x9b, 0xfa)
                         addMouseListener(object : MouseAdapter() {
                             override fun mouseClicked(e: MouseEvent) {
                                 ShowSettingsUtil.getInstance().showSettingsDialog(
