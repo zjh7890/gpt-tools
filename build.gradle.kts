@@ -186,8 +186,18 @@ project(":goland") {
     })
 }
 
-project(":core") {
+project(":java") {
+    dependencies(fun DependencyHandlerScope.() {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            // 添加 instrumentationTools 依赖
+            instrumentationTools()
+            intellijPlugins("com.intellij.java".split(',').map(String::trim).filter(String::isNotEmpty))
+        }
+    })
+}
 
+project(":core") {
     dependencies(fun DependencyHandlerScope.() {
         implementation("com.azure:azure-ai-openai:1.0.0-beta.11")
         implementation("com.squareup.okhttp3:okhttp:4.4.1")
