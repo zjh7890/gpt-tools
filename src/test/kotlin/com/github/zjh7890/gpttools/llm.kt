@@ -20,8 +20,7 @@ suspend fun main() {
         apiKey = "",
         model = "o1-mini",
         temperature = 1.0,
-        responseType = LLMSettingsState.ResponseType.JSON,
-        responseFormat = "\$.choices[0].message.content",
+        stream = true,
         maxTokens = null
     )
 

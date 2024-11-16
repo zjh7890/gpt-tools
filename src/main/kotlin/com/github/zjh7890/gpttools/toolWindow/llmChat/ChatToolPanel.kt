@@ -431,7 +431,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         inputSection.moveCursorToStart()
     }
 
-    fun showSuggestion(msg: @Nls String) {
+    fun showSuggestion(msg: String) {
         val label = panel {
             row {
                 link(msg) {

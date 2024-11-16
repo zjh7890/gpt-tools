@@ -43,9 +43,9 @@ class ResponseBodyCallback(private val emitter: FlowableEmitter<SSE>, private va
         try {
             if (!response.isSuccessful) {
                 if (response.body == null) {
-                    throw ShireHttpException("Response body is null", response.code)
+                    throw GptToolsHttpException("Response body is null", response.code)
                 } else {
-                    throw ShireHttpException(response.body?.string() ?: "", response.code)
+                    throw GptToolsHttpException(response.body?.string() ?: "", response.code)
                 }
             }
 
