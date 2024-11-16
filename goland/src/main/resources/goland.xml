@@ -1,0 +1,16 @@
+<idea-plugin package="com.github.zjh7890.gpttools.goland">
+    <dependencies>
+<!--        <plugin id="org.jetbrains.plugins.go"/>-->
+<!--        <plugin id="com.intellij.modules.go-capable"/>-->
+        <plugin id="com.intellij.modules.platform"/>
+    </dependencies>
+
+    <actions>
+        <action id="com.github.zjh7890.gpttools.goland.actions.HelloGoAction"
+                class="com.github.zjh7890.gpttools.goland.actions.HelloGoAction"
+                text="Show Hello Go"
+                description="Shows Hello Go message">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

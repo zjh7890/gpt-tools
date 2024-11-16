@@ -1,0 +1,13 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin  xmlns:xi="http://www.w3.org/2001/XInclude"  allow-bundled-update="true">
+    <id>com.github.zjh7890.gpttools</id>
+    <name>gpt-tools</name>
+    <vendor>zjh7890</vendor>
+
+    <!-- Include gpt-tools.xml -->
+    <xi:include href="/META-INF/gpt-tools.xml" xpointer="xpointer(/idea-plugin/*)"/>
+
+    <content>
+        <module name="goland"/>
+    </content>
+</idea-plugin>

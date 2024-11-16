@@ -3,4 +3,7 @@ plugins {
 }
 
 rootProject.name = "gpt-tools"
-include("golang")
+include("goland")
+include("pycharm")
+include("core")
+include("java")
