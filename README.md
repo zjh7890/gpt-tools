@@ -5,8 +5,9 @@
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/24670.svg)](https://plugins.jetbrains.com/plugin/24670)
 
 ## 我的微信
-项目刚开始有人用，问题有点多，可以加我微信反馈，不用麻烦提 issue 了。
-![1971732022918_ pic](https://github.com/user-attachments/assets/b07a49fa-987a-4409-b3e0-5faf5fb875f1)
+项目刚开始有人用，问题有点多，可以加我微信反馈，不用麻烦提 issue 了。<br/>
+<img width="193" alt="image" src="https://github.com/user-attachments/assets/026c2fc8-353b-46e2-9561-84c573c4359b">
+
 
 
 <!-- Plugin description -->
