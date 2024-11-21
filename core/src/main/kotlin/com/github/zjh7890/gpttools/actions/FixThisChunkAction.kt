@@ -20,8 +20,6 @@ import javax.swing.Icon
 
 class FixThisChunkAction : BaseIntentionAction(), Iconable
 {
-    fun isDumbAware(): Boolean = true
-
     override fun startInWriteAction(): Boolean = false
     override fun getText(): String = "gpt-tools Fix This"
     override fun getFamilyName(): String = "gpt-tools Fix This"
@@ -30,6 +28,7 @@ class FixThisChunkAction : BaseIntentionAction(), Iconable
         val offset = editor.caretModel.offset
         val elementAtCaret = psiFile.findElementAt(offset)
         return hasErrorAt(project, elementAtCaret, editor)
+        
     }
 
     @Throws(IncorrectOperationException::class)

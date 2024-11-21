@@ -181,11 +181,4 @@ ${border}
             ui.progressBar.isVisible = false
         }
     }
-
-
 }
-
-data class FileModification(
-    val file: String,
-    val content: String
-)

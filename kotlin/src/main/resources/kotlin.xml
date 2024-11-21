@@ -1,0 +1,51 @@
+<idea-plugin package="com.github.zjh7890.gpttools.kotlin">
+    <dependencies>
+        <plugin id="org.jetbrains.kotlin"/>
+        <module name="com.github.zjh7890.gpttools.java"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <classContextBuilder language="kotlin"
+                            implementationClass="com.github.zjh7890.gpttools.kotlin.context.KotlinClassContextBuilder"/>
+
+        <methodContextBuilder language="kotlin"
+                             implementationClass="com.github.zjh7890.gpttools.kotlin.context.KotlinMethodContextBuilder"/>
+
+        <fileContextBuilder language="kotlin"
+                           implementationClass="com.github.zjh7890.gpttools.kotlin.context.KotlinFileContextBuilder"/>
+
+        <variableContextBuilder language="kotlin"
+                               implementationClass="com.github.zjh7890.gpttools.kotlin.context.KotlinVariableContextBuilder"/>
+
+<!--        <codeModifier language="kotlin"-->
+<!--                      implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinCodeModifier"/>-->
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.kotlin.provider.KotlinTestContextProvider"/>-->
+
+<!--        <livingDocumentation language="kotlin"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinLivingDocumentation"/>-->
+
+<!--        <testDataBuilder language="kotlin"-->
+<!--                         implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinPsiElementDataBuilder"/>-->
+<!--        -->
+<!--        <refactoringTool language="kotlin"-->
+<!--                         implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinRefactoringTool"/>-->
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.kotlin.provider.KotlinVersionProvider"/>-->
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.kotlin.provider.KotlinTestContextProvider"/>-->
+
+<!--        <contextPrompter-->
+<!--                language="kotlin"-->
+<!--                implementation="com.github.zjh7890.gpttools.kotlin.provider.KotlinContextPrompter"/>-->
+<!--        <testContextProvider-->
+<!--                language="kotlin"-->
+<!--                implementation="com.github.zjh7890.gpttools.kotlin.provider.KotlinAutoTestService"/>-->
+
+<!--        <customPromptProvider-->
+<!--                language="kotlin"-->
+<!--                implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinCustomPromptProvider" />-->
+    </extensions>
+</idea-plugin>

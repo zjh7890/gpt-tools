@@ -33,7 +33,8 @@ import javax.swing.KeyStroke
 enum class AutoDevInputTrigger {
     Button,
     Key,
-    SearchContext
+    SearchContext,
+    CopyPrompt
 }
 
 interface AutoDevInputListener : EventListener {

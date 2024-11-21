@@ -1,0 +1,31 @@
+<idea-plugin package="com.github.zjh7890.gpttools.cpp">
+    <dependencies>
+        <plugin id="com.intellij.clion"/>
+        <plugin id="com.intellij.cidr.lang"/>
+        <plugin id="org.jetbrains.plugins.clion.test.catch"/>
+        <plugin id="org.jetbrains.plugins.clion.test.google"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <fileContextBuilder language="ObjectiveC"
+                           implementationClass="com.github.zjh7890.gpttools.cpp.context.CppFileContextBuilder"/>
+        <classContextBuilder language="ObjectiveC"
+                            implementationClass="com.github.zjh7890.gpttools.cpp.context.CppStructContextBuilder"/>
+        <methodContextBuilder language="ObjectiveC"
+                             implementationClass="com.github.zjh7890.gpttools.cpp.context.CppMethodContextBuilder"/>
+        <variableContextBuilder language="ObjectiveC"
+                               implementationClass="com.github.zjh7890.gpttools.cpp.context.CppVariableContextBuilder"/>
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.cpp.provider.CLionWorkspaceContextProvider"/>-->
+<!--        <testContextProvider language="ObjectiveC" -->
+<!--                            implementation="com.github.zjh7890.gpttools.cpp.provider.testing.CppAutoTestService"/>-->
+
+<!--        <codeModifier-->
+<!--                language="ObjectiveC"-->
+<!--                implementationClass="com.github.zjh7890.gpttools.cpp.provider.CppCodeModifier"/>-->
+
+<!--        <buildSystemProvider-->
+<!--                implementation="com.github.zjh7890.gpttools.cpp.provider.CppBuildSystemProvider"/>-->
+    </extensions>
+</idea-plugin>

@@ -1,0 +1,20 @@
+<idea-plugin package="com.github.zjh7890.gpttools.scala">
+    <dependencies>
+        <plugin id="org.intellij.scala"/>
+        <plugin id="com.intellij.modules.platform"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <classContextBuilder language="Scala"
+                            implementationClass="com.github.zjh7890.gpttools.scala.context.ScalaClassContextBuilder"/>
+
+<!--        <testContextProvider language="Scala" -->
+<!--                            implementation="com.github.zjh7890.gpttools.scala.provider.ScalaAutoTestService"/>-->
+
+    </extensions>
+
+
+    <actions>
+
+    </actions>
+</idea-plugin>

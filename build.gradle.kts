@@ -3,6 +3,9 @@ import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.extensions.IntelliJPlatformDependenciesExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.gradle.api.JavaVersion.VERSION_17
+
 
 // The same as `--stacktrace` param
 gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS
@@ -19,6 +22,7 @@ plugins {
     alias(libs.plugins.kover) // Gradle Kover Plugin
     alias(libs.plugins.serialization)
     id("net.saliman.properties") version "1.5.2"
+    id("org.jetbrains.grammarkit") version "2022.3.2.2"
 }
 
 fun prop(name: String): String =
@@ -28,6 +32,45 @@ fun prop(name: String): String =
 group = properties("pluginGroup").get()
 version = properties("pluginVersion").get()
 val platformVersion = prop("platformVersion").toInt()
+
+val clionVersion = prop("clionVersion")
+
+// https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html#modules-specific-to-functionality
+val clionPlugins = listOf(
+    "com.intellij.cidr.base",
+    "com.intellij.cidr.lang",
+    "com.intellij.clion",
+    prop("rustPlugin"),
+    "org.toml.lang"
+)
+
+var cppPlugins: List<String> = listOf(
+    "com.intellij.cidr.lang",
+    "com.intellij.clion",
+    "com.intellij.cidr.base",
+    "org.jetbrains.plugins.clion.test.google",
+    "org.jetbrains.plugins.clion.test.catch"
+)
+
+val ideaPlugins =
+    listOf(
+        "com.intellij.java",
+        "org.jetbrains.plugins.gradle",
+        "org.jetbrains.idea.maven",
+        "org.jetbrains.kotlin",
+        "JavaScript"
+    )
+
+val javaScriptPlugins = listOf("JavaScript")
+
+val scalaPlugin = prop("scalaPlugin")
+val pycharmPlugins = listOf(prop("pythonPlugin"))
+
+val rustPlugins = listOf(
+    prop("rustPlugin"),
+    "org.toml.lang"
+)
+
 
 // Configure project's dependencies
 repositories {
@@ -47,8 +90,15 @@ dependencies {
             instrumentationTools()
             testFramework(TestFrameworkType.Platform)
             pluginVerifier()
-            pluginModule(implementation(project(":goland")))
             pluginModule(implementation(project(":core")))
+            pluginModule(implementation(project(":cpp")))
+            pluginModule(implementation(project(":goland")))
+            pluginModule(implementation(project(":java")))
+            pluginModule(implementation(project(":javascript")))
+            pluginModule(implementation(project(":kotlin")))
+            pluginModule(implementation(project(":pycharm")))
+            pluginModule(implementation(project(":rust")))
+            pluginModule(implementation(project(":scala")))
         }
         testImplementation("junit:junit:4.13.2")
 
@@ -173,28 +223,25 @@ configure(
                 }
             }
     }
-}
 
-project(":goland") {
-    dependencies(fun DependencyHandlerScope.() {
-        intellijPlatform {
-            intellijIde(prop("ideaVersion"))
-            // 添加 instrumentationTools 依赖
-            instrumentationTools()
-//        intellijPlugins("org.jetbrains.plugins.go:233.11799.196".split(',').map(String::trim).filter(String::isNotEmpty))
-        }
-    })
-}
+    configure<JavaPluginExtension> {
+        sourceCompatibility = VERSION_17
+        targetCompatibility = VERSION_17
+    }
 
-project(":java") {
-    dependencies(fun DependencyHandlerScope.() {
-        intellijPlatform {
-            intellijIde(prop("ideaVersion"))
-            // 添加 instrumentationTools 依赖
-            instrumentationTools()
-            intellijPlugins("com.intellij.java".split(',').map(String::trim).filter(String::isNotEmpty))
+    tasks {
+        withType<KotlinCompile> {
+            kotlinOptions {
+                jvmTarget = VERSION_17.toString()
+//                languageVersion = "1.9"
+//                // see https://plugins.jetbrains.com/docs/intellij/using-kotlin.html#kotlin-standard-library
+//                apiVersion = "1.7"
+//                freeCompilerArgs = listOf("-Xjvm-default=all")
+            }
         }
-    })
+
+        prepareSandbox { enabled = false }
+    }
 }
 
 project(":core") {
@@ -214,9 +261,113 @@ project(":core") {
             intellijIde(prop("ideaVersion"))
             // 添加 instrumentationTools 依赖
             instrumentationTools()
-//        intellijPlugins("org.jetbrains.plugins.go:233.11799.196".split(',').map(String::trim).filter(String::isNotEmpty))
         }
     })
+}
+
+project(":cpp") {
+    if (platformVersion == 233 || platformVersion == 241) {
+        cppPlugins += "com.intellij.nativeDebug"
+    }
+
+    dependencies {
+        intellijPlatform {
+            intellijIde(clionVersion)
+            intellijPlugins(cppPlugins)
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+    }
+}
+
+project(":goland") {
+    dependencies {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            intellijPlugins(prop("goPlugin").split(',').map(String::trim).filter(String::isNotEmpty))
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+    }
+}
+
+project(":java") {
+    dependencies(fun DependencyHandlerScope.() {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            // 添加 instrumentationTools 依赖
+            instrumentationTools()
+            intellijPlugins("com.intellij.java".split(',').map(String::trim).filter(String::isNotEmpty))
+        }
+
+        implementation(project(":core"))
+    })
+}
+
+project(":javascript") {
+    dependencies {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            intellijPlugins(ideaPlugins)
+            intellijPlugins(javaScriptPlugins)
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+    }
+}
+
+
+project(":kotlin") {
+    dependencies {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            intellijPlugins(ideaPlugins)
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+        implementation(project(":java"))
+    }
+}
+
+project(":pycharm") {
+    dependencies {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            intellijPlugins(ideaPlugins + pycharmPlugins)
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+    }
+}
+
+project(":scala") {
+    dependencies {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            intellijPlugins(ideaPlugins + scalaPlugin)
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+        implementation(project(":java"))
+    }
+}
+
+project(":rust") {
+    dependencies {
+        intellijPlatform {
+            intellijIde(prop("ideaVersion"))
+            intellijPlugins(ideaPlugins + rustPlugins)
+            instrumentationTools()
+        }
+
+        implementation(project(":core"))
+    }
 }
 
 // Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin

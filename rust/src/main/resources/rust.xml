@@ -1,0 +1,32 @@
+<idea-plugin package="com.github.zjh7890.gpttools.rust">
+    <dependencies>
+        <plugin id="com.intellij.modules.rust-capable"/>
+        <plugin id="com.jetbrains.rust"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <fileContextBuilder language="Rust"
+                           implementationClass="com.github.zjh7890.gpttools.rust.context.RustFileContextBuilder"/>
+        <classContextBuilder language="Rust"
+                            implementationClass="com.github.zjh7890.gpttools.rust.context.RustClassContextBuilder"/>
+        <methodContextBuilder language="Rust"
+                             implementationClass="com.github.zjh7890.gpttools.rust.context.RustMethodContextBuilder"/>
+        <variableContextBuilder language="Rust"
+                               implementationClass="com.github.zjh7890.gpttools.rust.context.RustVariableContextBuilder"/>
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.rust.provider.RustVersionContextProvider"/>-->
+
+<!--        <livingDocumentation language="Rust"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.rust.provider.RustLivingDocumentation"/>-->
+
+<!--        <testContextProvider language="Rust" -->
+<!--                            implementation="com.github.zjh7890.gpttools.rust.provider.RustTestService"/>-->
+<!--        <codeModifier language="Rust" -->
+<!--                      implementationClass="com.github.zjh7890.gpttools.rust.provider.RustCodeModifier"/>-->
+    </extensions>
+
+    <actions>
+
+    </actions>
+</idea-plugin>

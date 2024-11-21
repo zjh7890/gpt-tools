@@ -15,8 +15,8 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 class OtherSettingsState : PersistentStateComponent<OtherSettingsState> {
     var showAddFileAction: Boolean = false
     var showAddRecursiveFileAction: Boolean = false
-    var showFindUsagesAcrossProjectsAction: Boolean = true
-    var showFindImplAcrossProjectsAction: Boolean = true
+    var showFindUsagesAcrossProjectsAction: Boolean = false
+    var showFindImplAcrossProjectsAction: Boolean = false
     var showConvertToMermaidAction: Boolean = false
     var showPsiDependencyByMethodAction: Boolean = false
     var showCopyMethodSingleFile: Boolean = false

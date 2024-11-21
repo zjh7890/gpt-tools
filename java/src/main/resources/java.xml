@@ -1,0 +1,62 @@
+<idea-plugin package="com.github.zjh7890.gpttools.java">
+    <dependencies>
+        <plugin id="com.intellij.modules.java"/>
+        <plugin id="org.jetbrains.plugins.gradle"/>
+        <plugin id="org.jetbrains.idea.maven"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <classContextBuilder language="JAVA"
+                            implementationClass="com.github.zjh7890.gpttools.java.context.JavaClassContextBuilder"/>
+
+        <methodContextBuilder language="JAVA"
+                             implementationClass="com.github.zjh7890.gpttools.java.context.JavaMethodContextBuilder"/>
+
+        <fileContextBuilder language="JAVA"
+                           implementationClass="com.github.zjh7890.gpttools.java.context.JavaFileContextBuilder"/>
+
+        <variableContextBuilder language="JAVA"
+                               implementationClass="com.github.zjh7890.gpttools.java.context.JavaVariableContextBuilder"/>
+
+<!--        <codeModifier language="JAVA"-->
+<!--                      implementationClass="com.github.zjh7890.gpttools.java.context.JavaCodeModifier"/>-->
+
+<!--        <livingDocumentation language="JAVA"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.java.provider.JavaLivingDocumentation"/>-->
+
+<!--        <testDataBuilder language="JAVA"-->
+<!--                         implementationClass="com.github.zjh7890.gpttools.java.provider.JavaPsiElementDataBuilder"/>-->
+
+<!--        <refactoringTool language="JAVA"-->
+<!--                         implementationClass="com.github.zjh7890.gpttools.java.provider.JavaRefactoringTool"/>-->
+
+<!--        <chatContextProvider implementation="com.github.zjh7890.gpttools.java.provider.JavaVersionProvider"/>-->
+<!--        <chatContextProvider implementation="com.github.zjh7890.gpttools.java.provider.SpringGradleContextProvider"/>-->
+<!--        <chatContextProvider implementation="com.github.zjh7890.gpttools.java.provider.JavaTestContextProvider"/>-->
+
+<!--        <contextPrompter-->
+<!--                language="JAVA"-->
+<!--                implementation="com.github.zjh7890.gpttools.java.prompting.JavaContextPrompter"/>-->
+
+<!--        <promptStrategy-->
+<!--                language="JAVA"-->
+<!--                implementation="com.github.zjh7890.gpttools.java.prompting.JvmPromptStrategy"/>-->
+
+<!--        <testContextProvider-->
+<!--                language="JAVA"-->
+<!--                implementation="com.github.zjh7890.gpttools.java.service.JavaAutoTestService"/>-->
+
+<!--        <buildSystemProvider-->
+<!--                implementation="com.github.zjh7890.gpttools.java.provider.JavaBuildSystemProvider"/>-->
+
+<!--        <customPromptProvider-->
+<!--                language="JAVA"-->
+<!--                implementationClass="com.github.zjh7890.gpttools.java.provider.JavaCustomPromptProvider"/>-->
+
+<!--        <layeredArchProvider-->
+<!--                implementation="com.github.zjh7890.gpttools.java.provider.JavaLayeredArchProvider"/>-->
+
+<!--        <customDevInsCompletionProvider-->
+<!--                implementation="com.github.zjh7890.gpttools.java.provider.JavaCustomDevInsSymbolProvider"/>-->
+    </extensions>
+</idea-plugin>

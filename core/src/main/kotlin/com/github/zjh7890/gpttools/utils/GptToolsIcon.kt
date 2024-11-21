@@ -12,4 +12,10 @@ object GptToolsIcon {
 
     @JvmField
     val Stop: Icon = IconLoader.getIcon("/icons/stop.svg", GptToolsIcon::class.java)
+
+    @JvmField
+    val ToPromptIcon: Icon = IconLoader.getIcon("/icons/contexts.svg", GptToolsIcon::class.java)
+
+    @JvmField
+    val ApplyCopyIcon: Icon = IconLoader.getIcon("/icons/download.svg", GptToolsIcon::class.java)
 }

@@ -1,0 +1,26 @@
+<idea-plugin package="com.github.zjh7890.gpttools.pycharm">
+    <dependencies>
+        <plugin id="com.intellij.modules.python"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <classContextBuilder language="Python"
+                            implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonClassContextBuilder"/>
+        <fileContextBuilder language="Python"
+                           implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonFileContextBuilder"/>
+        <methodContextBuilder language="Python"
+                             implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonMethodContextBuilder"/>
+        <variableContextBuilder language="Python"
+                               implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonVariableContextBuilder"/>
+
+<!--        <livingDocumentation language="Python"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.pycharm.provider.PythonLivingDocumentation"/>-->
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.pycharm.PythonFrameworkContextProvider"/>-->
+
+<!--        <testContextProvider-->
+<!--                language="Python"-->
+<!--                implementation="com.github.zjh7890.gpttools.pycharm.provider.PythonAutoTestService"/>-->
+    </extensions>
+</idea-plugin>

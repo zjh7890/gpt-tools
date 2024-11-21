@@ -1,9 +1,29 @@
 <idea-plugin package="com.github.zjh7890.gpttools.goland">
     <dependencies>
-<!--        <plugin id="org.jetbrains.plugins.go"/>-->
-<!--        <plugin id="com.intellij.modules.go-capable"/>-->
+        <plugin id="org.jetbrains.plugins.go"/>
+        <plugin id="com.intellij.modules.go-capable"/>
         <plugin id="com.intellij.modules.platform"/>
     </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <fileContextBuilder language="go" 
+                           implementationClass="com.github.zjh7890.gpttools.goland.context.GoFileContextBuilder"/>
+        <classContextBuilder language="go" 
+                            implementationClass="com.github.zjh7890.gpttools.goland.context.GoStructContextBuilder"/>
+        <methodContextBuilder language="go" 
+                             implementationClass="com.github.zjh7890.gpttools.goland.context.GoMethodContextBuilder"/>
+        <variableContextBuilder language="go" 
+                               implementationClass="com.github.zjh7890.gpttools.goland.context.GoVariableContextBuilder"/>
+
+<!--        <testContextProvider language="go" -->
+<!--                            implementation="com.github.zjh7890.gpttools.goland.provider.testing.GoAutoTestService"/>-->
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.goland.provider.GoVersionChatContextProvider"/>-->
+
+<!--        <livingDocumentation language="go" -->
+<!--                            implementationClass="com.github.zjh7890.gpttools.goland.provider.GoLivingDocumentationProvider"/>-->
+    </extensions>
 
     <actions>
         <action id="com.github.zjh7890.gpttools.goland.actions.HelloGoAction"

@@ -9,6 +9,8 @@ import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
+import com.github.zjh7890.gpttools.utils.FileUtil
+import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
@@ -19,9 +21,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.DialogPanel
-import com.intellij.openapi.ui.NullableComponent
-import com.intellij.openapi.ui.SimpleToolWindowPanel
+import com.intellij.openapi.ui.*
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.Gray
@@ -259,6 +259,16 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                         icon = AllIcons.Actions.ToggleVisibility
                         text = "Generate diff based on this chat"
                         description = "Generate diff based on this chat"
+                    },
+                    "",
+                    JBUI.size(16)
+                ))
+                cell(ActionButton(
+                    ApplyCopyAction(project, progressBar, inputSection, chatCodingService),
+                    Presentation().apply {
+                        icon = GptToolsIcon.ApplyCopyIcon
+                        text = "Apply copy content"
+                        description = "Apply copy content" 
                     },
                     "",
                     JBUI.size(16)
@@ -519,6 +529,71 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         
         // 清除文件列表
         fileListPanel.removeAll()
+    }
+
+    fun addMessageBoth(role: ChatRole, message: String, contentPanel: ChatToolPanel) {
+        val chatMessage = chatCodingService.appendLocalMessage(role, message)
+        contentPanel.addMessage(message, role == ChatRole.user, render = true, chatMessage = chatMessage)
+    }
+}
+
+private class ApplyCopyAction(
+    private val project: Project,
+    private val progressBar: JProgressBar,
+    private val inputSection: AutoDevInputSection,
+    private val chatCodingService: ChatCodingService
+) : AnAction("Apply copy content", "Apply copy content", GptToolsIcon.ApplyCopyIcon) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+        
+        // 创建一个包含多行文本框的面板
+        val textArea = JTextArea(10, 50) // 10行, 50列
+        textArea.lineWrap = true // 自动换行
+        textArea.wrapStyleWord = true // 按单词换行
+        
+        // 添加滚动条
+        val scrollPane = JBScrollPane(textArea)
+        
+        // 创建对话框
+        val dialog = DialogBuilder(project)
+        dialog.setCenterPanel(scrollPane)
+        dialog.setTitle("Apply Copy Content")
+        dialog.addOkAction()
+        dialog.addCancelAction()
+        
+        // 显示对话框
+        val result = dialog.show()
+        
+        // 如果用户点击确定且输入不为空
+        if (result == DialogWrapper.OK_EXIT_CODE) {
+            val message = textArea.text
+            if (message.isNotBlank()) {
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    progressBar.isVisible = true
+                    progressBar.isIndeterminate = true
+
+                    ApplicationManager.getApplication().invokeAndWait {
+                        // 添加用户消息
+                        contentPanel?.addMessageBoth(ChatRole.assistant, FileUtil.wrapBorder(message), contentPanel)
+                    }
+
+                    // 调用 GenerateDiffAgent.apply
+                    val projectStructure = DirectoryUtil.getDirectoryContents(project)
+                    GenerateDiffAgent.apply(
+                        project,
+                        LLMSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
+                        projectStructure,
+                        message,
+                        chatCodingService.getCurrentSession(),
+                        contentPanel!!
+                    )
+                    
+                    progressBar.isIndeterminate = false
+                    progressBar.isVisible = false
+                }
+            }
+        }
     }
 }
 

@@ -1,0 +1,58 @@
+<idea-plugin package="com.github.zjh7890.gpttools.javascript">
+    <dependencies>
+        <plugin id="JavaScript"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
+        <classContextBuilder language="JavaScript" 
+                            implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptClassContextBuilder"/>
+        <classContextBuilder language="TypeScript" 
+                            implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptClassContextBuilder"/>
+
+        <methodContextBuilder language="JavaScript" 
+                             implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptMethodContextBuilder"/>
+        <methodContextBuilder language="TypeScript" 
+                             implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptMethodContextBuilder"/>
+
+        <fileContextBuilder language="JavaScript" 
+                           implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptFileContextBuilder"/>
+        <fileContextBuilder language="TypeScript" 
+                           implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptFileContextBuilder"/>
+
+        <variableContextBuilder language="JavaScript" 
+                               implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptVariableContextBuilder"/>
+        <variableContextBuilder language="TypeScript" 
+                               implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptVariableContextBuilder"/>
+
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.javascript.provider.JavaScriptContextProvider"/>-->
+<!--        <chatContextProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.javascript.provider.JavaScriptVersionProvider"/>-->
+
+<!--        <codeModifier language="JavaScript" -->
+<!--                      implementationClass="com.github.zjh7890.gpttools.javascript.provider.testing.JestCodeModifier"/>-->
+<!--        <codeModifier language="TypeScript" -->
+<!--                      implementationClass="com.github.zjh7890.gpttools.javascript.provider.testing.JestCodeModifier"/>-->
+
+<!--        <promptStrategy language="JavaScript" -->
+<!--                       implementation="com.github.zjh7890.gpttools.javascript.provider.JavaScriptPromptStrategyAdvisor"/>-->
+<!--        <promptStrategy language="TypeScript" -->
+<!--                       implementation="com.github.zjh7890.gpttools.javascript.provider.JavaScriptPromptStrategyAdvisor"/>-->
+
+<!--        <testContextProvider language="JavaScript" -->
+<!--                            implementation="com.github.zjh7890.gpttools.javascript.provider.testing.JSAutoTestService"/>-->
+<!--        <testContextProvider language="TypeScript" -->
+<!--                            implementation="com.github.zjh7890.gpttools.javascript.provider.testing.JSAutoTestService"/>-->
+
+<!--        <refactoringTool language="TypeScript"-->
+<!--                         implementationClass="com.github.zjh7890.gpttools.javascript.provider.TypeScriptRefactoringTool"/>-->
+
+<!--        <livingDocumentation language="JavaScript"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.javascript.provider.JavaScriptLivingDocumentation"/>-->
+<!--        <livingDocumentation language="TypeScript"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.javascript.provider.JavaScriptLivingDocumentation"/>-->
+
+<!--        <buildSystemProvider -->
+<!--            implementation="com.github.zjh7890.gpttools.javascript.provider.JavaScriptBuildSystemProvider" />-->
+    </extensions>
+</idea-plugin>
