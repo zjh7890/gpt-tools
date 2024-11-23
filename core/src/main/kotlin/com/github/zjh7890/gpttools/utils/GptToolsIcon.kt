@@ -11,6 +11,9 @@ object GptToolsIcon {
     val Send: Icon = IconLoader.getIcon("/icons/send.svg", GptToolsIcon::class.java)
 
     @JvmField
+    val SendAndCopy: Icon = IconLoader.getIcon("/icons/send_gray.svg", GptToolsIcon::class.java)
+
+    @JvmField
     val Stop: Icon = IconLoader.getIcon("/icons/stop.svg", GptToolsIcon::class.java)
 
     @JvmField

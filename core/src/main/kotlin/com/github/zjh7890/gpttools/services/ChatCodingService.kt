@@ -8,6 +8,7 @@ import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
+import com.github.zjh7890.gpttools.toolWindow.chat.AutoDevInputTrigger
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
@@ -114,7 +115,8 @@ class ChatCodingService(val project: Project) : Disposable{
         prompter: String,
         searchContext: Boolean,
         editingMessage: ChatContextMessage?,
-        llmConfig: LlmConfig
+        llmConfig: LlmConfig,
+        trigger: AutoDevInputTrigger
     ) {
         val session = getCurrentSession()
         currentJob?.cancel()
@@ -123,9 +125,18 @@ class ChatCodingService(val project: Project) : Disposable{
         var message = editingMessage
         if (editingMessage == null) {
             message = ChatContextMessage(ChatRole.user, prompter)
-            ui.addMessage(prompter, true, prompter, null, message)
+            val addMessage = ui.addMessage(prompter, true, prompter, null, message)
+            addMessage.scrollToBottom()
             getCurrentSession().add(message)
         }
+
+        if (trigger == AutoDevInputTrigger.CopyPrompt) {
+            addContextToMessages(message!!, project)
+            val chatHistory = exportChatHistory(false)
+            ClipboardUtils.copyToClipboard(chatHistory)
+            return
+        }
+
         val messageView = ui.addMessage("Loading", chatMessage = null)
         messageView.scrollToBottom()
 
