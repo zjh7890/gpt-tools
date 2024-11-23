@@ -78,6 +78,7 @@ repositories {
     intellijPlatform {
         defaultRepositories()
         intellijDependencies()
+        jetbrainsRuntime()
     }
 }
 
@@ -86,21 +87,22 @@ dependencies {
     intellijPlatform {
 //        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
-            intellijIde(prop("ideaVersion"))
-            instrumentationTools()
-            testFramework(TestFrameworkType.Platform)
-            pluginVerifier()
-            pluginModule(implementation(project(":core")))
-            pluginModule(implementation(project(":cpp")))
-            pluginModule(implementation(project(":goland")))
-            pluginModule(implementation(project(":java")))
-            pluginModule(implementation(project(":javascript")))
-            pluginModule(implementation(project(":kotlin")))
-            pluginModule(implementation(project(":pycharm")))
-            pluginModule(implementation(project(":rust")))
-            pluginModule(implementation(project(":scala")))
-        }
-        testImplementation("junit:junit:4.13.2")
+        intellijIde(prop("ideaVersion"))
+        jetbrainsRuntime()
+        instrumentationTools()
+        testFramework(TestFrameworkType.Platform)
+        pluginVerifier()
+        pluginModule(implementation(project(":core")))
+        pluginModule(implementation(project(":cpp")))
+        pluginModule(implementation(project(":goland")))
+        pluginModule(implementation(project(":java")))
+        pluginModule(implementation(project(":javascript")))
+        pluginModule(implementation(project(":kotlin")))
+        pluginModule(implementation(project(":pycharm")))
+        pluginModule(implementation(project(":rust")))
+        pluginModule(implementation(project(":scala")))
+    }
+    testImplementation("junit:junit:4.13.2")
 
 //    implementation(libs.exampleLibrary)
 }
@@ -264,7 +266,7 @@ project(":core") {
 
 
         intellijPlatform {
-        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+            bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
             intellijIde(prop("ideaVersion"))
             // 添加 instrumentationTools 依赖
             instrumentationTools()
@@ -301,7 +303,7 @@ project(":goland") {
 }
 
 project(":java") {
-    dependencies(fun DependencyHandlerScope.() {
+    dependencies {
         intellijPlatform {
             intellijIde(prop("ideaVersion"))
             // 添加 instrumentationTools 依赖
@@ -310,7 +312,7 @@ project(":java") {
         }
 
         implementation(project(":core"))
-    })
+    }
 }
 
 project(":javascript") {
