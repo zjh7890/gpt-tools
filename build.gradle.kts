@@ -177,11 +177,12 @@ configure(
     subprojects
 ) {
     apply {
+        plugin("idea")
+        plugin("kotlin")
         plugin("org.jetbrains.intellij.platform.module")
         plugin("org.jetbrains.kotlin.jvm") // 使用完整的插件 ID
         plugin("org.jetbrains.kotlinx.kover") // 使用完整的插件 ID
         plugin("org.jetbrains.kotlin.plugin.serialization")
-
     }
 
     repositories {
@@ -189,7 +190,13 @@ configure(
 
         intellijPlatform {
             defaultRepositories()
+            jetbrainsRuntime()
         }
+    }
+
+    intellijPlatform {
+        instrumentCode = false
+        buildSearchableOptions = false
     }
 
     dependencies {

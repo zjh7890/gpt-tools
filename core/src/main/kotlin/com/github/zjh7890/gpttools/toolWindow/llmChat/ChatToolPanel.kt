@@ -8,6 +8,7 @@ import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
+import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
@@ -259,6 +260,17 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                         icon = AllIcons.Actions.ToggleVisibility
                         text = "Generate diff based on this chat"
                         description = "Generate diff based on this chat"
+                    },
+                    "",
+                    JBUI.size(16)
+                ))
+                // Add the "Copy prompt" button
+                cell(ActionButton(
+                    CopyPromptAction(project, chatCodingService),
+                    Presentation().apply {
+                        icon = GptToolsIcon.ToPromptIcon
+                        text = "Copy prompt"
+                        description = "Copy prompt"
                     },
                     "",
                     JBUI.size(16)
@@ -531,9 +543,30 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         fileListPanel.removeAll()
     }
 
-    fun addMessageBoth(role: ChatRole, message: String, contentPanel: ChatToolPanel) {
+    fun addMessageBoth(role: ChatRole, message: String) {
         val chatMessage = chatCodingService.appendLocalMessage(role, message)
-        contentPanel.addMessage(message, role == ChatRole.user, render = true, chatMessage = chatMessage)
+        addMessage(message, role == ChatRole.user, render = true, chatMessage = chatMessage)
+    }
+}
+
+// Add the CopyPromptAction class
+private class CopyPromptAction(
+    private val project: Project,
+    private val chatCodingService: ChatCodingService
+) : AnAction("Copy prompt", "Copy prompt", GptToolsIcon.ToPromptIcon) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+        val text = contentPanel?.inputSection?.text
+        if (text.isNullOrBlank()) {
+            return
+        }
+        // Update message view to inform the user
+        ApplicationManager.getApplication().invokeAndWait() {
+            contentPanel.addMessageBoth(ChatRole.user, text)
+        }
+        val chatHistory = chatCodingService.exportChatHistory(false)
+        ClipboardUtils.copyToClipboard(chatHistory)
     }
 }
 
@@ -575,7 +608,7 @@ private class ApplyCopyAction(
 
                     ApplicationManager.getApplication().invokeAndWait {
                         // 添加用户消息
-                        contentPanel?.addMessageBoth(ChatRole.assistant, FileUtil.wrapBorder(message), contentPanel)
+                        contentPanel?.addMessageBoth(ChatRole.assistant, FileUtil.wrapBorder(message))
                     }
 
                     // 调用 GenerateDiffAgent.apply

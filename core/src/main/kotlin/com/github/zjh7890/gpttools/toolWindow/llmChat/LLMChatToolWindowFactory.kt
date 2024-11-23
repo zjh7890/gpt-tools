@@ -98,7 +98,7 @@ class AppendMessageAction : AnAction("Append Message", "Append a new message", A
             val role: ChatRole = dialog.selectedRole
             val message = dialog.message
 // 处理添加消息
-            contentPanel?.addMessageBoth(role, message, contentPanel)
+            contentPanel?.addMessageBoth(role, message)
         }
     }
 }
