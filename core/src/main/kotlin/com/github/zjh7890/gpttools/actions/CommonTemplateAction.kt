@@ -1,12 +1,13 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.context.builder.PromptContextProvider
 import com.github.zjh7890.gpttools.settings.template.PromptTemplate
+import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.DrawioToMermaidConverter
-import com.github.zjh7890.gpttools.utils.FileUtil
-import com.github.zjh7890.gpttools.utils.PsiUtils.getDependencies
+import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
+import com.github.zjh7890.gpttools.utils.PsiUtils.generateSignature
 import com.github.zjh7890.gpttools.utils.TemplateUtils
-import com.github.zjh7890.gpttools.utils.sendToChatWindow
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -26,8 +27,7 @@ import javax.swing.JComponent
 import javax.swing.JScrollPane
 import javax.swing.JTextArea
 
-
-class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
+class CommonTemplateAction(val promptTemplate: PromptTemplate) : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project: Project? = e.project
         val editor: Editor? = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.EDITOR)
@@ -35,6 +35,7 @@ class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
             Messages.showMessageDialog(project, "Project or editor not found!", "Error", Messages.getErrorIcon())
             return
         }
+
 
         val document = editor.document
         val file = PsiDocumentManager.getInstance(project).getPsiFile(document)
@@ -63,78 +64,109 @@ class ServiceImplAction(val promptTemplate: PromptTemplate) : AnAction() {
         val textBeforeCaret = document.getText(TextRange(startOffset, currentLineEndOffset))
         val textAfterCaret = document.getText(TextRange(currentLineEndOffset, endOffset))
 
+        val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document)
+
         val method = PsiTreeUtil.getParentOfType(elementAtCaret, PsiMethod::class.java)
+        val GPT_methodText = method?.text ?: ""
+        val GPT_selectionText = editor.selectionModel.selectedText ?: ""
+        val GPT_textBeforeCursor = psiFile?.text?.substring(0, editor.caretModel.offset) ?: ""
+        val GPT_textAfterCursor = psiFile?.text?.substring(editor.caretModel.offset) ?: ""
+        val GPT_allText = psiFile?.text ?: ""
+        val GPT_50LinesTextBeforeCaret = textBeforeCaret
+        val GPT_50LinesTextAfterCaret = textAfterCaret
 
-        // 在适当的地方创建和显示对话框
+        // Create and display the dialog if necessary
         val dialog = UMLFunctionDialog(project, promptTemplate)
-
         if (promptTemplate.input1.isNotBlank()
             || promptTemplate.input2.isNotBlank()
             || promptTemplate.input3.isNotBlank()
             || promptTemplate.input4.isNotBlank()
-            || promptTemplate.input5.isNotBlank()) {
+            || promptTemplate.input5.isNotBlank()
+        ) {
             dialog.show()
-            if (dialog.isOK) {
-                // 在对话框关闭后处理并打印数据
-//            println("UML Text: ${dialog.input1}")
-//            println("Function Text: ${dialog.input2}")
-            } else {
+            if (!dialog.isOK) {
                 return
             }
         }
 
-        try {
-            val classes = getDependencies(clazz.containingFile.virtualFile, project)
-            // clazz 和 classes 形成新 List, clazz 放在第一个
-            val newClasses = listOf(clazz.containingFile.virtualFile) + classes
-            val classInfos =
-                newClasses.stream().map { x -> x.name }.collect(Collectors.toList()).joinToString("\n")
-            val GPT_methodInfo = newClasses.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString("\n\n")
-            val GPT_className = clazz.name!!
+        // Process the inputs if they contain "UML Text"
+        if (promptTemplate.input1.contains("UML Text")) {
+            dialog.input1 = DrawioToMermaidConverter.convert(dialog.input1)
+        }
+        if (promptTemplate.input2.contains("UML Text")) {
+            dialog.input2 = DrawioToMermaidConverter.convert(dialog.input2)
+        }
+        if (promptTemplate.input3.contains("UML Text")) {
+            dialog.input3 = DrawioToMermaidConverter.convert(dialog.input3)
+        }
+        if (promptTemplate.input4.contains("UML Text")) {
+            dialog.input4 = DrawioToMermaidConverter.convert(dialog.input4)
+        }
+        if (promptTemplate.input5.contains("UML Text")) {
+            dialog.input5 = DrawioToMermaidConverter.convert(dialog.input5)
+        }
 
-            if (promptTemplate.input1.contains("UML Text")) {
-                dialog.input1 = DrawioToMermaidConverter.convert(dialog.input1)
+        val function = PsiTreeUtil.getParentOfType(elementAtCaret, PsiMethod::class.java)
+        val signature = generateSignature(method!!, false)
+        val GPT_completeSignature = generateSignature(method, true)
+
+        val containingClass = function?.containingClass ?: return
+
+        val newClass = containingClass.copy() as PsiClass
+
+        newClass.methods.filter {
+            generateSignature(it, false) != signature
+        }.forEach { newClass.deleteChildRange(it, it) }
+        newClass.fields.filterNotNull().forEach { field ->
+            try {
+                newClass.deleteChildRange(field, field)
+            } catch (ex: Exception) {
+                println("Error deleting field: ${ex.message}")
             }
-            if (promptTemplate.input2.contains("UML Text")) {
-                dialog.input2 = DrawioToMermaidConverter.convert(dialog.input2)
-            }
-            if (promptTemplate.input3.contains("UML Text")) {
-                dialog.input3 = DrawioToMermaidConverter.convert(dialog.input3)
-            }
-            if (promptTemplate.input4.contains("UML Text")) {
-                dialog.input4 = DrawioToMermaidConverter.convert(dialog.input4)
-            }
-            if (promptTemplate.input5.contains("UML Text")) {
-                dialog.input5 = DrawioToMermaidConverter.convert(dialog.input5)
-            }
+        }
+
+        try {
+            val classes = findClassesFromMethod(method, project)
+            val classInfos =
+                classes.stream().map { x -> x.className }.collect(Collectors.toList()).joinToString("\n")
+            val GPT_methodInfo = classes.joinToString("\n")
+            val GPT_methodName = method.name
+            val GPT_className = containingClass.name!!
+            val GPT_simplifyClassText = newClass.text
 
             val map = mapOf(
                 "GPT_methodInfo" to GPT_methodInfo,
-                "GPT_methodName" to (method?.name ?: ""),
-                "GPT_methodText" to (method?.text ?: ""),
+                "GPT_simplifyClassText" to GPT_simplifyClassText,
+                "GPT_methodName" to GPT_methodName,
+                "GPT_completeSignature" to GPT_completeSignature,
                 "GPT_className" to GPT_className,
-                "GPT_selectionText" to (editor.selectionModel.selectedText ?: ""),
-                "GPT_textBeforeCursor" to file.text.substring(0, editor.caretModel.offset),
-                "GPT_textAfterCursor" to file.text.substring(editor.caretModel.offset),
-                "GPT_allText" to file.text,
+                "GPT_methodText" to GPT_methodText,
+                "GPT_selectionText" to GPT_selectionText,
+                "GPT_textBeforeCursor" to GPT_textBeforeCursor,
+                "GPT_textAfterCursor" to GPT_textAfterCursor,
+                "GPT_allText" to GPT_allText,
                 "GPT_input1" to dialog.input1,
                 "GPT_input2" to dialog.input2,
                 "GPT_input3" to dialog.input3,
                 "GPT_input4" to dialog.input4,
                 "GPT_input5" to dialog.input5,
-                "GPT_50LinesTextBeforeCaret" to textBeforeCaret,
-                "GPT_50LinesTextAfterCaret" to textAfterCaret,
+                "GPT_50LinesTextBeforeCaret" to GPT_50LinesTextBeforeCaret,
+                "GPT_50LinesTextAfterCaret" to GPT_50LinesTextAfterCaret
             )
 
             val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
-            // Update the content to send to the chat window
-            sendToChatWindow(project, { contentPanel, chatCodingService ->
+            ChatUtils.sendToChatWindow(project) { contentPanel, chatCodingService ->
                 chatCodingService.newSession()
                 contentPanel.setInput(result)
-            })
+            }
             copyToClipboard(result)
         } catch (ex: Exception) {
-            Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())
+            Messages.showMessageDialog(
+                project,
+                "Error finding classes: ${ex.message}",
+                "Error",
+                Messages.getErrorIcon()
+            )
         }
     }
 
@@ -155,7 +187,7 @@ class UMLFunctionDialog(project: Project?, val promptTemplate: PromptTemplate) :
     private val input4Area = JTextArea(10, 80)
     private val input5Area = JTextArea(10, 80)
 
-    // 定义属性来保存输入数据
+    // Define properties to store input data
     var input1: String = ""
     var input2: String = ""
     var input3: String = ""
@@ -171,35 +203,29 @@ class UMLFunctionDialog(project: Project?, val promptTemplate: PromptTemplate) :
         val formBuilder = FormBuilder.createFormBuilder()
 
         if (StringUtils.isNotBlank(promptTemplate.input1)) {
-            formBuilder.addLabeledComponent(promptTemplate.input1, JScrollPane(input1Area))  // 添加带滚动条的组件
+            formBuilder.addLabeledComponent(promptTemplate.input1, JScrollPane(input1Area))
         }
         if (StringUtils.isNotBlank(promptTemplate.input2)) {
-            formBuilder.addLabeledComponent(promptTemplate.input2, JScrollPane(input2Area))  // 添加带滚动条的组件
+            formBuilder.addLabeledComponent(promptTemplate.input2, JScrollPane(input2Area))
         }
         if (StringUtils.isNotBlank(promptTemplate.input3)) {
-            formBuilder.addLabeledComponent(promptTemplate.input3, JScrollPane(input3Area))  // 添加带滚动条的组件
+            formBuilder.addLabeledComponent(promptTemplate.input3, JScrollPane(input3Area))
         }
         if (StringUtils.isNotBlank(promptTemplate.input4)) {
-            formBuilder.addLabeledComponent(promptTemplate.input4, JScrollPane(input4Area))  // 添加带滚动条的组件
+            formBuilder.addLabeledComponent(promptTemplate.input4, JScrollPane(input4Area))
         }
         if (StringUtils.isNotBlank(promptTemplate.input5)) {
-            formBuilder.addLabeledComponent(promptTemplate.input5, JScrollPane(input5Area))  // 添加带滚动条的组件
+            formBuilder.addLabeledComponent(promptTemplate.input5, JScrollPane(input5Area))
         }
-//            .addLabeledComponent("UML Text:", scrollPaneForUML)  // 添加带滚动条的组件
-//            .addLabeledComponent("Function Text:", scrollPaneForFunction)  // 添加带滚动条的组件
         return formBuilder.panel
     }
 
     override fun doOKAction() {
-        // 在关闭前保存数据
         input1 = input1Area.text
         input2 = input2Area.text
         input3 = input3Area.text
         input4 = input4Area.text
         input5 = input5Area.text
-
         super.doOKAction()
     }
 }
-
-
