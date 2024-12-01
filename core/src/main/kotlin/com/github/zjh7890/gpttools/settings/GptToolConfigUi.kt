@@ -25,9 +25,7 @@ class GptToolConfigUi(
         panel.addTab("LLM Settings", llmSettingUi.component)
         panel.addTab("Template Prompt", templateSettingUi.panel)
         panel.addTab("Embed Template", embedTemplateUi.panel)
-        if (ApplicationInfo.getInstance().versionName.contains("IDEA")) {
-            panel.addTab("Others", otherSettingUi.component)
-        }
+        panel.addTab("Others", otherSettingUi.component)
     }
 
     fun isModified(templateSetting: CodeTemplateApplicationSettings, 

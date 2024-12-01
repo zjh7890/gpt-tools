@@ -7,15 +7,16 @@
     </dependencies>
 
     <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
-        <fileContextBuilder language="ObjectiveC"
-                           implementationClass="com.github.zjh7890.gpttools.cpp.context.CppFileContextBuilder"/>
-        <classContextBuilder language="ObjectiveC"
-                            implementationClass="com.github.zjh7890.gpttools.cpp.context.CppStructContextBuilder"/>
-        <methodContextBuilder language="ObjectiveC"
-                             implementationClass="com.github.zjh7890.gpttools.cpp.context.CppMethodContextBuilder"/>
-        <variableContextBuilder language="ObjectiveC"
-                               implementationClass="com.github.zjh7890.gpttools.cpp.context.CppVariableContextBuilder"/>
-                               
+<!--        <fileContextBuilder language="ObjectiveC"-->
+<!--                           implementationClass="com.github.zjh7890.gpttools.cpp.context.CppFileContextBuilder"/>-->
+<!--        <classContextBuilder language="ObjectiveC"-->
+<!--                            implementationClass="com.github.zjh7890.gpttools.cpp.context.CppStructContextBuilder"/>-->
+<!--        <methodContextBuilder language="ObjectiveC"-->
+<!--                             implementationClass="com.github.zjh7890.gpttools.cpp.context.CppMethodContextBuilder"/>-->
+<!--        <variableContextBuilder language="ObjectiveC"-->
+<!--                               implementationClass="com.github.zjh7890.gpttools.cpp.context.CppVariableContextBuilder"/>-->
+<!--                               -->
+<!--                               -->
         <promptContextBuilder language="C++"
                         implementationClass="com.github.zjh7890.gpttools.cpp.context.CppPromptContextBuilder"/>
 

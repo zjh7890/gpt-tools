@@ -16,6 +16,9 @@ import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
 import com.intellij.util.ui.FormBuilder
 import java.awt.*
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import java.net.URI
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -77,6 +80,22 @@ class TemplateSettingUi(
 
         val templatePanel = LeftRightComponent(templatesDecorator.createPanel(), combinedPanel).mainPanel
         panel.add(templatePanel, BorderLayout.CENTER)
+
+
+        // 在 templatePanel 创建后添加
+        val linkPanel = JPanel(FlowLayout(FlowLayout.CENTER, 0, 0)).apply {
+            add(JLabel("Help Documentation").apply {
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                addMouseListener(object : MouseAdapter() {
+                    override fun mouseClicked(e: MouseEvent) {
+                        Desktop.getDesktop().browse(URI("https://gpt-tools.yuque.com/pfm3um/doc/ba0sbxf3gc0bn5f6"))
+                    }
+                })
+            })
+            add(JLabel(AllIcons.Ide.External_link_arrow))
+        }
+
+        panel.add(linkPanel, BorderLayout.NORTH)
     }
 
     private fun updateCombinedPanelDisplay(selectedItem: PromptTemplate?) {

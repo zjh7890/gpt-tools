@@ -74,7 +74,7 @@ class ReviewChangesAction : AnAction() {
                 filePatch = filePatch
             )
         }
-        GitDiffUtils.parseGitDiffOutput(project, fileChanges)
+//        GitDiffUtils.parseGitDiffOutput(project, fileChanges)
         val res = StringBuilder()
         for (fileChange in fileChanges) {
             val patch = fileChange.filePatch
@@ -89,68 +89,7 @@ class ReviewChangesAction : AnAction() {
                     sb.appendLine("- ${line.text}")
                 }
             } else if (fileChange.change.type == Change.Type.MODIFICATION) {
-                val list = GitDiffUtils.extractAffectedMethodsLines(project, fileChange)
-                val psiFile = fileChange.change.afterRevision!!.file.virtualFile!!
-                val lineCount = GitDiffUtils.getLineCount(psiFile)
-                if (list.isEmpty()) {
-                    var prev = 0
-                    for (hunk in patch.hunks) {
-                        if (prev != hunk.startLineAfter - 1) {
-                            sb.append("// ...\n")
-                        }
-                        for (line in hunk.lines) {
-                            sb.appendLine(
-                                when (line.type) {
-                                    PatchLine.Type.CONTEXT -> "  ${line.text}"
-                                    PatchLine.Type.ADD -> "+ ${line.text}"
-                                    PatchLine.Type.REMOVE -> "- ${line.text}"
-                                }
-                            )
-                        }
-                    }
-                    if (patch.hunks[0].endLineAfter != lineCount) {
-                        sb.append("// ...\n")
-                    }
-                } else {
-                    var i = 0
-                    var method: PsiMethod? = list[i]
-                    val methodStartAndEndLines = PsiUtils.getMethodStartAndEndLines(method!!)
-                    var consumedLine = methodStartAndEndLines.first
-                    var prev = 0
-                    for (hunk in patch.hunks) {
-                        if (method != null && hunk.startLineAfter > consumedLine) {
-                            while (consumedLine < min(hunk.startLineAfter, methodStartAndEndLines.second)) {
-                                if (prev != consumedLine - 1) {
-                                    sb.append("// ...\n")
-                                }
-                                sb.appendLine("  " + PsiUtils.getLineContent(psiFile, consumedLine, project))
-                                prev = consumedLine
-                                consumedLine++
-                            }
-                        }
-                        if (prev != hunk.startLineAfter - 1) {
-                            sb.append("// ...\n")
-                        }
-                        for (line in hunk.lines) {
-                            sb.appendLine(
-                                when (line.type) {
-                                    PatchLine.Type.CONTEXT -> "  ${line.text}"
-                                    PatchLine.Type.ADD -> "+ ${line.text}"
-                                    PatchLine.Type.REMOVE -> "- ${line.text}"
-                                }
-                            )
-                        }
-                        if (consumedLine < hunk.endLineAfter && hunk.endLineAfter < methodStartAndEndLines.second) {
-                            consumedLine = hunk.endLineAfter + 1
-                        } else if (hunk.endLineAfter >= methodStartAndEndLines.second) {
-                            i++
-                            method = if (i < list.size) list[i] else null
-                        }
-                    }
-                    if (patch.hunks[0].endLineAfter != lineCount) {
-                        sb.append("// ...\n")
-                    }
-                }
+                expandJavaMethod(project, fileChange, patch, sb)
             } else {
                 // moved
                 continue
@@ -170,6 +109,98 @@ class ReviewChangesAction : AnAction() {
         val map = mapOf("GPT_diffCode" to GPT_diffCode)
         return TemplateUtils.replacePlaceholders(templateContent, map)
     }
+
+    private fun expandJavaMethod(
+        project: Project,
+        fileChange: FileChange,
+        patch: TextFilePatch,
+        sb: StringBuilder
+    ) {
+        val psiFile = fileChange.change.afterRevision!!.file.virtualFile!!
+        val lineCount = GitDiffUtils.getLineCount(psiFile)
+        var prev = 0
+        for (hunk in patch.hunks) {
+            if (prev != hunk.startLineAfter - 1) {
+                sb.append("// ...\n")
+            }
+            for (line in hunk.lines) {
+                sb.appendLine(
+                    when (line.type) {
+                        PatchLine.Type.CONTEXT -> "  ${line.text}"
+                        PatchLine.Type.ADD -> "+ ${line.text}"
+                        PatchLine.Type.REMOVE -> "- ${line.text}"
+                    }
+                )
+            }
+        }
+        if (patch.hunks[0].endLineAfter != lineCount) {
+            sb.append("// ...\n")
+        }
+
+//        val list = GitDiffUtils.extractAffectedMethodsLines(project, fileChange)
+//        val psiFile = fileChange.change.afterRevision!!.file.virtualFile!!
+//        val lineCount = GitDiffUtils.getLineCount(psiFile)
+//        if (list.isEmpty()) {
+//            var prev = 0
+//            for (hunk in patch.hunks) {
+//                if (prev != hunk.startLineAfter - 1) {
+//                    sb.append("// ...\n")
+//                }
+//                for (line in hunk.lines) {
+//                    sb.appendLine(
+//                        when (line.type) {
+//                            PatchLine.Type.CONTEXT -> "  ${line.text}"
+//                            PatchLine.Type.ADD -> "+ ${line.text}"
+//                            PatchLine.Type.REMOVE -> "- ${line.text}"
+//                        }
+//                    )
+//                }
+//            }
+//            if (patch.hunks[0].endLineAfter != lineCount) {
+//                sb.append("// ...\n")
+//            }
+//        } else {
+//            var i = 0
+//            var method: PsiMethod? = list[i]
+//            val methodStartAndEndLines = PsiUtils.getMethodStartAndEndLines(method!!)
+//            var consumedLine = methodStartAndEndLines.first
+//            var prev = 0
+//            for (hunk in patch.hunks) {
+//                if (method != null && hunk.startLineAfter > consumedLine) {
+//                    while (consumedLine < min(hunk.startLineAfter, methodStartAndEndLines.second)) {
+//                        if (prev != consumedLine - 1) {
+//                            sb.append("// ...\n")
+//                        }
+//                        sb.appendLine("  " + PsiUtils.getLineContent(psiFile, consumedLine, project))
+//                        prev = consumedLine
+//                        consumedLine++
+//                    }
+//                }
+//                if (prev != hunk.startLineAfter - 1) {
+//                    sb.append("// ...\n")
+//                }
+//                for (line in hunk.lines) {
+//                    sb.appendLine(
+//                        when (line.type) {
+//                            PatchLine.Type.CONTEXT -> "  ${line.text}"
+//                            PatchLine.Type.ADD -> "+ ${line.text}"
+//                            PatchLine.Type.REMOVE -> "- ${line.text}"
+//                        }
+//                    )
+//                }
+//                if (consumedLine < hunk.endLineAfter && hunk.endLineAfter < methodStartAndEndLines.second) {
+//                    consumedLine = hunk.endLineAfter + 1
+//                } else if (hunk.endLineAfter >= methodStartAndEndLines.second) {
+//                    i++
+//                    method = if (i < list.size) list[i] else null
+//                }
+//            }
+//            if (patch.hunks[0].endLineAfter != lineCount) {
+//                sb.append("// ...\n")
+//            }
+//        }
+    }
+
     private fun isBinaryOrTooLarge(@NotNull change: Change): Boolean {
         return isBinaryOrTooLarge(change.beforeRevision) || isBinaryOrTooLarge(change.afterRevision)
     }

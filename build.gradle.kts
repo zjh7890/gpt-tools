@@ -118,10 +118,13 @@ dependencies {
         intellijPlugins(pluginList)
 //        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
 //        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
-        intellijIde(prop("ideaVersion"))
 
-//        goland("2024.1", useInstaller = true)
-//        create(IntelliJPlatformType.GoLand, "2024.2")
+        if (lang == "go") {
+            goland("2024.1", useInstaller = true)
+        } else {
+            intellijIde(prop("ideaVersion"))
+        }
+
 
 
         jetbrainsRuntime()
@@ -148,9 +151,18 @@ kotlin {
     jvmToolchain(17)
 }
 
+tasks {
+    patchPluginXml {
+//        inputFile.set(file("src/main/resources/META-INF/plugin.xml"))
+    }
+}
+
 // Configure Gradle IntelliJ Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellijPlatform {
     autoReload=false
+    instrumentCode = false
+    buildSearchableOptions = false
+
     pluginConfiguration {
         name = properties("pluginName")
         version = properties("pluginVersion")
@@ -198,16 +210,17 @@ intellijPlatform {
         password = environment("PRIVATE_KEY_PASSWORD")
     }
 
-//    pluginVerification {
-//        ides {
-//            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2024.2")
-//            recommended()
-//            select {
-//                sinceBuild = properties("pluginSinceBuild")
-//                untilBuild = properties("pluginUntilBuild")
-//            }
-//        }
-//    }
+    pluginVerification {
+        ides {
+            val (type, version) = prop("ideaVersion").toTypeWithVersion()
+            ide(type, version)
+            recommended()
+            select {
+                sinceBuild = properties("pluginSinceBuild")
+                untilBuild = properties("pluginUntilBuild")
+            }
+        }
+    }
 }
 //
 //intellijPlatformTesting {

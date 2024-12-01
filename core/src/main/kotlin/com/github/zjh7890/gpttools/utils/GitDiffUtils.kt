@@ -130,7 +130,7 @@ object GitDiffUtils {
     fun extractAffectedMethodsLines(project: Project, fileChange: FileChange): List<PsiMethod> {
         val affectedMethods = mutableListOf<PsiMethod>()
 
-        if (fileChange.filePath.contains("src/test")) {
+        if (fileChange.filePath.contains("test")) {
             return affectedMethods // Skip test files
         }
 

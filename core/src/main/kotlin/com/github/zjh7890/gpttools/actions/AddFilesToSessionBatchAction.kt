@@ -1,6 +1,5 @@
 package com.github.zjh7890.gpttools.actions
 
-import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
@@ -9,7 +8,7 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 
-class AddToSessionFileListBatchAction : AnAction() {
+class AddFilesToSessionBatchAction : AnAction("Add Files to Session") {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
         val virtualFiles = e.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)
