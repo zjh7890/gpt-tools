@@ -16,17 +16,22 @@ class CodeTemplateApplicationSettingsService : PersistentStateComponent<CodeTemp
     @Synchronized
     override fun loadState(state: CodeTemplateApplicationSettings) {
         // 解析当前 myState 的模板
-        val defaultTemplates = JsonUtils.parse(myState.templates, object : TypeReference<List<PromptTemplate>>() {})
-
-        // 解析传入 state 的模板，并过滤掉描述以 * 开头的模板
-        val customTemplates = JsonUtils.parse(state.templates, object : TypeReference<List<PromptTemplate>>() {})
-            .filterNot { it.desc.trim(' ').startsWith("*") }
-
-        // 合并模板列表，将默认模板放在前面
-        val mergedTemplates = defaultTemplates + customTemplates
-
-        // 序列化合并后的模板列表，并更新 myState
-        myState.templates = JsonUtils.toJson(mergedTemplates)
+//        val defaultTemplates = JsonUtils.parse(myState.templates, object : TypeReference<List<PromptTemplate>>() {})
+//
+//        // 解析传入 state 的模板，并过滤掉描述以 * 开头的模板
+//        val customTemplates = JsonUtils.parse(state.templates, object : TypeReference<List<PromptTemplate>>() {})
+//            .filterNot { it.desc.trim(' ').startsWith("*") }
+//            .map {
+//                it.apply {
+//                }
+//            }
+//
+//        // 合并模板列表，将默认模板放在前面
+//        val mergedTemplates = defaultTemplates + customTemplates
+//
+//        // 序列化合并后的模板列表，并更新 myState
+//        myState.templates = JsonUtils.toJson(mergedTemplates)
+        myState.templates = state.templates
     }
 
     companion object {
@@ -43,75 +48,82 @@ class CodeTemplateApplicationSettingsService : PersistentStateComponent<CodeTemp
 
 class CodeTemplateApplicationSettings {
     var templates: String =
-        JsonUtils.toJson(listOf(
-        PromptTemplate(
-            key = "ClassFinderAction",
-            value = FileUtil.readResourceFile("template/ClassFinderAction.md"),
-            desc = "* 递归获取参数返回值类信息"
-        ),
-        PromptTemplate(
-            key = "CodeReviewPromptAction",
-            value = FileUtil.readResourceFile("template/CodeReviewPromptAction.md"),
-            desc = "* 生成 Code Review",
-        ),
-        PromptTemplate(
-            key = "FileTestAction",
-            value = FileUtil.readResourceFile("template/FileTestAction.md"),
-            desc = "* 生成类单测"
-        ),
-        PromptTemplate(
-            key = "GenerateMethodTestAction",
-            value = FileUtil.readResourceFile("template/GenerateMethodTestAction.md"),
-            desc = "* 生成方法单测"
-        ),
-        PromptTemplate(
-            key = "GenerateRpcAction",
-            value = FileUtil.readResourceFile("template/GenerateRpcAction.md"),
-            desc = "* 生成RPC代码"
-        ),
-        PromptTemplate(
-            key = "GenJsonAction",
-            value = FileUtil.readResourceFile("template/GenJsonAction.md"),
-            desc = "* 生成 json 示例"
-        ),
-        PromptTemplate(
-            key = "StructConverterCodeGenAction",
-            value = FileUtil.readResourceFile("template/StructConverterCodeGenAction.md"),
-            desc = "* 生成 converter 代码"
-        ),
-        PromptTemplate(
-            key = "ServiceImplAction",
-            value = FileUtil.readResourceFile("template/ServiceImplAction.md"),
-            desc = "* 实现 service 逻辑",
-            input1 = "UML Text:",
-            input2 = "Function Text"
-        ),
-        PromptTemplate(
-            key = "ServiceImplAction",
-            value = FileUtil.readResourceFile("template/GenApolloConfigByJson.md"),
-            desc = "* 根据 json 生成 apollo 配置",
-            input1 = "json",
-        ),
-        PromptTemplate(
-            key = "ServiceImplAction",
-            value = FileUtil.readResourceFile("template/AddRedisCache.md"),
-            desc = "* 给函数增加 redis 缓存"
-        ),
-            PromptTemplate(
-                key = "FixThisChunkAction",
-                value = FileUtil.readResourceFile("template/FixThisChunkAction.md"),
-                desc = "* 修复块"
+        JsonUtils.toJson(
+            listOf(
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/ChatWithSelectedCode.md"),
+                    desc = "Chat with selected code",
+                    showInEditorPopupMenu = false,
+                    newChat = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/ChatWithMethod.md"),
+                    desc = "Chat with method",
+                    showInEditorPopupMenu = false,
+                    newChat = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/ClassFinderAction.md"),
+                    desc = "查找方法及相关内容",
+                    showInFloatingToolBar = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/FileTestAction.md"),
+                    desc = "生成类单测",
+                    showInFloatingToolBar = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/GenerateMethodTestAction.md"),
+                    desc = "根据调用日志生成方法单测",
+                    input1 = "调用 json:",
+                    showInFloatingToolBar = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/GenerateRpcAction.md"),
+                    desc = "生成RPC代码",
+                    showInFloatingToolBar = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/GenJsonAction.md"),
+                    desc = "生成 json 示例",
+                    showInFloatingToolBar = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/StructConverterCodeGenAction.md"),
+                    desc = "生成 converter 代码",
+                    showInFloatingToolBar = false
+                ),
+//                PromptTemplate(
+//                    value = FileUtil.readResourceFile("template/ServiceImplAction.md"),
+//                    desc = "实现 service 逻辑",
+//                    input1 = "UML Text:",
+//                    input2 = "Function Text",
+//                    showInFloatingToolBar = false
+//                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/GenApolloConfigByJson.md"),
+                    desc = "根据 json 生成 apollo 配置",
+                    input1 = "json",
+                    showInFloatingToolBar = false
+                ),
+                PromptTemplate(
+                    value = FileUtil.readResourceFile("template/AddRedisCache.md"),
+                    desc = "给函数增加 redis 缓存",
+                    showInFloatingToolBar = false
+                )
             )
-    ))
+        )
 }
 
 data class PromptTemplate (
-    var key : String = "",
     var value : String = "",
     var desc : String = "",
     var input1 : String = "",
     var input2 : String = "",
     var input3 : String = "",
     var input4 : String = "",
-    var input5 : String = ""
+    var input5 : String = "",
+    var showInEditorPopupMenu: Boolean = true,
+    var showInFloatingToolBar: Boolean = true,
+    var newChat: Boolean = true
 )

@@ -1,11 +1,13 @@
 package com.github.zjh7890.gpttools.settings.template
 
+import com.github.zjh7890.gpttools.services.Action
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Splitter
 import java.awt.BorderLayout
+import java.awt.event.ActionListener
 import javax.swing.JComponent
 import javax.swing.JPanel
 
@@ -33,6 +35,14 @@ class EnhancedEditorDialog(private var template: PromptTemplate?) : DialogWrappe
         splitter.secondComponent = controlPanel
         panel.add(splitter, BorderLayout.CENTER)
         return panel
+    }
+
+    /**
+     * 屏蔽 esc 退出逻辑，防止用户误退出导致模板没保存
+     */
+    @Override
+    override fun createCancelAction() : ActionListener? {
+        return null
     }
 
     override fun doOKAction() {

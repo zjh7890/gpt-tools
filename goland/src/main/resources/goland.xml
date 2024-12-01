@@ -14,7 +14,11 @@
                              implementationClass="com.github.zjh7890.gpttools.goland.context.GoMethodContextBuilder"/>
         <variableContextBuilder language="go" 
                                implementationClass="com.github.zjh7890.gpttools.goland.context.GoVariableContextBuilder"/>
-
+                               
+                               <promptContextBuilder language="go"
+                        implementationClass="com.github.zjh7890.gpttools.goland.context.GoPromptContextBuilder"/>
+                               
+                               
 <!--        <testContextProvider language="go" -->
 <!--                            implementation="com.github.zjh7890.gpttools.goland.provider.testing.GoAutoTestService"/>-->
 
@@ -26,11 +30,11 @@
     </extensions>
 
     <actions>
-        <action id="com.github.zjh7890.gpttools.goland.actions.HelloGoAction"
-                class="com.github.zjh7890.gpttools.goland.actions.HelloGoAction"
-                text="Show Hello Go"
-                description="Shows Hello Go message">
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-        </action>
+<!--        <action id="com.github.zjh7890.gpttools.goland.action.HelloGoAction"-->
+<!--                class="com.github.zjh7890.gpttools.goland.action.HelloGoAction"-->
+<!--                text="Show Hello Go"-->
+<!--                description="Shows Hello Go message">-->
+<!--            <add-to-group group-id="EditorPopupMenu" anchor="last"/>-->
+<!--        </action>-->
     </actions>
 </idea-plugin>

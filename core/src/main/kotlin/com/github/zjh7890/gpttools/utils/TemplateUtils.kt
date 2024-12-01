@@ -17,4 +17,20 @@ object TemplateUtils {
             replacements[key] ?: matchResult.value
         }
     }
+
+    /**
+     * Checks if all variables in the template are present in the variables map.
+     * @param template The template string containing placeholders.
+     * @param variablesMap A map of variables to check against.
+     * @return A list of missing variable names. Empty if all variables are present.
+     */
+    fun checkVariables(template: String, variablesMap: Map<String, String>): List<String> {
+        // Regex to match placeholders like ${GPT_}
+        val regex = "\\$\\{(GPT_[a-zA-Z0-9_]+)\\}".toRegex()
+        // Find all unique variables in the template
+        val variablesInTemplate = regex.findAll(template).map { it.groupValues[1] }.toSet()
+        // Identify missing variables
+        val missingVariables = variablesInTemplate.filter { variablesMap[it].isNullOrBlank() }
+        return missingVariables
+    }
 }

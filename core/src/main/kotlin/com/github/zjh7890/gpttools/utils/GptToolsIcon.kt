@@ -11,7 +11,7 @@ object GptToolsIcon {
     val Send: Icon = IconLoader.getIcon("/icons/send.svg", GptToolsIcon::class.java)
 
     @JvmField
-    val SendAndCopy: Icon = IconLoader.getIcon("/icons/send_gray.svg", GptToolsIcon::class.java)
+    val SendGray: Icon = IconLoader.getIcon("/icons/send_gray.svg", GptToolsIcon::class.java)
 
     @JvmField
     val Stop: Icon = IconLoader.getIcon("/icons/stop.svg", GptToolsIcon::class.java)
@@ -21,4 +21,7 @@ object GptToolsIcon {
 
     @JvmField
     val ApplyCopyIcon: Icon = IconLoader.getIcon("/icons/download.svg", GptToolsIcon::class.java)
+
+    @JvmField
+    val SendThenDiff: Icon = IconLoader.getIcon("/icons/send_then_diff.svg", GptToolsIcon::class.java)
 }

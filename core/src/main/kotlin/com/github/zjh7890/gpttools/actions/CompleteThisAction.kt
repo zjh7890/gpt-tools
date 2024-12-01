@@ -1,8 +1,8 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
-import com.github.zjh7890.gpttools.utils.sendToChatWindow
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.editor.CaretModel
 import com.intellij.openapi.editor.Editor
@@ -51,7 +51,7 @@ class CompleteThisAction : IntentionAction, Iconable {
         val fileName = file.virtualFile.path
 
         // Update the content to send to the chat window
-        sendToChatWindow(project, { contentPanel, chatCodingService ->
+        ChatUtils.sendToChatWindow(project, { contentPanel, chatCodingService ->
             chatCodingService.newSession()
             val inputText = """
 在 ${'$'}{GPT_GENERATE_CODE_HERE} 处自动补全代码。

@@ -23,6 +23,11 @@
                                implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptVariableContextBuilder"/>
         <variableContextBuilder language="TypeScript" 
                                implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptVariableContextBuilder"/>
+                               
+        <promptContextBuilder language="JavaScript"
+                        implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptPromptContextBuilder"/>
+        <promptContextBuilder language="TypeScript"
+                        implementationClass="com.github.zjh7890.gpttools.javascript.context.JavaScriptPromptContextBuilder"/>
 
 <!--        <chatContextProvider -->
 <!--            implementation="com.github.zjh7890.gpttools.javascript.provider.JavaScriptContextProvider"/>-->

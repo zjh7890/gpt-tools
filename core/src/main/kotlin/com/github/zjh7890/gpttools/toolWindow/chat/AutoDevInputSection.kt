@@ -36,10 +36,8 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
     private val input: AutoDevInput
     private val documentListener: DocumentListener
     private val sendButtonPresentation: Presentation
-    private val sendAndCopyButtonPresentation: Presentation
     private val stopButtonPresentation: Presentation
     private val sendButton: ActionButton
-    private val sendAndCopyButton: ActionButton
     private val stopButton: ActionButton
     private val buttonPanel = JPanel(CardLayout())
     private val logger = logger<AutoDevInputSection>()
@@ -55,13 +53,9 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
             input.text = text
         }
     init {
-        val sendButtonPresentation = Presentation("send")
-        sendButtonPresentation.setIcon(GptToolsIcon.Send)
+        val sendButtonPresentation = Presentation("Send")
+        sendButtonPresentation.setIcon(GptToolsIcon.SendGray)
         this.sendButtonPresentation = sendButtonPresentation
-        val sendAndCopyButtonPresentation = Presentation("Send and Copy")
-        sendAndCopyButtonPresentation.setIcon(GptToolsIcon.SendAndCopy)
-        this.sendAndCopyButtonPresentation = sendAndCopyButtonPresentation
-
         val stopButtonPresentation = Presentation("Stop")
         stopButtonPresentation.setIcon(GptToolsIcon.Stop)
         this.stopButtonPresentation = stopButtonPresentation
@@ -82,21 +76,7 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
             "",
             Dimension(20, 20)
         )
-        sendAndCopyButton = ActionButton(
-            DumbAwareAction.create {
-                object : DumbAwareAction("") {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        if (input.text.isBlank()) {
-                            return
-                        }
-                        editorListeners.multicaster.onSubmit(this@AutoDevInputSection, AutoDevInputTrigger.CopyPrompt)
-                    }
-                }.actionPerformed(it)
-            },
-            this.sendAndCopyButtonPresentation,
-            "",
-            Dimension(20, 20)
-        )
+        
         stopButton = ActionButton(
             DumbAwareAction.create {
                 object : DumbAwareAction("") {
@@ -151,7 +131,8 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
                     selected: Boolean,
                     hasFocus: Boolean
                 ) {
-                    text = "${value?.modelName} - ${value?.provider?.name}" ?: "Unknown"
+                    val displayName = if (value?.name.isNullOrEmpty()) value?.modelName else value?.name
+            text = "$displayName" ?: "Unknown"
                     horizontalAlignment = SwingConstants.RIGHT
                 }
             }
@@ -167,16 +148,9 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
             isOpaque = false
             add(configComboBox, BorderLayout.WEST)
             add(Box.createHorizontalStrut(10), BorderLayout.CENTER) // 添加10像素的间距
-            
-            // 创建一个新面板来容纳两个按钮
-            val buttonsContainer = JPanel(FlowLayout(FlowLayout.LEFT, 5, 0)).apply {
-                isOpaque = false
-                add(buttonPanel)
-                add(sendAndCopyButton)
-            }
-
-            add(buttonsContainer, BorderLayout.EAST)
+            add(buttonPanel, BorderLayout.EAST)
         }
+
         layoutPanel.addToCenter(horizontalGlue)
         layoutPanel.addToRight(rightPanel)
         addToBottom(layoutPanel)

@@ -75,6 +75,4 @@ public enum BehaviorRecordEnum {
 ${GPT_input2}
 --------
 请你按照规范实现下面的 mermaid 流程，拆分需求，然后一步一步实现：
-```
 ${GPT_input1}
-```

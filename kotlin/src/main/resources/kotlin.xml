@@ -1,7 +1,7 @@
 <idea-plugin package="com.github.zjh7890.gpttools.kotlin">
     <dependencies>
         <plugin id="org.jetbrains.kotlin"/>
-        <module name="com.github.zjh7890.gpttools.java"/>
+        <module name="java"/>
     </dependencies>
 
     <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
@@ -17,7 +17,11 @@
         <variableContextBuilder language="kotlin"
                                implementationClass="com.github.zjh7890.gpttools.kotlin.context.KotlinVariableContextBuilder"/>
 
-<!--        <codeModifier language="kotlin"-->
+        <promptContextBuilder language="kotlin"
+                              implementationClass="com.github.zjh7890.gpttools.kotlin.context.KotlinPromptContextBuilder"/>
+
+
+        <!--        <codeModifier language="kotlin"-->
 <!--                      implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinCodeModifier"/>-->
 
 <!--        <chatContextProvider -->
@@ -48,4 +52,13 @@
 <!--                language="kotlin"-->
 <!--                implementationClass="com.github.zjh7890.gpttools.kotlin.provider.KotlinCustomPromptProvider" />-->
     </extensions>
+
+    <actions>
+        <action id="com.github.zjh7890.gpttools.kotlin.HelloKotlin"
+                class="com.github.zjh7890.gpttools.kotlin.action.HelloKotlinAction"
+                text="Hello Kotlin"
+                description="A simple hello action for Kotlin">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

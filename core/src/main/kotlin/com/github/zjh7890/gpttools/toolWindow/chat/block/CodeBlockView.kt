@@ -3,14 +3,14 @@
 package com.github.zjh7890.gpttools.toolWindow.chat.block
 
 import CodeChangeBlockView
+import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.Code
+import com.intellij.icons.AllIcons
 import com.intellij.lang.Language
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.ActionToolbar
-import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.ex.FocusChangeListener
 import com.intellij.openapi.editor.ex.MarkupModelEx
 import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.fileTypes.UnknownFileType
 import com.intellij.openapi.observable.properties.GraphProperty
@@ -161,16 +162,16 @@ class CodeBlockView(
 
             val toolbarActionGroup = DefaultActionGroup().apply {
                 add(AutoDevRunDevInsAction(block))
+                add(CopyCodeToClipboardAction { graphProperty.get() })
+                add(InsertCodeIntoEditorAction { graphProperty.get() })
             }
-            toolbarActionGroup?.let {
+            toolbarActionGroup.let {
                 val toolbar: ActionToolbar = ActionManager.getInstance()
                     .createActionToolbar(ActionPlaces.MAIN_TOOLBAR, toolbarActionGroup, true)
-
                 toolbar.component.background = editor.backgroundColor
                 toolbar.component.isOpaque = true
                 toolbar.targetComponent = editor.contentComponent
                 editor.headerComponent = toolbar.component
-
                 val connect = project.messageBus.connect(disposable)
                 val topic: Topic<EditorColorsListener> = EditorColorsManager.TOPIC
                 connect.subscribe(topic, EditorColorsListener {
@@ -205,18 +206,45 @@ fun Disposable.whenDisposed(
     listener: () -> Unit
 ) {
     val isDisposed = AtomicBoolean(false)
-
     val disposable = Disposable {
         if (isDisposed.compareAndSet(false, true)) {
             listener()
         }
     }
-
     Disposer.register(this, disposable)
-
     Disposer.register(parentDisposable, Disposable {
         if (isDisposed.compareAndSet(false, true)) {
             Disposer.dispose(disposable)
         }
     })
+}
+
+class CopyCodeToClipboardAction(private val codeProvider: () -> String) :
+    AnAction("Copy Code", "Copy code to clipboard", AllIcons.Actions.Copy) {
+    override fun actionPerformed(e: AnActionEvent) {
+        val code = codeProvider()
+        ClipboardUtils.copyToClipboard(code)
+    }
+}
+
+class InsertCodeIntoEditorAction(private val codeProvider: () -> String) :
+    AnAction("Insert Code", "Insert code into editor", AllIcons.ToolbarDecorator.Import) {
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return
+        val code = codeProvider()
+        val document = editor.document
+        val selectionModel = editor.selectionModel
+        val caretModel = editor.caretModel
+        WriteCommandAction.runWriteCommandAction(project) {
+            if (selectionModel.hasSelection()) {
+                document.replaceString(selectionModel.selectionStart, selectionModel.selectionEnd, code)
+            } else if (caretModel.offset >= 0) {
+                val offset = caretModel.offset
+                document.insertString(offset, code)
+            } else {
+                return@runWriteCommandAction
+            }
+        }
+    }
 }

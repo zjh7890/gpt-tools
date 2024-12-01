@@ -1,4 +1,4 @@
-请你写一个或多个方法，将 ${GPT_firstParamName} 转换成 ${GPT_returnParamName}。
+请你写一个或多个方法，实现 ${GPT_methodName} 的逻辑。
 转换过程注意判空
 注意基类中的对象也要一起转化
 如果遇到嵌套的对象，请生成单独的函数进行转化

@@ -15,6 +15,9 @@
                              implementationClass="com.github.zjh7890.gpttools.cpp.context.CppMethodContextBuilder"/>
         <variableContextBuilder language="ObjectiveC"
                                implementationClass="com.github.zjh7890.gpttools.cpp.context.CppVariableContextBuilder"/>
+                               
+        <promptContextBuilder language="C++"
+                        implementationClass="com.github.zjh7890.gpttools.cpp.context.CppPromptContextBuilder"/>
 
 <!--        <chatContextProvider -->
 <!--            implementation="com.github.zjh7890.gpttools.cpp.provider.CLionWorkspaceContextProvider"/>-->

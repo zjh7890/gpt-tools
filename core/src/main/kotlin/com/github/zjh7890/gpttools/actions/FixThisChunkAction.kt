@@ -1,8 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
 //import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
-import com.github.zjh7890.gpttools.settings.template.CodeTemplateApplicationSettingsService
-import com.github.zjh7890.gpttools.settings.template.PromptTemplate
+import com.github.zjh7890.gpttools.settings.embedTemplate.EmbedTemplateSettings
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.github.zjh7890.gpttools.utils.TemplateUtils
@@ -48,8 +47,8 @@ class FixThisChunkAction : BaseIntentionAction(), Iconable
 
         val document = editor.document
 
-        val promptTemplate: PromptTemplate = CodeTemplateApplicationSettingsService.getTemplates()
-            .firstOrNull { it.key == "FixThisChunkAction" } ?: return
+        // 从全局设置中获取模板内容
+        val templateContent = EmbedTemplateSettings.instance.getStoredFixThisTemplate()
 
         // 获取光标位置前后30行的文本
         val totalLines = document.lineCount
@@ -74,7 +73,7 @@ class FixThisChunkAction : BaseIntentionAction(), Iconable
                 "GPT_30LinesTextAfterCaret" to textAfterCaret,
             )
 
-            val result = TemplateUtils.replacePlaceholders(promptTemplate.value, map)
+            val result = TemplateUtils.replacePlaceholders(templateContent, map)
             copyToClipboard(result)
         } catch (ex: Exception) {
             Messages.showMessageDialog(project, "Error finding classes: ${ex.message}", "Error", Messages.getErrorIcon())

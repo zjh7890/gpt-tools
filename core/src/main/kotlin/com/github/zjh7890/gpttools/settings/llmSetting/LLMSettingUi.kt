@@ -54,13 +54,10 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
             ): Component {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
                 if (value is LLMSetting) {
-                    val provider = value.provider.name
-                    if (value.isDefault) {
-                        text = "${value.modelName} [$provider] ✅" // 显示 Provider 信息
-                    } else {
-                        text = "${value.modelName} [$provider]"
-                    }
-                }
+                val provider = value.provider.name
+                val displayName = if (value.name.isNullOrEmpty()) value.modelName else value.name
+                text = "$displayName"
+            }
                 return this
             }
         }
@@ -140,14 +137,15 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
         for (i in 0 until listModel.size) {
             val current = listModel.getElementAt(i)
             val original = settings.settings[i]
-            if (current.temperature != original.temperature ||
+            if (current.name != original.name ||
+                current.temperature != original.temperature ||
                 current.apiHost != original.apiHost ||
                 current.modelName != original.modelName ||
                 current.apiToken != original.apiToken ||
                 current.azureModel != original.azureModel ||
                 current.azureEndpoint != original.azureEndpoint ||
                 current.azureApiKey != original.azureApiKey ||
-                current.stream != original.stream ||  // 改用 stream
+                current.stream != original.stream ||
                 current.isDefault != original.isDefault
             ) {
                 return true
@@ -269,13 +267,16 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
 
     // 显示配置项编辑对话框
     private fun showShireSettingDialog(setting: LLMSetting? = null): LLMSetting? {
-        val nameField = JTextField(20).apply { text = setting?.modelName ?: "" }
-        // 根据 ShireSetting 的字段添加更多输入框
+        val nameField = JTextField(20).apply { text = setting?.name ?: "" }
+        val modelNameField = JTextField(20).apply { text = setting?.modelName ?: "" }
 
         val panel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            add(JLabel("Model Name:"))
+            add(JLabel("Name:"))
             add(nameField)
+            add(Box.createVerticalStrut(10))
+            add(JLabel("Model Name:"))
+            add(modelNameField)
             add(Box.createVerticalStrut(10))
             // 添加更多字段的标签和输入框
             // 例如 provider 选择框等，可以根据需要扩展
@@ -291,7 +292,8 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
 
         return if (result == JOptionPane.OK_OPTION) {
             LLMSetting(
-                modelName = nameField.text.trim(),
+                name = nameField.text.trim(),
+                modelName = modelNameField.text.trim(),
                 // 初始化其他字段为默认值，用户需要在详细面板中进行编辑
             )
         } else {
@@ -340,6 +342,7 @@ class ShireConfigItemComponent(
 ) {
     private val panel: JPanel
     private val defaultCheckBox = JBCheckBox("默认配置")
+    private val nameField = JBTextField(setting.name)
     private val providerComboBox = JComboBox(Provider.values()).apply {
         minimumSize = Dimension(130, minimumSize.height)
         preferredSize = Dimension(130, preferredSize.height)
@@ -394,6 +397,7 @@ class ShireConfigItemComponent(
 
         // 构建主面板
         panel = FormBuilder.createFormBuilder()
+            .addLabeledComponent(JLabel("Name:"), nameField)
             .addLabeledComponent(JLabel("Provider:"), providerComboBox)
             .addComponent(uniqueFieldsPanel)
             .addLabeledComponent(JLabel("Temperature:"), temperatureField)
@@ -454,6 +458,8 @@ class ShireConfigItemComponent(
      * 为各字段设置文档监听器，实时更新 setting 对象
      */
     private fun setDocumentListeners() {
+        // name 字段监听器
+        nameField.document.addDocumentListener(createDocumentListener { setting.name = nameField.text })
         // 独有字段监听器
         apiHostField.document.addDocumentListener(createDocumentListener { setting.apiHost = apiHostField.text })
         modelNameField.document.addDocumentListener(createDocumentListener { setting.modelName = modelNameField.text })
@@ -539,6 +545,7 @@ class ShireConfigItemComponent(
      * 重置字段值为指定的 setting 对象
      */
     fun reset(setting: LLMSetting) {
+        nameField.text = setting.name
         providerComboBox.selectedItem = setting.provider
         showProviderFields(setting.provider)
 

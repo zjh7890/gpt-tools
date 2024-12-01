@@ -18,7 +18,10 @@
         <variableContextBuilder language="JAVA"
                                implementationClass="com.github.zjh7890.gpttools.java.context.JavaVariableContextBuilder"/>
 
-<!--        <codeModifier language="JAVA"-->
+        <promptContextBuilder language="JAVA"
+                              implementationClass="com.github.zjh7890.gpttools.java.context.JavaPromptContextBuilder"/>
+
+        <!--        <codeModifier language="JAVA"-->
 <!--                      implementationClass="com.github.zjh7890.gpttools.java.context.JavaCodeModifier"/>-->
 
 <!--        <livingDocumentation language="JAVA"-->
@@ -59,4 +62,13 @@
 <!--        <customDevInsCompletionProvider-->
 <!--                implementation="com.github.zjh7890.gpttools.java.provider.JavaCustomDevInsSymbolProvider"/>-->
     </extensions>
+
+    <actions>
+        <action id="com.github.zjh7890.gpttools.java.HelloJava"
+                class="com.github.zjh7890.gpttools.java.action.HelloJavaAction"
+                text="Hello Java"
+                description="Shows Hello Java message">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

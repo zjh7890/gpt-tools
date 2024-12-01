@@ -41,7 +41,15 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
     override fun getState(): LLMSettingsState = this
 
     @Synchronized
-    override fun loadState(state: LLMSettingsState) = XmlSerializerUtil.copyBean(state, this)
+    override fun loadState(state: LLMSettingsState) {
+        XmlSerializerUtil.copyBean(state, this)
+        // 兼容历史配置
+        settings.forEach { setting ->
+            if (setting.name.isNullOrEmpty()) {
+                setting.name = setting.modelName
+            }
+        }
+    }
 
     /**
      * 获取默认的配置项
@@ -68,8 +76,9 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
         fun toLlmConfig(setting: LLMSetting?): LlmConfig {
             val defaultSetting = setting ?: getInstance().getDefaultSetting()
             ?: throw IllegalStateException("No default setting found")
+            val title = if (defaultSetting.name.isNullOrEmpty()) defaultSetting.modelName else defaultSetting.name
             return LlmConfig(
-                title = defaultSetting.modelName,
+                title = title,
                 provider = defaultSetting.provider,
                 apiKey = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.apiToken else defaultSetting.azureApiKey,
                 model = if (defaultSetting.provider == Provider.OpenAILike) defaultSetting.modelName else defaultSetting.azureModel,

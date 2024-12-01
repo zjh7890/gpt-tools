@@ -113,7 +113,7 @@ class ChatCodingService(val project: Project) : Disposable{
     fun handlePromptAndResponse(
         ui: ChatToolPanel,
         prompter: String,
-        searchContext: Boolean,
+        withDiff: Boolean,
         editingMessage: ChatContextMessage?,
         llmConfig: LlmConfig,
         trigger: AutoDevInputTrigger
@@ -141,17 +141,17 @@ class ChatCodingService(val project: Project) : Disposable{
         messageView.scrollToBottom()
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            if (searchContext) {
-                val fileList =
-                    ContextCollectAgent.collectContext(session, prompter, llmConfig, projectStructure, project)
-                val fileContents = FileUtil.readFileInfoForLLM(project, fileList)
-
-                val contextMessage = ChatContextMessage(ChatRole.user, "下面是文件的上下文信息: \n" + FileUtil.wrapBorder(fileContents))
-                getCurrentSession().add(contextMessage)
-                ApplicationManager.getApplication().invokeLater {
-                    ui.addMessage(fileList.joinToString("\n"), chatMessage = message)
-                }
-            }
+//            if (withDiff) {
+//                val fileList =
+//                    ContextCollectAgent.collectContext(session, prompter, llmConfig, projectStructure, project)
+//                val fileContents = FileUtil.readFileInfoForLLM(project, fileList)
+//
+//                val contextMessage = ChatContextMessage(ChatRole.user, "下面是文件的上下文信息: \n" + FileUtil.wrapBorder(fileContents))
+//                getCurrentSession().add(contextMessage)
+//                ApplicationManager.getApplication().invokeLater {
+//                    ui.addMessage(fileList.joinToString("\n"), chatMessage = message)
+//                }
+//            }
 
             addContextToMessages(message!!, project)
             val messages: MutableList<ChatMessage> = getCurrentSession().transformMessages()
@@ -189,7 +189,7 @@ class ChatCodingService(val project: Project) : Disposable{
                 saveSessions()
                 
                 // 只在没有错误时执行 GenerateDiffAgent
-                if (!hasError && CommonSettings.getInstance().generateDiff) {
+                if (!hasError && withDiff) {
                     ApplicationManager.getApplication().executeOnPooledThread {
                         GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession(), ui)
                     }

@@ -53,7 +53,7 @@ class WelcomePanel: JPanel(BorderLayout()) {
                 cell(linkPanel)
             }
             row {
-                text("<a href=\"https://gpt-tools.yuque.com/pfm3um/doc\">Learn more</a>")
+                text("<a href=\"https://gpt-tools.yuque.com/pfm3um/doc\">How to use ?</a>")
             }
             row {
                 text("<a href=\"https://github.com/zjh7890/gpt-tools/issues/\">Want new feature / Report bug</a>")

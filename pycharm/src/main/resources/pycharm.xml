@@ -2,7 +2,14 @@
     <dependencies>
         <plugin id="com.intellij.modules.python"/>
     </dependencies>
-
+    <actions>
+<!--        <action id="com.github.zjh7890.gpttools.pycharm.HelloPython"-->
+<!--                class="com.github.zjh7890.gpttools.pycharm.action.HelloPythonAction"-->
+<!--                text="Hello Python"-->
+<!--                description="Shows Hello Python message">-->
+<!--            <add-to-group group-id="EditorPopupMenu" anchor="last"/>-->
+<!--        </action>-->
+    </actions>
     <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
         <classContextBuilder language="Python"
                             implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonClassContextBuilder"/>
@@ -12,6 +19,9 @@
                              implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonMethodContextBuilder"/>
         <variableContextBuilder language="Python"
                                implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonVariableContextBuilder"/>
+                               
+        <promptContextBuilder language="Python"
+                        implementationClass="com.github.zjh7890.gpttools.pycharm.context.PythonPromptContextBuilder"/>
 
 <!--        <livingDocumentation language="Python"-->
 <!--                            implementationClass="com.github.zjh7890.gpttools.pycharm.provider.PythonLivingDocumentation"/>-->

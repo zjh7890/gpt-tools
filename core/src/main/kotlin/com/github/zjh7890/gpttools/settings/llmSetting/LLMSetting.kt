@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.settings.llmSetting
 data class LLMSetting(
+    var name: String = "",
     var temperature: Double = 0.0,
     // OpenAI 相关字段
     var apiHost: String = "https://api.openai.com/v1/chat/completions",

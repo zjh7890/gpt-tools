@@ -45,6 +45,4 @@
 
 
 请你严格参考示例和规范给方法 ${GPT_methodName} 增加缓存的逻辑，方法如下：
-```
 ${GPT_methodText}
-```

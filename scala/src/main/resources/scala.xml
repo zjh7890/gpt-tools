@@ -7,6 +7,9 @@
     <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
         <classContextBuilder language="Scala"
                             implementationClass="com.github.zjh7890.gpttools.scala.context.ScalaClassContextBuilder"/>
+                            
+        <promptContextBuilder language="Scala"
+                        implementationClass="com.github.zjh7890.gpttools.scala.context.ScalaPromptContextBuilder"/>
 
 <!--        <testContextProvider language="Scala" -->
 <!--                            implementation="com.github.zjh7890.gpttools.scala.provider.ScalaAutoTestService"/>-->

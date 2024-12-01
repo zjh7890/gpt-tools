@@ -82,7 +82,6 @@ class TemplateSettingUi(
     private fun updateCombinedPanelDisplay(selectedItem: PromptTemplate?) {
         combinedPanel.removeAll()  // 清除所有当前组件
         if (selectedItem != null) {
-            val keyTextField = JTextField()
             val descTextField = JTextField()
             val valueTextArea = JTextArea(5, 80)
             val input1 = JTextField()
@@ -92,18 +91,28 @@ class TemplateSettingUi(
             val input5 = JTextField()
 
             val formBuilder: FormBuilder = FormBuilder.createFormBuilder()
-            // 如果 desc 以 * 开头，添加警告标签
-            if (selectedItem.desc.startsWith("*")) {
-                val warningLabel = JLabel("* 开头的模板修改将不生效，请复制模板后去掉 * 号再进行修改").apply {
-                    isOpaque = true
-                    background = Color(255, 255, 204)  // 浅黄色背景
-                }
-                formBuilder.addComponent(warningLabel)
+
+            val showInEditorPopupMenuCheckBox = JCheckBox("Show in Editor Popup Menu", selectedItem?.showInEditorPopupMenu ?: true)
+            val showInFloatingToolBarCheckBox = JCheckBox("Show in Floating Toolbar", selectedItem?.showInFloatingToolBar ?: true)
+            val newChatCheckBox = JCheckBox("Start a new chat", selectedItem?.newChat ?: true)
+
+            showInEditorPopupMenuCheckBox.addActionListener {
+                selectedItem?.showInEditorPopupMenu = showInEditorPopupMenuCheckBox.isSelected
+            }
+
+            showInFloatingToolBarCheckBox.addActionListener {
+                selectedItem?.showInFloatingToolBar = showInFloatingToolBarCheckBox.isSelected
+            }
+
+            newChatCheckBox.addActionListener {
+                selectedItem?.newChat = newChatCheckBox.isSelected
             }
 
             val formPane = formBuilder
                 .addLabeledComponent("Desc:", descTextField)
-                .addLabeledComponent("Key:", keyTextField)
+                .addComponent(showInEditorPopupMenuCheckBox)
+                .addComponent(showInFloatingToolBarCheckBox)
+                .addComponent(newChatCheckBox)
                 .addSeparator()
                 .addComponent(
                     JButton("Open Editor").apply {
@@ -121,17 +130,6 @@ class TemplateSettingUi(
                 .addLabeledComponent("Input5:", input5)
                 .addComponentFillVertically(JPanel(), 0)
                 .panel
-
-            keyTextField.text = selectedItem.key ?: ""
-            keyTextField.document.addDocumentListener(object : DocumentListener {
-                override fun insertUpdate(e: DocumentEvent) = updateSelectedItem()
-                override fun removeUpdate(e: DocumentEvent) = updateSelectedItem()
-                override fun changedUpdate(e: DocumentEvent) = updateSelectedItem()
-
-                private fun updateSelectedItem() {
-                    selectedItem.key = keyTextField.text
-                }
-            })
 
             valueTextArea.text = selectedItem.value ?: ""
             valueTextArea.document.addDocumentListener(object : DocumentListener {
@@ -259,7 +257,6 @@ class TemplateSettingUi(
         val selectedTemplate = templateList.selectedValue
         if (selectedTemplate != null) {
             val newTemplate = PromptTemplate(
-                key = selectedTemplate.key,
                 desc = selectedTemplate.desc.trim(' ').trim('*').trim(' '),
                 value = selectedTemplate.value,
                 input1 = selectedTemplate.input1,
@@ -285,7 +282,6 @@ class TemplateSettingUi(
     }
 
     private fun showPromptTemplateDialog(template: PromptTemplate? = null): PromptTemplate? {
-        val keyField = JTextField(10).apply { text = template?.key ?: "" }
         val descField = JTextField(10).apply { text = template?.desc ?: "" }
 
         val panel = JPanel(GridBagLayout()).apply {
@@ -295,15 +291,13 @@ class TemplateSettingUi(
                 anchor = GridBagConstraints.WEST
                 insets = Insets(4, 4, 4, 4)
             }
-            add(JLabel("Key:"), gbc)
-            add(keyField, gbc.clone().apply {  })
             add(JLabel("Description:"), gbc)
             add(descField, gbc.clone().apply {  })
         }
 
         val result = JOptionPane.showConfirmDialog(panel, panel, "Edit Prompt Template", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
         if (result == JOptionPane.OK_OPTION) {
-            return PromptTemplate(key = keyField.text, desc = descField.text)
+            return PromptTemplate(desc = descField.text)
         }
         return null
     }
@@ -358,8 +352,10 @@ class TemplateSettingUi(
         val model = templateList.model as DefaultListModel<PromptTemplate>
         val listOptions = model.elements().asSequence().toList()
 
-        // Check if the number of options has been modified
+        // Parse the original templates from the app settings
         val templates = JsonUtils.parse(appSetting.templates, object : TypeReference<List<PromptTemplate>>() {})
+
+        // Check if the number of templates has been modified
         if (listOptions.size != templates.size) {
             return true
         }
@@ -369,7 +365,17 @@ class TemplateSettingUi(
             val uiTemplate = listOptions[i]
             val originalTemplate = templates.getOrNull(i)
 
-            if (originalTemplate == null || uiTemplate.key != originalTemplate.key || uiTemplate.value != originalTemplate.value || uiTemplate.desc != originalTemplate.desc) {
+            if (originalTemplate == null ||
+                uiTemplate.value != originalTemplate.value ||
+                uiTemplate.desc != originalTemplate.desc ||
+                uiTemplate.input1 != originalTemplate.input1 ||
+                uiTemplate.input2 != originalTemplate.input2 ||
+                uiTemplate.input3 != originalTemplate.input3 ||
+                uiTemplate.input4 != originalTemplate.input4 ||
+                uiTemplate.input5 != originalTemplate.input5 ||
+                uiTemplate.showInEditorPopupMenu != originalTemplate.showInEditorPopupMenu ||
+                uiTemplate.showInFloatingToolBar != originalTemplate.showInFloatingToolBar ||
+                uiTemplate.newChat != originalTemplate.newChat) {
                 return true
             }
         }

@@ -38,13 +38,11 @@ public class LiveStartListenerTest {
 按照前文提到单测规范生成 ${GPT_methodName} 方法的单测代码，中文作答，注释也用中文。
 以下是提供的一些信息: 
 单测测试参数，如果为空你就自己mock吧：
-```
-${GPT_userInput}
-```
+${GPT_input1}
 
 方法信息：
 ${GPT_completeSignature}
-```
+
 ${GPT_simplifyClassText}
-```
+
 ${GPT_methodInfo}

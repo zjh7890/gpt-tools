@@ -81,6 +81,11 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
                                 ignoredDirectories.none { ignoredDir -> file.absolutePath.contains(ignoredDir) }
                     }.forEach { file ->
                         val content = file.readText()
+                        if (projectName.equals("xxq-trade-web")) {
+                            if (file.name.contains("RewardLiveServiceImpl")) {
+                                println("hhi")
+                            }
+                        }
                         if (content.contains(qualifiedClassName)) {
                             ApplicationManager.getApplication().runReadAction {
                                 list.add(file);
@@ -103,11 +108,32 @@ class FindUsagesAcrossProjectsAction : AnAction(), DumbAware {
         projectName: String,
         absolutePath: String
     ) {
+        // 获取目标方法的特征
+        val targetClassName = method.containingClass?.qualifiedName
+        val targetMethodName = method.name
+        val targetParameterTypes = method.parameterList.parameters.map { it.type.canonicalText }
+
         psiFile.accept(object : JavaRecursiveElementVisitor() {
-            override fun visitReferenceExpression(reference: PsiReferenceExpression) {
-                super.visitReferenceExpression(reference)
-                if (reference.isReferenceTo(method)) {
-                    usages.add(ReferenceUsage(reference, projectName, absolutePath))
+            override fun visitMethodCallExpression(expression: PsiMethodCallExpression) {
+                super.visitMethodCallExpression(expression)
+
+                val methodName = expression.methodExpression.referenceName
+                if (methodName == targetMethodName) {
+                    val qualifier = expression.methodExpression.qualifier
+                    val argumentList = expression.argumentList
+
+                    // 检查参数数量
+                    if (argumentList.expressionCount == targetParameterTypes.size) {
+                        // 检查方法调用的上下文
+                        val containingFile = expression.containingFile
+                        if (containingFile is PsiJavaFile) {
+                            // 检查导入语句
+                            val imports = containingFile.importList?.importStatements?.map { it.qualifiedName }
+                            if (imports?.contains(targetClassName) == true) {
+                                usages.add(ReferenceUsage(expression.methodExpression, projectName, absolutePath))
+                            }
+                        }
+                    }
                 }
             }
         })

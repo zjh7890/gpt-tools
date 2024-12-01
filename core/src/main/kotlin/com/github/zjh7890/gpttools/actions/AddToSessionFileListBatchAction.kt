@@ -1,6 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -18,9 +19,7 @@ class AddToSessionFileListBatchAction : AnAction() {
             return
         }
 
-        val chatCodingService = ChatCodingService.getInstance(project)
         val filesToAdd = mutableListOf<VirtualFile>()
-
         // 递归处理所选项目
         for (file in virtualFiles) {
             if (file.isDirectory) {
@@ -30,8 +29,9 @@ class AddToSessionFileListBatchAction : AnAction() {
             }
         }
 
-        // 添加所有收集到的文件
-        filesToAdd.forEach { chatCodingService.addFileToCurrentSession(it) }
+        ChatUtils.activateToolWindowRun(project) { panel, service ->
+            filesToAdd.forEach { service.addFileToCurrentSession(it) }
+        }
     }
 
     private fun collectFiles(directory: VirtualFile, files: MutableList<VirtualFile>) {

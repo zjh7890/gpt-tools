@@ -13,6 +13,9 @@
                              implementationClass="com.github.zjh7890.gpttools.rust.context.RustMethodContextBuilder"/>
         <variableContextBuilder language="Rust"
                                implementationClass="com.github.zjh7890.gpttools.rust.context.RustVariableContextBuilder"/>
+                               
+        <promptContextBuilder language="Rust"
+                        implementationClass="com.github.zjh7890.gpttools.rust.context.RustPromptContextBuilder"/>
 
 <!--        <chatContextProvider -->
 <!--            implementation="com.github.zjh7890.gpttools.rust.provider.RustVersionContextProvider"/>-->

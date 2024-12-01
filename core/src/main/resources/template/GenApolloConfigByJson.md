@@ -57,6 +57,4 @@ public class AudienceQualificationThresholdsApollo {
 
 -----
 下面是给定的json：
-```json
 ${GPT_input1}
-```

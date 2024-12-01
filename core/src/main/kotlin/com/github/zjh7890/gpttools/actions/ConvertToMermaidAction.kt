@@ -54,7 +54,7 @@ class UMLDialog(project: Project?) : DialogWrapper(project) {
 
     init {
         init()
-        title = "Enter UML and Function Text"
+        title = "Input"
     }
 
     override fun createCenterPanel(): JComponent {

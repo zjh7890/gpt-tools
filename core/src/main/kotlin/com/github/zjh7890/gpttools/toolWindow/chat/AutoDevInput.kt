@@ -33,7 +33,7 @@ import javax.swing.KeyStroke
 enum class AutoDevInputTrigger {
     Button,
     Key,
-    SearchContext,
+    ChatThenDiff,
     CopyPrompt
 }
 
@@ -79,7 +79,7 @@ class AutoDevInput(
                 }
                 if (this@AutoDevInput.editor?.contentComponent?.hasFocus() == true) {
                     if (e.id == KeyEvent.KEY_PRESSED && e.keyCode == KeyEvent.VK_ENTER && e.isMetaDown) {
-                        editorListeners.multicaster.onSubmit(inputSection, AutoDevInputTrigger.SearchContext)
+                        editorListeners.multicaster.onSubmit(inputSection, AutoDevInputTrigger.ChatThenDiff)
                     }
                 }
                 return false
@@ -125,7 +125,7 @@ class AutoDevInput(
                     val modifiers = event.inputEvent!!.modifiersEx
                     val isMetaPressed = modifiers and KeyEvent.META_DOWN_MASK != 0
                     if (isMetaPressed) {
-                        editorListeners.multicaster.onSubmit(inputSection, AutoDevInputTrigger.SearchContext)
+                        editorListeners.multicaster.onSubmit(inputSection, AutoDevInputTrigger.ChatThenDiff)
                     } else {
                         editorListeners.multicaster.onSubmit(inputSection, AutoDevInputTrigger.Key)
                     }
@@ -159,7 +159,7 @@ class AutoDevInput(
     }
 
     private fun updatePlaceholderText() {
-        setPlaceholder("↩ chat  /  ⌘↩ search context chat  /  ⇧↩ 换行")
+        setPlaceholder("↩ chat  /  ⌘↩ chat then diff  /  ⇧↩ 换行")
         repaint()
     }
 

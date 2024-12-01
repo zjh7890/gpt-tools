@@ -1,8 +1,8 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
-import com.github.zjh7890.gpttools.utils.sendToChatWindow
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
@@ -32,11 +32,8 @@ class ChatWithThisAction : IntentionAction, Iconable {
         // 获取当前文件的 VirtualFile
         val virtualFile = file.virtualFile
 
-        // 将当前文件添加到会话
-        val chatCodingService = ChatCodingService.getInstance(project)
-
         // 更新发送到聊天窗口的内容
-        sendToChatWindow(project, { contentPanel, chatCodingService ->
+        ChatUtils.sendToChatWindow(project, { contentPanel, chatCodingService ->
             chatCodingService.newSession(true)
             chatCodingService.addFileToCurrentSession(virtualFile)
             contentPanel.setInput("")

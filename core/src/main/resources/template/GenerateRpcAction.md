@@ -59,8 +59,8 @@ public class LiveAnchorAuthRPC {
 按照前文提到的Rpc规范生成 ${GPT_methodName} 方法的 Rpc 调用代码，中文作答，注释也用中文。
 以下是提供的一些信息:
 ${GPT_completeSignature}
-```
+
 ${GPT_simplifyClassText}
-```
+
 ${GPT_methodInfo}
         

@@ -1,6 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -17,8 +18,8 @@ class AddToSessionFileListAction : AnAction("Add to Session File List") {
             return
         }
 
-        val chatCodingService = ChatCodingService.getInstance(project)
-        // 如果没有编辑器上下文，直接添加右键点击的文件
-        chatCodingService.addFileToCurrentSession(virtualFile)
+        ChatUtils.activateToolWindowRun(project) { panel, service ->
+            service.addFileToCurrentSession(virtualFile)
+        }
     }
 }

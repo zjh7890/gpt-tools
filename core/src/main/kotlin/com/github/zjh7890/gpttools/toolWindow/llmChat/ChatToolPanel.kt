@@ -8,12 +8,15 @@ import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
-import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.DocumentAdapter
+import javax.swing.event.DocumentEvent
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.Presentation
@@ -28,6 +31,7 @@ import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.ui.dsl.builder.panel
@@ -37,6 +41,8 @@ import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.flow.Flow
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
@@ -51,6 +57,20 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     val myTitle = JBLabel("Conversation")
     val myList = JPanel(VerticalLayout(JBUI.scale(10)))
     var inputSection: AutoDevInputSection
+    private val addFileButton = ActionButton(
+        object : AnAction() {
+            override fun actionPerformed(e: AnActionEvent) {
+                showFileSelectionPopup()
+            }
+        },
+        Presentation().apply {
+            icon = AllIcons.General.Add  // 使用 Plus 图标
+            text = "Add File (待优化）"
+            description = "Add file to session file list"
+        },
+        "",
+        JBUI.size(16)
+    )
     val withFilesCheckbox = JCheckBox("WithFiles", CommonSettings.getInstance().withFiles)
     val withDirCheckbox = JCheckBox("WithDir", CommonSettings.getInstance().withDir).apply {
         toolTipText = "Send with project directory structure, without files"
@@ -212,7 +232,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                     chatCodingService.handlePromptAndResponse(
                         this@ChatToolPanel,
                         prompt,
-                        trigger == AutoDevInputTrigger.SearchContext,
+                        trigger == AutoDevInputTrigger.ChatThenDiff,
                         editingMessage,
                         llmConfig,
                         trigger
@@ -221,7 +241,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                     chatCodingService.handlePromptAndResponse(
                         this@ChatToolPanel,
                         prompt,
-                        trigger == AutoDevInputTrigger.SearchContext,
+                        trigger == AutoDevInputTrigger.ChatThenDiff,
                         null,
                         llmConfig,
                         trigger
@@ -253,11 +273,9 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
             }
             row { cell(editingPanel).fullWidth() }
             row {
+                cell(addFileButton)
                 cell(withFilesCheckbox)
                 cell(withDirCheckbox)
-                cell(generateDiffCheckbox)
-                cell(toggleFileListButton)
-                // 添加生成 diff 的按钮
                 cell(ActionButton(
                     GenerateDiffAction(project, progressBar, inputSection, chatCodingService),
                     Presentation().apply {
@@ -268,12 +286,30 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                     "",
                     JBUI.size(16)
                 ))
+                // 添加发送并复制按钮
+                cell(ActionButton(
+                    object : AnAction() {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            if (inputSection.text.isBlank()) {
+                                return
+                            }
+                            inputSection.editorListeners.multicaster.onSubmit(inputSection, AutoDevInputTrigger.CopyPrompt)
+                        }
+                    },
+                    Presentation().apply {
+                        icon = AllIcons.Actions.Redo
+                        text = "Send and copy prompt"
+                        description = "Send and copy prompt to clipboard"
+                    },
+                    "",
+                    JBUI.size(16)
+                ))
                 cell(ActionButton(
                     ApplyCopyAction(project, progressBar, inputSection, chatCodingService),
                     Presentation().apply {
                         icon = GptToolsIcon.ApplyCopyIcon
                         text = "Apply copy content"
-                        description = "Apply copy content" 
+                        description = "Apply copy content"
                     },
                     "",
                     JBUI.size(16)
@@ -343,6 +379,84 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         fileListPanel.repaint()
     }
 
+    private fun showFileSelectionPopup() {
+        val textField = JTextField()
+        val listModel = DefaultListModel<VirtualFile>()
+        val fileList = JBList(listModel)
+        fileList.selectionMode = ListSelectionModel.SINGLE_SELECTION
+
+        // 获取项目中的所有文件
+        val allFiles = ArrayList<VirtualFile>()
+        VfsUtilCore.iterateChildrenRecursively(
+            project.baseDir,
+            { true },
+            { fileOrDir ->
+                if (!fileOrDir.isDirectory) {
+                    allFiles.add(fileOrDir)
+                }
+                true
+            }
+        )
+
+        // 设置筛选功能
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) {
+                val filterText = textField.text
+                listModel.clear()
+                val filteredFiles = allFiles.filter { it.name.contains(filterText, true) }
+                filteredFiles.forEach { listModel.addElement(it) }
+            }
+        })
+
+        // 初始化文件列表
+        allFiles.forEach { listModel.addElement(it) }
+
+        val panel = JPanel(BorderLayout())
+        panel.add(textField, BorderLayout.NORTH)
+        panel.add(JBScrollPane(fileList), BorderLayout.CENTER)
+
+        val dialog = DialogBuilder(project)
+            .apply {
+                setTitle("Add File to Session")
+                setCenterPanel(panel)
+                addCancelAction() // 添加这一行来支持 ESC 关闭窗口
+                setOkOperation {
+                    val selectedFile = fileList.selectedValue
+                    if (selectedFile != null) {
+                        chatCodingService.getCurrentSession().fileList.add(selectedFile)
+                        refreshFileList()
+                    }
+                }
+            }
+
+        // 监听双击和 Enter 键事件
+        val addSelectedFile: () -> Unit = {
+            val selectedFile = fileList.selectedValue
+            if (selectedFile != null) {
+                chatCodingService.getCurrentSession().fileList.add(selectedFile)
+                refreshFileList()
+            }
+        }
+
+        fileList.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 2) {
+                    addSelectedFile()
+                }
+            }
+        })
+
+        fileList.addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if (e.keyCode == KeyEvent.VK_ENTER) {
+                    addSelectedFile()
+                }
+            }
+        })
+
+        dialog.show()
+    }
+    
     fun focusInput() {
         val focusManager = IdeFocusManager.getInstance(chatCodingService.project)
         focusManager.doWhenFocusSettlesDown {

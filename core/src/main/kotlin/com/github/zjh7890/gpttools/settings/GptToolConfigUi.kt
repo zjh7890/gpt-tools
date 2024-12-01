@@ -6,9 +6,9 @@ import com.github.zjh7890.gpttools.settings.other.OtherSettingUi
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.settings.template.CodeTemplateApplicationSettings
 import com.github.zjh7890.gpttools.settings.template.CodeTemplateApplicationSettingsService
+import com.github.zjh7890.gpttools.settings.embedTemplate.EmbedTemplateSettingUi
 import com.github.zjh7890.gpttools.settings.template.TemplateSettingUi
 import com.intellij.openapi.application.ApplicationInfo
-import com.intellij.util.PlatformUtils
 import javax.swing.JTabbedPane
 
 class GptToolConfigUi(
@@ -18,12 +18,14 @@ class GptToolConfigUi(
     val panel = JTabbedPane()
     private val llmSettingUi = LLMSettingUi()
     private val templateSettingUi = TemplateSettingUi(templateSettings, gptToolsConfigurable)
+    private val embedTemplateUi = EmbedTemplateSettingUi()
     private val otherSettingUi = OtherSettingUi()
 
     init {
         panel.addTab("LLM Settings", llmSettingUi.component)
         panel.addTab("Template Prompt", templateSettingUi.panel)
-       if (ApplicationInfo.getInstance().versionName.contains("IDEA")) {
+        panel.addTab("Embed Template", embedTemplateUi.panel)
+        if (ApplicationInfo.getInstance().versionName.contains("IDEA")) {
             panel.addTab("Others", otherSettingUi.component)
         }
     }
@@ -33,7 +35,8 @@ class GptToolConfigUi(
                    otherSetting: OtherSettingsState): Boolean {
         return llmSettingUi.isModified(llmSetting) || 
                templateSettingUi.isModified(templateSetting) ||
-               otherSettingUi.isModified(otherSetting)
+               otherSettingUi.isModified(otherSetting) ||
+               embedTemplateUi.isModified()
     }
 
     fun resetFrom(templateSetting: CodeTemplateApplicationSettings, 
@@ -42,6 +45,7 @@ class GptToolConfigUi(
         llmSettingUi.reset(llmSetting)
         templateSettingUi.resetFrom(templateSetting)
         otherSettingUi.reset(otherSetting)
+        embedTemplateUi.resetFrom()
     }
 
     fun applyTo(templateSetting: CodeTemplateApplicationSettings, 
@@ -50,5 +54,6 @@ class GptToolConfigUi(
         llmSettingUi.apply(llmSetting)
         templateSettingUi.applyTo(templateSetting)
         otherSettingUi.apply(otherSetting)
+        embedTemplateUi.applyTo()
     }
 }

@@ -25,6 +25,8 @@ plugins {
     id("org.jetbrains.grammarkit") version "2022.3.2.2"
 }
 
+var lang = extra.properties["lang"] ?: "java"
+
 fun prop(name: String): String =
     extra.properties[name] as? String ?: error("Property `$name` is not defined in gradle.properties")
 
@@ -51,6 +53,8 @@ var cppPlugins: List<String> = listOf(
     "org.jetbrains.plugins.clion.test.google",
     "org.jetbrains.plugins.clion.test.catch"
 )
+
+val javaPlugins = listOf("com.intellij.java", "org.jetbrains.kotlin")
 
 val ideaPlugins =
     listOf(
@@ -85,9 +89,41 @@ repositories {
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
     intellijPlatform {
+        val pluginList: MutableList<String> = mutableListOf("Git4Idea")
+        when (lang) {
+            "idea" -> {
+                pluginList += javaPlugins
+            }
+
+            "scala" -> {
+                pluginList += javaPlugins + scalaPlugin
+            }
+
+            "python" -> {
+                pluginList += pycharmPlugins
+            }
+
+            "go" -> {
+                pluginList += listOf("org.jetbrains.plugins.go")
+            }
+
+            "cpp" -> {
+                pluginList += clionPlugins
+            }
+
+            "rust" -> {
+                pluginList += rustPlugins
+            }
+        }
+        intellijPlugins(pluginList)
 //        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
-        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+//        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
         intellijIde(prop("ideaVersion"))
+
+//        goland("2024.1", useInstaller = true)
+//        create(IntelliJPlatformType.GoLand, "2024.2")
+
+
         jetbrainsRuntime()
         instrumentationTools()
         testFramework(TestFrameworkType.Platform)
@@ -162,17 +198,23 @@ intellijPlatform {
         password = environment("PRIVATE_KEY_PASSWORD")
     }
 
-    pluginVerification {
-        ides {
-            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2024.2")
-            recommended()
-            select {
-                sinceBuild = properties("pluginSinceBuild")
-                untilBuild = properties("pluginUntilBuild")
-            }
-        }
-    }
+//    pluginVerification {
+//        ides {
+//            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2024.2")
+//            recommended()
+//            select {
+//                sinceBuild = properties("pluginSinceBuild")
+//                untilBuild = properties("pluginUntilBuild")
+//            }
+//        }
+//    }
 }
+//
+//intellijPlatformTesting {
+//    runIde.register("runWhat") {
+//
+//    }
+//}
 
 
 configure(
@@ -206,31 +248,31 @@ configure(
     }
 
     sourceSets {
-            main {
+        main {
 //                java.srcDirs("src/gen")
 //                if (platformVersion == 241) {
 //                    resources.srcDirs("src/233/main/resources")
 //                }
-                resources.srcDirs("src/$platformVersion/main/resources")
-            }
-            test {
-                resources.srcDirs("src/$platformVersion/test/resources")
-            }
+            resources.srcDirs("src/$platformVersion/main/resources")
         }
+        test {
+            resources.srcDirs("src/$platformVersion/test/resources")
+        }
+    }
 
     kotlin {
-            sourceSets {
-                main {
-                    // share 233 code to 241
-                    if (platformVersion == 241) {
-                        kotlin.srcDirs("src/233/main/kotlin")
-                    }
-                    kotlin.srcDirs("src/$platformVersion/main/kotlin")
+        sourceSets {
+            main {
+                // share 233 code to 241
+                if (platformVersion == 241) {
+                    kotlin.srcDirs("src/233/main/kotlin")
                 }
-                test {
-                    kotlin.srcDirs("src/$platformVersion/test/kotlin")
-                }
+                kotlin.srcDirs("src/$platformVersion/main/kotlin")
             }
+            test {
+                kotlin.srcDirs("src/$platformVersion/test/kotlin")
+            }
+        }
     }
 
     configure<JavaPluginExtension> {
@@ -266,7 +308,8 @@ project(":core") {
 
 
         intellijPlatform {
-            bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+            intellijPlugins(javaPlugins)
+//            bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
             intellijIde(prop("ideaVersion"))
             // 添加 instrumentationTools 依赖
             instrumentationTools()
