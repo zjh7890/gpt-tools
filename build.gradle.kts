@@ -297,7 +297,7 @@ configure(
 
 project(":core") {
     dependencies(fun DependencyHandlerScope.() {
-        implementation("com.azure:azure-ai-openai:1.0.0-beta.11")
+        implementation("com.azure:azure-ai-openai:1.0.0-beta.13")
         implementation("com.squareup.okhttp3:okhttp:4.4.1")
         implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
         implementation("io.reactivex.rxjava3:rxjava:3.1.9")
