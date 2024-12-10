@@ -61,16 +61,14 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         this.stopButtonPresentation = stopButtonPresentation
         input = AutoDevInput(project, listOf(), disposable, this)
         sendButton = ActionButton(
-            DumbAwareAction.create {
-                object : DumbAwareAction("") {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        if (input.text.isBlank()) {
-                            return
-                        }
-                        showStopButton()
-                        editorListeners.multicaster.onSubmit(this@AutoDevInputSection, AutoDevInputTrigger.Button)
+            object : DumbAwareAction("") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    if (input.text.isBlank()) {
+                        return
                     }
-                }.actionPerformed(it)
+                    showStopButton()
+                    editorListeners.multicaster.onSubmit(this@AutoDevInputSection, AutoDevInputTrigger.Button)
+                }
             },
             this.sendButtonPresentation,
             "",
@@ -78,12 +76,10 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         )
         
         stopButton = ActionButton(
-            DumbAwareAction.create {
-                object : DumbAwareAction("") {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        editorListeners.multicaster.onStop(this@AutoDevInputSection)
-                    }
-                }.actionPerformed(it)
+            object : DumbAwareAction("") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    editorListeners.multicaster.onStop(this@AutoDevInputSection)
+                }
             },
             this.stopButtonPresentation,
             "",

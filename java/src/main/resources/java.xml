@@ -72,7 +72,7 @@
         </action>
 
         <action id="FindUsagesAcrossProjectsAction"
-                class="com.github.zjh7890.gpttools.actions.FindUsagesAcrossProjectsAction"
+                class="com.github.zjh7890.gpttools.java.action.FindUsagesAcrossProjectsAction"
                 text="微服务 -Find Usages"
                 description="Find Usages in other projects"
                 icon="/icons/icon_16px.svg">
@@ -80,7 +80,7 @@
         </action>
 
         <action id="FindImplAcrossProjectsAction"
-                class="com.github.zjh7890.gpttools.actions.FindImplAcrossProjectsAction"
+                class="com.github.zjh7890.gpttools.java.action.FindImplAcrossProjectsAction"
                 text="微服务 -Find Impl"
                 description="Find Impl in other projects"
                 icon="/icons/icon_16px.svg">
@@ -88,7 +88,7 @@
         </action>
 
         <action id="PsiDependencyByMethodAction"
-                class="com.github.zjh7890.gpttools.actions.PsiDependencyByMethodAction"
+                class="com.github.zjh7890.gpttools.java.action.PsiDependencyByMethodAction"
                 text="PsiDependencyByMethodAction"
                 description="PsiDependencyByMethodAction"
                 icon="/icons/icon_16px.svg">
@@ -96,7 +96,7 @@
         </action>
 
         <action id="CopyMethodSingleFile"
-                class="com.github.zjh7890.gpttools.actions.CopyMethodSingleFile"
+                class="com.github.zjh7890.gpttools.java.action.CopyMethodSingleFile"
                 text="CopyMethodSingleFile"
                 description="CopyMethodSingleFile"
                 icon="/icons/icon_16px.svg">
@@ -104,7 +104,7 @@
         </action>
 
         <action id="AllMethodFile"
-                class="com.github.zjh7890.gpttools.actions.AllMethodFile"
+                class="com.github.zjh7890.gpttools.java.action.AllMethodFile"
                 text="AllMethodFile"
                 description="AllMethodFile"
                 icon="/icons/icon_16px.svg">

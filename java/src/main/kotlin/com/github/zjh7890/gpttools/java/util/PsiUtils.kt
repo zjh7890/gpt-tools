@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.utils
+package com.github.zjh7890.gpttools.java.util
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager

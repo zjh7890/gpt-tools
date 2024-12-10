@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.toolWindow.treePanel
+package com.github.zjh7890.gpttools.java.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.intellij.icons.AllIcons
@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.ContentFactory
 
 class GptToolsContextToolWindowFactory : ToolWindowFactory {
@@ -33,7 +34,6 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        // New Action to copy files
         val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
             override fun actionPerformed(e: AnActionEvent) {
                 panel.copyAllFiles(e.project!!)
@@ -44,7 +44,20 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        toolWindow.setTitleActions(listOf(copyFilesAction, removeAction))
+        val rerunAction = object : AnAction("Rerun", "Rerun dependency analysis", AllIcons.Actions.Refresh) {
+            override fun actionPerformed(e: AnActionEvent) {
+                val panel = e.project?.let {
+                    val toolWindow = ToolWindowManager.getInstance(it).getToolWindow("GptFileTree")
+                    toolWindow?.contentManager?.getContent(0)?.component as? FileTreeListPanel
+                }
+                panel?.rerunAnalysis(e.project!!)
+            }
+
+            override fun getActionUpdateThread(): ActionUpdateThread {
+                return ActionUpdateThread.BGT
+            }
+        }
+
+        toolWindow.setTitleActions(listOf(copyFilesAction, removeAction, rerunAction))
     }
 }
-

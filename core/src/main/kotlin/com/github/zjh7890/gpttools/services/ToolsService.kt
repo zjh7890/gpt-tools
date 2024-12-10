@@ -3,7 +3,6 @@ package com.github.zjh7890.gpttools.services
 import com.github.zjh7890.gpttools.utils.Desc
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.github.zjh7890.gpttools.utils.FileUtil
-import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -110,17 +109,18 @@ class ToolsService(val project: Project) {
             return "未找到匹配的方法: $methodName($parametersSignature)"
         }
 
-        val method = matchingMethods.get(0)
-        val classes = findClassesFromMethod(method, project)
-        val classInfos =
-            classes.stream().map { x -> x.className }.collect(Collectors.toList()).joinToString("\n")
-        val GPT_methodInfo = classes.joinToString("\n")
-        val GPT_methodName = method.name
-        return """
-${GPT_methodName}
-参数及返回值信息:
-${GPT_methodInfo}
-        """.trimIndent()
+//        val method = matchingMethods.get(0)
+//        val classes = findClassesFromMethod(method, project)
+//        val classInfos =
+//            classes.stream().map { x -> x.className }.collect(Collectors.toList()).joinToString("\n")
+//        val GPT_methodInfo = classes.joinToString("\n")
+//        val GPT_methodName = method.name
+//        return """
+//${GPT_methodName}
+//参数及返回值信息:
+//${GPT_methodInfo}
+//        """.trimIndent()
+        return ""
     }
 
     @Desc("读取文件列表内容")

@@ -116,12 +116,17 @@ dependencies {
             }
         }
         intellijPlugins(pluginList)
+//        bundledPlugins("com.intellij.modules.json")
 //        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
 //        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
 
         if (lang == "go") {
             goland("2024.1", useInstaller = true)
-        } else {
+        }
+        else if (lang == "cpp") {
+            clion("2024.1", useInstaller = true)
+        }
+        else {
             intellijIde(prop("ideaVersion"))
         }
 
@@ -168,8 +173,8 @@ intellijPlatform {
         version = properties("pluginVersion")
 
         ideaVersion {
-            sinceBuild = properties("pluginSinceBuild")
-            untilBuild = properties("pluginUntilBuild")
+            sinceBuild = prop("pluginSinceBuild")
+            untilBuild = prop("pluginUntilBuild")
         }
 
         // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
@@ -214,10 +219,10 @@ intellijPlatform {
         ides {
             val (type, version) = prop("ideaVersion").toTypeWithVersion()
             ide(type, version)
-            recommended()
+//            recommended()
             select {
-                sinceBuild = properties("pluginSinceBuild")
-                untilBuild = properties("pluginUntilBuild")
+                sinceBuild = prop("pluginSinceBuild")
+                untilBuild = prop("pluginUntilBuild")
             }
         }
     }
@@ -258,6 +263,9 @@ configure(
 
     dependencies {
         implementation("com.nfeld.jsonpathkt:jsonpathkt:2.0.1")
+        intellijPlatform {
+//            bundledPlugins("com.intellij.modules.json")
+        }
     }
 
     sourceSets {
@@ -324,6 +332,7 @@ project(":core") {
             intellijPlugins(javaPlugins)
 //            bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
             intellijIde(prop("ideaVersion"))
+//            bundledPlugins("com.intellij.modules.json")
             // 添加 instrumentationTools 依赖
             instrumentationTools()
         }

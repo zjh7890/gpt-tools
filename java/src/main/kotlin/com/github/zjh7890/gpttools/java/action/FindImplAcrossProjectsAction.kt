@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.actions
+package com.github.zjh7890.gpttools.java.action
 
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.intellij.lang.java.JavaLanguage

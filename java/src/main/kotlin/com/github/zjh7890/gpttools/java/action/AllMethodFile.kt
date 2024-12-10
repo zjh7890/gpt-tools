@@ -1,10 +1,10 @@
-package com.github.zjh7890.gpttools.actions
+package com.github.zjh7890.gpttools.java.action
 
 import com.baomidou.plugin.idea.mybatisx.dom.model.IdDomElement
 import com.baomidou.plugin.idea.mybatisx.service.JavaService
+import com.github.zjh7890.gpttools.java.util.PsiUtils
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
-import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -18,11 +18,11 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.CommonProcessors
 
 
-class PsiDependencyByMethodAction : AnAction() {
+class AllMethodFile : AnAction() {
     override fun update(e: AnActionEvent) {
         super.update(e)
         val settings = OtherSettingsState.getInstance()
-        e.presentation.isVisible = settings.showPsiDependencyByMethodAction
+        e.presentation.isVisible = settings.showAllMethodFile
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -42,14 +42,16 @@ class PsiDependencyByMethodAction : AnAction() {
         val dependency = findMethodDependency(method, project)
 
 //        val psiFields = findDubboReferenceFields(dependency)
-        val callsLinks = generateRpcCallsLinksFromTree(dependency.methodTree)
-        val message = callsLinks.joinToString("\n")
+//        val callsLinks = generateRpcCallsLinksFromTree(dependency.methodTree)
+//        val message = callsLinks.joinToString("\n")
+
+        val joinToString = dependency.psiElementList.filterIsInstance<PsiMethod>()
+            .map { "${it.containingClass?.name}\n```\n${it.text}\n```\n" }
+            .joinToString("\n")
 
 //        val element = simplyFileByDependency(method.containingFile!!, dependency, project)
 //        val message = element.text
-        ClipboardUtils.copyToClipboard(message)
-        println(message)
-        println(message)
+        ClipboardUtils.copyToClipboard(joinToString)
     }
 
     fun generateRpcCallsLinksFromTree(node: NodeInfo): List<String> {
@@ -519,56 +521,3 @@ class PsiDependencyByMethodAction : AnAction() {
         return ActionUpdateThread.BGT
     }
 }
-
-data class PsiDependency(
-    // 记录 psiFile 的遍历合集，广度遍历过程中加入，需要去重
-    val psiFileList: MutableList<PsiFile> = mutableListOf(),
-    // 记录 psiClass 的遍历合集，广度遍历过程中加入，需要去重
-    val psiClassList: MutableList<PsiClass> = mutableListOf(),
-    // 记录 psiElement 的遍历合集，可以是 method, field, 或者是 data class, data class 定义为只有 getter setter 的类，广度遍历过程中加入，需要去重
-    val psiElementList: MutableList<PsiElement> = mutableListOf(),
-    // 记录 element 依赖的节点，可以是 method, field, 或者是 data class
-    val elementDependsList: MutableMap<PsiElement, MutableList<ElementDependInfo>> = mutableMapOf(),
-    // 记录依赖 element 的节点，对方可以是 method, field, 或者是 data class
-    val elementIncomingList: MutableMap<PsiElement, MutableList<ElementDependInfo>> = mutableMapOf(),
-
-    val methodTree: NodeInfo
-)
-
-data class ElementDependInfo (
-    val element: PsiElement,
-    val referenceElement: PsiElement
-)
-
-data class DependencyNode(
-    val element: PsiElement,
-    val children: MutableList<DependencyNode> = mutableListOf()
-)
-
-data class NodeInfo(
-    val element: PsiElement,
-
-    var hasRpc: Boolean = false,
-    var hasMybatis: Boolean = false,
-    var hasKafka: Boolean = false,
-    var hasRedis: Boolean = false,
-    var hasAries: Boolean = false,
-    var hasLog: Boolean = false,
-
-    var childHasRpc: Boolean = false,
-    var childHasMybatis: Boolean = false,
-    var childHasKafka: Boolean = false,
-    var childHasRedis: Boolean = false,
-    var childHasAries: Boolean = false,
-    var childHasLog: Boolean = false,
-
-    val rpcCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-    val mybatisCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-    val kafkaCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-    val redisCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-    val ariesCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-    val logCalls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-    val calls: MutableList<PsiMethodCallExpression> = mutableListOf(),
-
-    val childrenNodes : MutableList<NodeInfo> = mutableListOf()
-)

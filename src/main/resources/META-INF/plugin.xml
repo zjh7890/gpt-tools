@@ -4,7 +4,7 @@
     <name>gpt-tools</name>
     <vendor>zjh7890</vendor>
 
-    <!-- Include gpt-tools.xml -->
+    <!-- Include gpt-t、ools.xml -->
     <xi:include href="/META-INF/gpt-tools.xml" xpointer="xpointer(/idea-plugin/*)"/>
 
     <content>

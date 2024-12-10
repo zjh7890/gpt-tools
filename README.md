@@ -11,16 +11,16 @@
 
 
 <!-- Plugin description -->
+## An AI plugin that turns your thoughts into code instantly.
+This plugin offers two main features:
+1. Chat (Interact with AI to implement logic, perform Code Review, similar to Aider, Cursor)
+2. Template prompts (Used for generating boilerplate code, I frequently use it to generate Apollo and RPC classes)
+
 ## 一个所想即所得的 AI 插件。
 插件有两大功能：
 1. chat（通过对话让 AI 实现逻辑，Code Review，类似 Aider, Cursor）
 2. 模板 prompt（用于生成样板代码，我常用于生成 Apollo 和 RPC 类）
 
-
-## An AI plugin that turns your thoughts into code instantly.
-This plugin offers two main features:
-1. Chat (Interact with AI to implement logic, perform Code Review, similar to Aider, Cursor)
-2. Template prompts (Used for generating boilerplate code, I frequently use it to generate Apollo and RPC classes)
 <!-- Plugin description end -->
 
 ## Installation

@@ -3,14 +3,13 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
-    <depends optional="true">com.intellij.modules.java</depends>
+<!--    <depends>com.intellij.modules.json</depends>-->
+<!--    <depends optional="true">com.intellij.modules.java</depends>-->
 <!--    <depends optional="true">com.intellij.modules.python</depends>-->
 <!--    <depends>com.intellij.modules.go</depends>-->
 <!--    <depends>com.intellij.json</depends>-->
 <!--    <depends>com.intellij.modules.vcs</depends>-->
     <depends>Git4Idea</depends>
-
-    <description>gpt-tools</description>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
@@ -61,7 +60,7 @@
 
         <toolWindow id="GptFileTree"
                     anchor="right"
-                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"
+                    factoryClass="com.github.zjh7890.gpttools.java.toolWindow.treePanel.GptToolsContextToolWindowFactory"
                     canCloseContent="false"
                     canWorkInDumbMode="false"
                     icon="/icons/icon_dark_16px.svg">
@@ -115,7 +114,7 @@
         </action>
 
         <action id="AddFileAction"
-                class="com.github.zjh7890.gpttools.actions.AddFileAction"
+                class="com.github.zjh7890.gpttools.java.action.AddFileAction"
                 text="Add File to ToolWindow"
                 description="Adds the selected file to the ToolWindow."
                 icon="/icons/icon_16px.svg">
@@ -131,7 +130,7 @@
         </action>
 
         <action id="AddRecursiveFileAction"
-                class="com.github.zjh7890.gpttools.actions.AddRecursiveFileAction"
+                class="com.github.zjh7890.gpttools.java.action.AddRecursiveFileAction"
                 text="Recursively Add Files to ToolWindow"
                 description="Recursively adds files to the ToolWindow based on dependencies."
                 icon="/icons/icon_16px.svg">

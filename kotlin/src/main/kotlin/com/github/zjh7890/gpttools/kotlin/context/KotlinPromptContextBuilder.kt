@@ -2,7 +2,6 @@ package com.github.zjh7890.gpttools.kotlin.context
 
 import com.github.zjh7890.gpttools.context.builder.PromptContextBuilder
 import com.github.zjh7890.gpttools.context.builder.PromptContext
-import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement

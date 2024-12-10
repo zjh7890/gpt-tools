@@ -1,10 +1,10 @@
-package com.github.zjh7890.gpttools.actions
+package com.github.zjh7890.gpttools.java.action
 
 import com.baomidou.plugin.idea.mybatisx.dom.model.IdDomElement
 import com.baomidou.plugin.idea.mybatisx.service.JavaService
+import com.github.zjh7890.gpttools.java.util.PsiUtils
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
-import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent

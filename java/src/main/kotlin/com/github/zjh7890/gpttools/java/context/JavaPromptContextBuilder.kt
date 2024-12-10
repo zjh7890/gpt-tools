@@ -2,8 +2,8 @@ package com.github.zjh7890.gpttools.java.context
 
 import com.github.zjh7890.gpttools.context.builder.PromptContextBuilder
 import com.github.zjh7890.gpttools.context.builder.PromptContext
-import com.github.zjh7890.gpttools.utils.PsiUtils.findClassesFromMethod
-import com.github.zjh7890.gpttools.utils.PsiUtils.generateSignature
+import com.github.zjh7890.gpttools.java.util.PsiUtils.findClassesFromMethod
+import com.github.zjh7890.gpttools.java.util.PsiUtils.generateSignature
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
