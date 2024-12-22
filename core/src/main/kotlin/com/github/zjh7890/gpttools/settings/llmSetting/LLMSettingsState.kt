@@ -47,7 +47,7 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
                     name = "claude-3.5-sonnet - Trial",
                     temperature = 0.0,
                     apiHost = "https://api.zyai.online/v1/chat/completions",
-                    apiToken = "sk-tOedSsr00qxzCyUUF672C2E0850f4483Bd82A1625bC53379",
+                    apiToken = "",
                     modelName = "claude-3-5-sonnet-20241022",
                     azureEndpoint = "https://{deploymentName}.openai.azure.com",
                     azureApiKey = "",
