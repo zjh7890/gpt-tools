@@ -20,7 +20,7 @@ class AddRecursiveFileAction : AnAction("Analyzer - analyze file", "Add the curr
             toolWindow?.show {
                 ApplicationManager.getApplication().executeOnPooledThread {
                     val fileTreeListPanel = toolWindow.contentManager.getContent(0)?.component as? FileTreeListPanel
-                    fileTreeListPanel?.addFileRecursively(virtualFile, project)
+//                    fileTreeListPanel?.addFileRecursively(virtualFile, project)
                 }
             }
         }

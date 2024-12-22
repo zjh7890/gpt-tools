@@ -1,6 +1,6 @@
 package com.github.zjh7890.gpttools.settings.llmSetting
 
-import com.github.zjh7890.gpttools.ShireCoroutineScope
+import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.components.LeftRightComponent
 import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
@@ -120,7 +120,7 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
         listModel.clear()
 
         // 使用副本填充列表模型
-        settings.settings.forEach { setting ->
+        settings.getFillSettings().forEach { setting ->
             listModel.addElement(setting.copy())
         }
 
@@ -133,10 +133,10 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
     }
 
     override fun isModified(settings: LLMSettingsState): Boolean {
-        if (listModel.size != settings.settings.size) return true
+        if (listModel.size != settings.getFillSettings().size) return true
         for (i in 0 until listModel.size) {
             val current = listModel.getElementAt(i)
-            val original = settings.settings[i]
+            val original = settings.getFillSettings()[i]
             if (current.name != original.name ||
                 current.temperature != original.temperature ||
                 current.apiHost != original.apiHost ||
@@ -589,7 +589,7 @@ class ShireConfigItemComponent(
         testResultField.text = "Testing connection..."
 
         // 使用 CoroutineExceptionHandler 处理异常，自动忽略 CancelledException
-        testJob = ShireCoroutineScope.scope(project).launch(CoroutineExceptionHandler { _, throwable ->
+        testJob = LLMCoroutineScope.scope(project).launch(CoroutineExceptionHandler { _, throwable ->
             testResultField.text = throwable.message ?: "Unknown error"
         }) {
             val llmConfig = LlmConfig(

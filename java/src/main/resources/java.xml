@@ -5,6 +5,26 @@
         <plugin id="org.jetbrains.idea.maven"/>
     </dependencies>
 
+    <extensions defaultExtensionNs="com.intellij">
+<!--        &lt;!&ndash; mapper.xml文件属性提示 &ndash;&gt;-->
+<!--        <dom.fileMetaData id="baomidou.MapperDescription"-->
+<!--                          rootTagName="mapper"-->
+<!--                          implementation="mybatisx.dom.description.MapperDescription"/>-->
+<!--        &lt;!&ndash; mybatis配置文件属性提示 &ndash;&gt;-->
+<!--        <dom.fileMetaData id="baomidou.ConfigurationDescription"-->
+<!--                          rootTagName="configuration"-->
+<!--                          implementation="mybatisx.dom.description.ConfigurationDescription"/>-->
+
+
+        <toolWindow id="GptFileTree"
+                    anchor="right"
+                    factoryClass="com.github.zjh7890.gpttools.java.toolWindow.treePanel.GptToolsContextToolWindowFactory"
+                    canCloseContent="false"
+                    canWorkInDumbMode="false"
+                    icon="/icons/icon_dark_16px.svg">
+        </toolWindow>
+    </extensions>
+
     <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
         <classContextBuilder language="JAVA"
                             implementationClass="com.github.zjh7890.gpttools.java.context.JavaClassContextBuilder"/>
@@ -108,6 +128,21 @@
                 text="AllMethodFile"
                 description="AllMethodFile"
                 icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
+        <action id="AddClassAction"
+                class="com.github.zjh7890.gpttools.java.action.AddClassAction"
+                text="Add File to ToolWindow"
+                description="Adds the selected file to the ToolWindow."
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
+        <action id="GptTools.AddMethodAction"
+                class="com.github.zjh7890.gpttools.java.action.AddMethodAction"
+                text="Analyzer - add method"
+                description="Add the current method to root classes and show the panel">
             <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
     </actions>

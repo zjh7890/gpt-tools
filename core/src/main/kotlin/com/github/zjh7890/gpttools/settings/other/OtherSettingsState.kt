@@ -13,7 +13,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil
     storages = [Storage("GptToolsOtherSettings.xml")]
 )
 class OtherSettingsState : PersistentStateComponent<OtherSettingsState> {
-    var showAddFileAction: Boolean = false
+    var showAddClassAction: Boolean = false
     var showAddRecursiveFileAction: Boolean = false
     var showFindUsagesAcrossProjectsAction: Boolean = false
     var showFindImplAcrossProjectsAction: Boolean = false
@@ -23,6 +23,7 @@ class OtherSettingsState : PersistentStateComponent<OtherSettingsState> {
     var showAllMethodFile: Boolean = false
     var showOpenChatLogDirectoryAction: Boolean = false
     var showGptToolsContextWindow: Boolean = false
+    var dependencyPatterns: String = ""  // 默认值
 
     @Synchronized
     override fun getState(): OtherSettingsState = this

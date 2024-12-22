@@ -8,7 +8,7 @@
     <xi:include href="/META-INF/gpt-tools.xml" xpointer="xpointer(/idea-plugin/*)"/>
 
     <content>
-        <module name="cpp"/>
+<!--        <module name="cpp"/>-->
         <module name="goland"/>
         <module name="java"/>
         <module name="javascript"/>

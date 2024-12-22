@@ -10,12 +10,11 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 
 @Service(Service.Level.APP)
 @State(
-    name = "com.github.zjh7890.gpttools.settings.llmSetting.ShireSettingsState",
-    storages = [Storage("ShireSettings.xml")]
+    name = "com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState",
+    storages = [Storage("LLMSettingsState.xml")]
 )
 class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
     var settings: MutableList<LLMSetting> = mutableListOf(
-        LLMSetting()
     )
 
     // 添加监听器列表
@@ -40,9 +39,51 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
     @Synchronized
     override fun getState(): LLMSettingsState = this
 
+    fun getFillSettings(): List<LLMSetting> {
+        // 如果配置列表为空，添加默认配置
+        if (settings.isEmpty()) {
+            settings.add(
+                LLMSetting(
+                    name = "claude-3.5-sonnet - Trial",
+                    temperature = 0.0,
+                    apiHost = "https://api.zyai.online/v1/chat/completions",
+                    apiToken = "sk-tOedSsr00qxzCyUUF672C2E0850f4483Bd82A1625bC53379",
+                    modelName = "claude-3-5-sonnet-20241022",
+                    azureEndpoint = "https://{deploymentName}.openai.azure.com",
+                    azureApiKey = "",
+                    azureModel = "",
+                    stream = true,
+                    isDefault = true,
+                    provider = Provider.OpenAILike
+                )
+            )
+        }
+        return settings
+    }
+
     @Synchronized
     override fun loadState(state: LLMSettingsState) {
         XmlSerializerUtil.copyBean(state, this)
+        
+        // 如果配置列表为空，添加默认配置
+        if (settings.isEmpty()) {
+            settings.add(
+                LLMSetting(
+                    name = "claude-3.5-sonnet - Trial",
+                    temperature = 0.0,
+                    apiHost = "https://api.zyai.online/v1/chat/completions",
+                    apiToken = "sk-tOedSsr00qxzCyUUF672C2E0850f4483Bd82A1625bC53379",
+                    modelName = "claude-3-5-sonnet-20241022",
+                    azureEndpoint = "https://{deploymentName}.openai.azure.com",
+                    azureApiKey = "",
+                    azureModel = "",
+                    stream = true,
+                    isDefault = true,
+                    provider = Provider.OpenAILike
+                )
+            )
+        }
+        
         // 兼容历史配置
         settings.forEach { setting ->
             if (setting.name.isNullOrEmpty()) {

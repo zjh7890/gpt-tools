@@ -45,12 +45,33 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
         }
 
         val rerunAction = object : AnAction("Rerun", "Rerun dependency analysis", AllIcons.Actions.Refresh) {
+            private var isAnalyzing = false
+            
             override fun actionPerformed(e: AnActionEvent) {
-                val panel = e.project?.let {
-                    val toolWindow = ToolWindowManager.getInstance(it).getToolWindow("GptFileTree")
-                    toolWindow?.contentManager?.getContent(0)?.component as? FileTreeListPanel
+                if (isAnalyzing) {
+                    // TODO: 实现终止分析的逻辑
+                    isAnalyzing = false
+                    e.presentation.icon = AllIcons.Actions.Refresh
+                    e.presentation.text = "Rerun"
+                    e.presentation.description = "Rerun dependency analysis"
+                } else {
+                    isAnalyzing = true
+                    e.presentation.icon = AllIcons.Actions.Suspend
+                    e.presentation.text = "Stop"
+                    e.presentation.description = "Stop dependency analysis"
+                    
+                    val panel = e.project?.let {
+                        val toolWindow = ToolWindowManager.getInstance(it).getToolWindow("GptFileTree")
+                        toolWindow?.contentManager?.getContent(0)?.component as? FileTreeListPanel
+                    }
+                    panel?.runAnalysis(e.project!!) {
+                        // 分析完成的回调
+                        isAnalyzing = false
+                        e.presentation.icon = AllIcons.Actions.Refresh
+                        e.presentation.text = "Rerun"
+                        e.presentation.description = "Rerun dependency analysis"
+                    }
                 }
-                panel?.rerunAnalysis(e.project!!)
             }
 
             override fun getActionUpdateThread(): ActionUpdateThread {
@@ -58,6 +79,34 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        toolWindow.setTitleActions(listOf(copyFilesAction, removeAction, rerunAction))
+        val expandAction = object : AnAction("Expand Selected", "Expand selected nodes recursively", AllIcons.Actions.Expandall) {
+            override fun actionPerformed(e: AnActionEvent) {
+                panel.expandSelectedNodes()
+            }
+
+            override fun update(e: AnActionEvent) {
+                e.presentation.isEnabled = panel.tree.selectionPath != null
+            }
+
+            override fun getActionUpdateThread(): ActionUpdateThread {
+                return ActionUpdateThread.BGT
+            }
+        }
+
+        val collapseAction = object : AnAction("Collapse Selected", "Collapse selected nodes recursively", AllIcons.Actions.Collapseall) {
+            override fun actionPerformed(e: AnActionEvent) {
+                panel.collapseSelectedNodes()
+            }
+
+            override fun update(e: AnActionEvent) {
+                e.presentation.isEnabled = panel.tree.selectionPath != null
+            }
+
+            override fun getActionUpdateThread(): ActionUpdateThread {
+                return ActionUpdateThread.BGT
+            }
+        }
+
+        toolWindow.setTitleActions(listOf(copyFilesAction, removeAction, expandAction, collapseAction, rerunAction))
     }
 }

@@ -1,7 +1,7 @@
 package com.github.zjh7890.gpttools.java.action
 
-import com.baomidou.plugin.idea.mybatisx.dom.model.IdDomElement
-import com.baomidou.plugin.idea.mybatisx.service.JavaService
+import mybatisx.dom.model.IdDomElement
+import mybatisx.service.JavaService
 import com.github.zjh7890.gpttools.java.util.PsiUtils
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
@@ -323,169 +323,6 @@ class AllMethodFile : AnAction() {
         }
     }
 
-    private fun isLogMethodCall(methodCall: PsiMethodCallExpression): Boolean {
-        // 获取调用者表达式
-        val qualifierExpression = methodCall.methodExpression.qualifierExpression
-
-        // 确保调用者表达式存在并且是一个字段引用
-        if (qualifierExpression is PsiReferenceExpression) {
-            // 解析引用到的元素
-            val resolvedElement = qualifierExpression.resolve()
-
-            // 检查解析到的元素是否是字段
-            if (resolvedElement is PsiField) {
-                // 获取字段的类型
-                val fieldType = resolvedElement.type
-                val fieldTypeCanonicalText = fieldType.canonicalText
-
-                // 检查字段类型是否为常见的 Logger 类
-                if (fieldTypeCanonicalText == "org.slf4j.Logger" ||
-                    fieldTypeCanonicalText == "org.apache.logging.log4j.Logger" ||
-                    fieldTypeCanonicalText == "org.apache.log4j.Logger" ||
-                    fieldTypeCanonicalText == "java.util.logging.Logger" ||
-                    fieldTypeCanonicalText == "ch.qos.logback.classic.Logger") {
-                    return true
-                }
-            }
-        }
-
-        // 如果不是字段引用或者类型不匹配，返回 false
-        return false
-    }
-
-    private fun isAriesMethodCall(methodCall: PsiMethodCallExpression): Boolean {
-        // 获取调用者表达式
-        val qualifierExpression = methodCall.methodExpression.qualifierExpression
-
-        // 确保调用者表达式存在并且是一个字段引用
-        if (qualifierExpression is PsiReferenceExpression) {
-            // 解析引用到的元素
-            val resolvedElement = qualifierExpression.resolve()
-
-            // 检查解析到的元素是否是字段
-            if (resolvedElement is PsiField) {
-                // 获取字段的类型
-                val fieldType = resolvedElement.type
-                val fieldTypeCanonicalText = fieldType.canonicalText
-
-                // 检查字段类型是否为 AriesTemplate
-                if (fieldTypeCanonicalText == "com.yupaopao.framework.spring.boot.aries.AriesTemplate") {
-                    return true
-                }
-            }
-        }
-
-        // 如果不是字段引用或者类型不匹配，返回 false
-        return false
-    }
-
-    private fun isRedisMethodCall(methodCall: PsiMethodCallExpression): Boolean {
-        // 获取调用者表达式
-        val qualifierExpression = methodCall.methodExpression.qualifierExpression
-
-        // 确保调用者表达式存在并且是一个字段引用
-        if (qualifierExpression is PsiReferenceExpression) {
-            // 解析引用到的元素
-            val resolvedElement = qualifierExpression.resolve()
-
-            // 检查解析到的元素是否是字段
-            if (resolvedElement is PsiField) {
-                // 获取字段的类型
-                val fieldType = resolvedElement.type
-                val fieldTypeCanonicalText = fieldType.canonicalText
-
-                // 检查字段类型是否为 RedisService、RedisTemplate 或 RedissonClient
-                if (fieldTypeCanonicalText == "com.yupaopao.framework.spring.boot.redis.RedisService" ||
-                    fieldTypeCanonicalText == "org.springframework.data.redis.core.RedisTemplate<*>" || // 处理泛型情况
-                    fieldTypeCanonicalText.startsWith("org.springframework.data.redis.core.RedisTemplate<") ||
-                    fieldTypeCanonicalText == "org.redisson.api.RedissonClient") { // RedissonClient 类型检查
-                    return true
-                }
-            }
-        }
-
-        // 如果不是字段引用或者类型不匹配，返回 false
-        return false
-    }
-
-    private fun isKafkaMethodCall(methodCall: PsiMethodCallExpression): Boolean {
-        // 获取调用者表达式
-        val qualifierExpression = methodCall.methodExpression.qualifierExpression
-
-        // 确保调用者表达式存在并且是一个字段引用
-        if (qualifierExpression is PsiReferenceExpression) {
-            // 解析引用到的元素
-            val resolvedElement = qualifierExpression.resolve()
-
-            // 检查解析到的元素是否是字段
-            if (resolvedElement is PsiField) {
-                // 获取字段的类型
-                val fieldType = resolvedElement.type
-
-                // 检查字段类型是否为 com.yupaopao.framework.spring.boot.kafka.KafkaProducer
-                if (fieldType.canonicalText == "com.yupaopao.framework.spring.boot.kafka.KafkaProducer") {
-                    return true
-                }
-            }
-        }
-
-        // 如果不是字段引用或者类型不匹配，返回 false
-        return false
-    }
-
-    private fun isMybatisMethodCall(it: PsiJavaCodeReferenceElement, project: Project): Boolean {
-        val resolvedElement = it.resolve()
-
-        // 检查 resolvedElement 是否为 PsiMethod
-        if (resolvedElement is PsiMethod) {
-            // 使用属性访问语法代替 getter
-            val processor = CommonProcessors.CollectProcessor<IdDomElement>()
-            JavaService.getInstance(it.project).processMethod(resolvedElement, processor)
-            return processor.getResults().size > 0
-        }
-        // 如果 resolvedElement 不是 PsiMethod，返回 false 或者进行其他处理
-        return false
-    }
-
-    fun isDubboReferenceMethodCall(methodCall: PsiMethodCallExpression): Boolean {
-        // 获取调用者表达式
-        val qualifierExpression = methodCall.methodExpression.qualifierExpression
-
-        // 确保调用者表达式存在并且是一个字段引用
-        if (qualifierExpression is PsiReferenceExpression) {
-            // 解析引用到的元素
-            val resolvedElement = qualifierExpression.resolve()
-
-            // 检查解析到的元素是否是字段
-            if (resolvedElement is PsiField) {
-                // 获取字段上的注解
-                val annotations = resolvedElement.annotations
-
-                // 检查是否有 @DubboReference 或 @Reference 注解
-                return annotations.any { annotation ->
-                    val qualifiedName = annotation.qualifiedName
-                    qualifiedName == "org.apache.dubbo.config.annotation.DubboReference" ||
-                            qualifiedName == "org.apache.dubbo.config.annotation.Reference"
-                }
-            }
-        }
-
-        // 如果不是字段引用或者没有注解，返回 false
-        return false
-    }
-
-    fun isElementInProject(element: PsiElement, project: Project): Boolean {
-        val psiFile: PsiFile? = element.containingFile
-        val virtualFile: VirtualFile? = psiFile?.virtualFile
-
-        if (virtualFile != null) {
-            val projectFileIndex = ProjectRootManager.getInstance(project).fileIndex
-            return projectFileIndex.isInContent(virtualFile)
-        }
-
-        return false
-    }
-
     private fun isDataClass(element: PsiElement?): Boolean {
         if (element !is PsiClass) return false
 
@@ -519,5 +356,173 @@ class AllMethodFile : AnAction() {
 
     override fun getActionUpdateThread(): ActionUpdateThread {
         return ActionUpdateThread.BGT
+    }
+
+    companion object {
+        fun isLogMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+            // 获取调用者表达式
+            val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+            // 确保调用者表达式存在并且是一个字段引用
+            if (qualifierExpression is PsiReferenceExpression) {
+                // 解析引用到的元素
+                val resolvedElement = qualifierExpression.resolve()
+
+                // 检查解析到的元素是否是字段
+                if (resolvedElement is PsiField) {
+                    // 获取字段的类型
+                    val fieldType = resolvedElement.type
+                    val fieldTypeCanonicalText = fieldType.canonicalText
+
+                    // 检查字段类型是否为常见的 Logger 类
+                    if (fieldTypeCanonicalText == "org.slf4j.Logger" ||
+                        fieldTypeCanonicalText == "org.apache.logging.log4j.Logger" ||
+                        fieldTypeCanonicalText == "org.apache.log4j.Logger" ||
+                        fieldTypeCanonicalText == "java.util.logging.Logger" ||
+                        fieldTypeCanonicalText == "ch.qos.logback.classic.Logger") {
+                        return true
+                    }
+                }
+            }
+
+            // 如果不是字段引用或者类型不匹配，返回 false
+            return false
+        }
+
+        fun isAriesMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+            // 获取调用者表达式
+            val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+            // 确保调用者表达式存在并且是一个字段引用
+            if (qualifierExpression is PsiReferenceExpression) {
+                // 解析引用到的元素
+                val resolvedElement = qualifierExpression.resolve()
+
+                // 检查解析到的元素是否是字段
+                if (resolvedElement is PsiField) {
+                    // 获取字段的类型
+                    val fieldType = resolvedElement.type
+                    val fieldTypeCanonicalText = fieldType.canonicalText
+
+                    // 检查字段类型是否为 AriesTemplate
+                    if (fieldTypeCanonicalText == "com.yupaopao.framework.spring.boot.aries.AriesTemplate") {
+                        return true
+                    }
+                }
+            }
+
+            // 如果不是字段引用或者类型不匹配，返回 false
+            return false
+        }
+
+        fun isRedisMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+            // 获取调用者表达式
+            val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+            // 确保调用者表达式存在并且是一个字段引用
+            if (qualifierExpression is PsiReferenceExpression) {
+                // 解析引用到的元素
+                val resolvedElement = qualifierExpression.resolve()
+
+                // 检查解析到的元素是否是字段
+                if (resolvedElement is PsiField) {
+                    // 获取字段的类型
+                    val fieldType = resolvedElement.type
+                    val fieldTypeCanonicalText = fieldType.canonicalText
+
+                    // 检查字段类型是否为 RedisService、RedisTemplate 或 RedissonClient
+                    if (fieldTypeCanonicalText == "com.yupaopao.framework.spring.boot.redis.RedisService" ||
+                        fieldTypeCanonicalText == "org.springframework.data.redis.core.RedisTemplate<*>" || // 处理泛型情况
+                        fieldTypeCanonicalText.startsWith("org.springframework.data.redis.core.RedisTemplate<") ||
+                        fieldTypeCanonicalText == "org.redisson.api.RedissonClient") { // RedissonClient 类型检查
+                        return true
+                    }
+                }
+            }
+
+            // 如果不是字段引用或者类型不匹配，返回 false
+            return false
+        }
+
+        fun isKafkaMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+            // 获取调用者表达式
+            val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+            // 确保调用者表达式存在并且是一个字段引用
+            if (qualifierExpression is PsiReferenceExpression) {
+                // 解析引用到的元素
+                val resolvedElement = qualifierExpression.resolve()
+
+                // 检查解析到的元素是否是字段
+                if (resolvedElement is PsiField) {
+                    // 获取字段的类型
+                    val fieldType = resolvedElement.type
+
+                    // 检查字段类型是否为 com.yupaopao.framework.spring.boot.kafka.KafkaProducer
+                    if (fieldType.canonicalText == "com.yupaopao.framework.spring.boot.kafka.KafkaProducer") {
+                        return true
+                    }
+                }
+            }
+
+            // 如果不是字段引用或者类型不匹配，返回 false
+            return false
+        }
+
+        fun isMybatisMethodCall(it: PsiJavaCodeReferenceElement, project: Project): Boolean {
+            if (true) {
+                return false
+            }
+            val resolvedElement = it.resolve()
+
+            // 检查 resolvedElement 是否为 PsiMethod
+            if (resolvedElement is PsiMethod) {
+                // 使用属性访问语法代替 getter
+                val processor = CommonProcessors.CollectProcessor<IdDomElement>()
+                JavaService.getInstance(it.project).processMethod(resolvedElement, processor)
+                return processor.getResults().size > 0
+            }
+            // 如果 resolvedElement 不是 PsiMethod，返回 false 或者进行其他处理
+            return false
+        }
+
+        fun isDubboReferenceMethodCall(methodCall: PsiMethodCallExpression): Boolean {
+            // 获取调用者表达式
+            val qualifierExpression = methodCall.methodExpression.qualifierExpression
+
+            // 确保调用者表达式存在并且是一个字段引用
+            if (qualifierExpression is PsiReferenceExpression) {
+                // 解析引用到的元素
+                val resolvedElement = qualifierExpression.resolve()
+
+                // 检查解析到的元素是否是字段
+                if (resolvedElement is PsiField) {
+                    // 获取字段上的注解
+                    val annotations = resolvedElement.annotations
+
+                    // 检查是否有 @DubboReference 或 @Reference 注解
+                    return annotations.any { annotation ->
+                        val qualifiedName = annotation.qualifiedName
+                        qualifiedName == "org.apache.dubbo.config.annotation.DubboReference" ||
+                                qualifiedName == "org.apache.dubbo.config.annotation.Reference"
+                    }
+                }
+            }
+
+            // 如果不是字段引用或者没有注解，返回 false
+            return false
+        }
+
+        fun isElementInProject(element: PsiElement, project: Project): Boolean {
+            val psiFile: PsiFile? = element.containingFile
+            val virtualFile: VirtualFile? = psiFile?.virtualFile
+
+            if (virtualFile != null) {
+                val projectFileIndex = ProjectRootManager.getInstance(project).fileIndex
+                return projectFileIndex.isInContent(virtualFile)
+            }
+
+            return false
+        }
     }
 }

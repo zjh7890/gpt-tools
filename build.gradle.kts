@@ -137,7 +137,7 @@ dependencies {
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()
         pluginModule(implementation(project(":core")))
-        pluginModule(implementation(project(":cpp")))
+//        pluginModule(implementation(project(":cpp")))
         pluginModule(implementation(project(":goland")))
         pluginModule(implementation(project(":java")))
         pluginModule(implementation(project(":javascript")))
@@ -339,21 +339,21 @@ project(":core") {
     })
 }
 
-project(":cpp") {
-    if (platformVersion == 233 || platformVersion == 241) {
-        cppPlugins += "com.intellij.nativeDebug"
-    }
-
-    dependencies {
-        intellijPlatform {
-            intellijIde(clionVersion)
-            intellijPlugins(cppPlugins)
-            instrumentationTools()
-        }
-
-        implementation(project(":core"))
-    }
-}
+//project(":cpp") {
+//    if (platformVersion == 233 || platformVersion == 241) {
+//        cppPlugins += "com.intellij.nativeDebug"
+//    }
+//
+//    dependencies {
+//        intellijPlatform {
+//            intellijIde(clionVersion)
+//            intellijPlugins(cppPlugins)
+//            instrumentationTools()
+//        }
+//
+//        implementation(project(":core"))
+//    }
+//}
 
 project(":goland") {
     dependencies {

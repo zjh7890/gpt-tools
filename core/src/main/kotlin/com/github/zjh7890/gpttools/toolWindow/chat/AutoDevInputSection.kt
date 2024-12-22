@@ -112,7 +112,7 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         // 将自身添加为设置变化的监听器
         LLMSettingsState.addSettingsChangeListener(this)
         // 获取 ShireSettings 列表
-        val settingsList = LLMSettingsState.settings
+        val settingsList = LLMSettingsState.getFillSettings()
         // 查找默认的配置项（isDefault 为 true）
         val defaultSetting = settingsList.find { it.isDefault } ?: settingsList.firstOrNull()
         // 创建 ComboBox 的模型
@@ -210,7 +210,7 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
     val focusableComponent: JComponent get() = input
     override fun onSettingsChanged() {
         SwingUtilities.invokeLater {
-            val settingsList = LLMSettingsState.getInstance().settings
+            val settingsList = LLMSettingsState.getInstance().getFillSettings()
             // 获取当前选中的模型
             val currentSelection = configComboBox.selectedItem as? LLMSetting
             // 检查当前选中的模型是否仍然存在于新的设置列表中

@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools
 import com.azure.ai.openai.OpenAIClientBuilder
 import com.azure.ai.openai.models.*
 import com.azure.core.credential.AzureKeyCredential
+import com.jetbrains.rd.util.string.println
 
 fun parseGitDiff(diffText: String): String {
     val result = mutableListOf<Map<String, Any>>()
@@ -84,7 +85,7 @@ index 850dd6a8..329367a0 100644
  }
 """
 
-fun main() {
+fun main2() {
 //    println(parseGitDiff(diffText))
 
     val client = OpenAIClientBuilder()
@@ -112,4 +113,13 @@ fun main() {
     }
 
 
+}
+
+fun main() {
+    val path = "/Users/zjh/.m2/repository/com/yupaopao/platform/config-client/0.10.21/config-client-0.10.21.jar!/com/ctrip/framework/apollo/Config.class"
+    val regex = ".*/repository/(.+)/([^/]+)/([^/]+)/([^/]+!)/(.*)".toRegex()
+    val matchResult = regex.find(path) ?: return
+
+    val (groupPath, artifactId, version) = matchResult.destructured
+    println("fdsklajf")
 }

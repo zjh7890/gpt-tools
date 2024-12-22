@@ -1,8 +1,7 @@
 package com.github.zjh7890.gpttools.services
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.github.zjh7890.gpttools.ShireCoroutineScope
-import com.github.zjh7890.gpttools.agent.ContextCollectAgent
+import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.llm.LlmConfig
@@ -161,7 +160,7 @@ class ChatCodingService(val project: Project) : Disposable{
             ui.progressBar.isIndeterminate = true  // 设置为不确定状态
             ui.updateUI()
             val responseStream = LlmProvider.stream(messages, llmConfig = llmConfig)
-            currentJob = ShireCoroutineScope.scope(project).launch {
+            currentJob = LLMCoroutineScope.scope(project).launch {
                 var text = ""
                 var hasError = false  // 添加错误标志
                 responseStream.onCompletion {

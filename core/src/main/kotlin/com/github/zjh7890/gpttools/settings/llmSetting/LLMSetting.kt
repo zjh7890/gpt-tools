@@ -1,11 +1,11 @@
 package com.github.zjh7890.gpttools.settings.llmSetting
 data class LLMSetting(
-    var name: String = "claude-3.5-sonnet - Trial",
+    var name: String = "",
     var temperature: Double = 0.0,
     // OpenAI 相关字段
-    var apiHost: String = "https://api.zyai.online/v1/chat/completions",
-    var apiToken: String = "sk-tOedSsr00qxzCyUUF672C2E0850f4483Bd82A1625bC53379",
-    var modelName: String = "claude-3-5-sonnet-20241022",
+    var apiHost: String = "https://api.openai.com/v1/chat/completions",
+    var apiToken: String = "",
+    var modelName: String = "",
     // Azure 相关字段
     var azureEndpoint: String = "https://{deploymentName}.openai.azure.com",
     var azureApiKey: String = "",

@@ -1,6 +1,6 @@
 package com.github.zjh7890.gpttools.agent
 
-import com.github.zjh7890.gpttools.ShireCoroutineScope
+import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.services.ChatCodingService
@@ -157,7 +157,7 @@ ${border}
 
         var responseText = ""
 
-        chatCodingService.currentJob = ShireCoroutineScope.scope(project).launch {
+        chatCodingService.currentJob = LLMCoroutineScope.scope(project).launch {
             applyFlow.onCompletion {
                 logger.warn("onCompletion ${it?.message}")
             }.catch {

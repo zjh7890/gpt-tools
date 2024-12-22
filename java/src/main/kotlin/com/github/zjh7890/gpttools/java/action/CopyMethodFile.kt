@@ -1,7 +1,7 @@
 package com.github.zjh7890.gpttools.java.action
 
-import com.baomidou.plugin.idea.mybatisx.dom.model.IdDomElement
-import com.baomidou.plugin.idea.mybatisx.service.JavaService
+import mybatisx.dom.model.IdDomElement
+import mybatisx.service.JavaService
 import com.github.zjh7890.gpttools.java.util.PsiUtils
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils

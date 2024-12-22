@@ -11,6 +11,7 @@ import com.intellij.psi.*
 import com.intellij.psi.impl.compiled.ClsTypeParameterImpl
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import java.util.jar.JarFile
 
 
@@ -148,25 +149,19 @@ object PsiUtils {
         val sourcesJarFile = LocalFileSystem.getInstance().findFileByPath(sourcesJarPath) ?: return null
 
         if (sourcesJarFile == null) {
-            println("Sources JAR not found at: $sourcesJarPath")
             return null
         }
 
-        println("Found sources JAR: ${sourcesJarFile.path}")
-
         // 获取源代码对应的路径
         val sourceEntryPath = classEntryPath.replace(".class", ".java")
-        println("Looking for source entry: $sourceEntryPath")
 
         return try {
             JarFile(sourcesJarFile.path).use { jarFile ->
                 val sourceEntry = jarFile.getEntry(sourceEntryPath)
                 if (sourceEntry != null) {
                     val sourceFileUrl = "jar://${sourcesJarFile.path}!/$sourceEntryPath"
-                    println("Found source file: $sourceFileUrl")
                     VirtualFileManager.getInstance().findFileByUrl(sourceFileUrl)
                 } else {
-                    println("Source entry not found in JAR: $sourceEntryPath")
                     null
                 }
             }
@@ -183,17 +178,20 @@ object PsiUtils {
         PsiTreeUtil.findChildrenOfType(psiFile, PsiElement::class.java).forEach { element ->
             element.references.forEach { reference ->
                 val resolvedFile = reference.resolve()?.containingFile
-
                 // 假设 resolvedFile 是 PsiFile 类型
                 if (resolvedFile != null && resolvedFile !== psiFile && resolvedFile.virtualFile != null) {
                     val virtualFile = resolvedFile.virtualFile
-                    if (isFileInProject(virtualFile, project) || virtualFile.path.contains("com/yupaopao")) {
+                    // virtualFile.path
+                    // example /Users/zjh/.m2/repository/com/platform/config-client/0.10.21/config-client-0.10.21.jar!/com/ctrip/framework/apollo/Config.class
+                    val patterns = OtherSettingsState.getInstance().dependencyPatterns
+                        .split("\n")
+                        .filter { it.isNotEmpty() }
+                        .map { it.toRegex() }
+                    if (isFileInProject(virtualFile, project) || 
+                        patterns.any { pattern -> virtualFile.path.matches(pattern) }) {
                         // 在这里继续处理 virtualFile
                         findSourceCode(resolvedFile)?.let { referencedFiles.add(it) }
                     }
-                } else {
-                    // 处理文件不存在或无法访问的情况
-                    println("文件不存在或无法获取 VirtualFile")
                 }
             }
         }
