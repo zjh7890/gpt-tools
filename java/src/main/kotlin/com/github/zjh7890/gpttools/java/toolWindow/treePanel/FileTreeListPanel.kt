@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.java.toolWindow.treePanel
 
+import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.application.ApplicationManager
@@ -283,6 +284,20 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 val packageNode = findOrCreatePackageNode(moduleNode, packageName)
                 packageNode.add(DefaultMutableTreeNode(cls.name))
             } else {
+                // 获取 dependencyPatterns
+                val dependencyPatterns = OtherSettingsState.getInstance().dependencyPatterns
+                    .split("\n")
+                    .filter { it.isNotEmpty() }
+                    .map { it.toRegex() }
+
+                val virtualFile = cls.containingFile?.virtualFile ?: return@forEach
+                val filePath = virtualFile.path
+
+                // 应用 dependencyPatterns 过滤
+                if (!dependencyPatterns.any { pattern -> filePath.matches(pattern) }) {
+                    // 如果不匹配任何模式，跳过此依赖
+                    return@forEach
+                }
                 // 处理外部依赖
                 val mavenInfo = extractMavenInfo(cls)
                 if (mavenInfo != null) {
