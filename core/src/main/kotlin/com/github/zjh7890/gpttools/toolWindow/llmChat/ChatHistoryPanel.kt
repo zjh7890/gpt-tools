@@ -2,7 +2,7 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatSession
-import com.github.zjh7890.gpttools.services.SessionListener
+import com.github.zjh7890.gpttools.services.SessionHistoryListener
 import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.intellij.openapi.project.Project
@@ -15,7 +15,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.swing.*
 
-class ChatHistoryPanel(val project: Project) : JPanel(), SessionListener {
+class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener {
 
     private val chatCodingService = ChatCodingService.getInstance(project)
 

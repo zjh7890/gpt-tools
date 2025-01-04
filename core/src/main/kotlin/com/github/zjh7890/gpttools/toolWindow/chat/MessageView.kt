@@ -7,7 +7,7 @@ import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.block.*
-import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatPanel
 import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.intellij.icons.AllIcons
@@ -35,7 +35,7 @@ class MessageView(
     val project: Project,
     render: Boolean,
     val chatMessage: ChatContextMessage?,
-    val chatToolPanel: ChatToolPanel
+    val chatPanel: ChatPanel
 ) : JBPanel<MessageView>() {
     private val myNameLabel: Component
     private val component: DisplayComponent = DisplayComponent(message)
@@ -92,7 +92,7 @@ class MessageView(
 
         val group = DefaultActionGroup().apply {
             if (role == ChatRole.user) {
-                add(EditMessageAction(messageView, chatToolPanel))
+                add(EditMessageAction(messageView, chatPanel))
             }
             // 如果需要，您可以为助手消息添加其他操作
             if (role == ChatRole.assistant) {
@@ -187,14 +187,14 @@ class MessageView(
     }
 }
 
-class EditMessageAction(private val messageView: MessageView, val chatToolPanel: ChatToolPanel) :
+class EditMessageAction(private val messageView: MessageView, val chatPanel: ChatPanel) :
     AnAction("Edit", "Edit this message", AllIcons.Actions.Edit) {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val chatCodingService = ChatCodingService.getInstance(project)
         // 设置 AutoDevInputSection 为编辑模式，并设置要编辑的消息
-        chatToolPanel.setEditingMessage(messageView)
+        chatPanel.setEditingMessage(messageView)
     }
 }
 

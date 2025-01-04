@@ -1,6 +1,5 @@
 package com.github.zjh7890.gpttools.services
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.llm.ChatMessage
@@ -9,7 +8,7 @@ import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.toolWindow.chat.AutoDevInputTrigger
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
-import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatPanel
 import com.github.zjh7890.gpttools.utils.*
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -21,13 +20,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlin.reflect.KClass
-import kotlin.reflect.KParameter
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.full.memberFunctions
-import kotlin.reflect.full.primaryConstructor
-import kotlin.reflect.full.valueParameters
 
 @Service(Service.Level.PROJECT)
 class ChatCodingService(val project: Project) : Disposable {
@@ -42,7 +34,7 @@ class ChatCodingService(val project: Project) : Disposable {
      * 处理用户输入的提示，并与 LLM 交互获取响应
      */
     fun handlePromptAndResponse(
-        ui: ChatToolPanel,
+        ui: ChatPanel,
         prompter: String,
         withDiff: Boolean,
         editingMessage: ChatContextMessage?,

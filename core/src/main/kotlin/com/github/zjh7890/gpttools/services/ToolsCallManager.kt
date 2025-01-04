@@ -2,30 +2,16 @@ package com.github.zjh7890.gpttools.services
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
-import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatPanel
 import com.github.zjh7890.gpttools.utils.CmdUtils
 import com.github.zjh7890.gpttools.utils.Desc
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.DialogBuilder
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBList
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.panels.VerticalLayout
-import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import javax.swing.DefaultListModel
 import javax.swing.JPanel
 import javax.swing.JTextField
-import javax.swing.ListSelectionModel
 import java.awt.BorderLayout
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.findAnnotation
@@ -100,7 +86,7 @@ class ToolsCallManager(private val project: Project, private val sessionManager:
     /**
      * 确认并执行动作列表
      */
-    fun confirmAndExecuteActions(actions: List<Action>, ui: ChatToolPanel) {
+    fun confirmAndExecuteActions(actions: List<Action>, ui: ChatPanel) {
         ApplicationManager.getApplication().invokeLater {
             actions.forEachIndexed { idx, action ->
                 val (description, commandType, command) = action

@@ -7,7 +7,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import kotlinx.serialization.Serializable
 import java.util.UUID
 
 @Service(Service.Level.PROJECT)
@@ -16,7 +15,7 @@ class SessionManager(private val project: Project) : Disposable {
 
     private val sessions = mutableMapOf<String, ChatSession>()
     private var currentSessionId: String = ""
-    private val sessionListeners = mutableListOf<SessionListener>()
+    private val sessionHistoryListeners = mutableListOf<SessionHistoryListener>()
 
     private val sessionFilePath: String = getSessionFilePath()
 
@@ -102,15 +101,15 @@ class SessionManager(private val project: Project) : Disposable {
     /**
      * 添加会话监听器
      */
-    fun addSessionListener(listener: SessionListener) {
-        sessionListeners.add(listener)
+    fun addSessionListener(listener: SessionHistoryListener) {
+        sessionHistoryListeners.add(listener)
     }
 
     /**
      * 通知所有监听器会话列表已更改
      */
     private fun notifySessionListChanged() {
-        sessionListeners.forEach { it.sessionListChanged() }
+        sessionHistoryListeners.forEach { it.sessionListChanged() }
     }
 
     /**
@@ -164,7 +163,7 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     override fun dispose() {
-        sessionListeners.clear()
+        sessionHistoryListeners.clear()
     }
 
     companion object {

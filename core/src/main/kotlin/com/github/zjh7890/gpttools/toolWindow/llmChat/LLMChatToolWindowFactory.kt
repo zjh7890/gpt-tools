@@ -1,7 +1,6 @@
 package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.MyBundle
-import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
@@ -40,16 +39,16 @@ class LLMChatToolWindowFactory : ToolWindowFactory, DumbAware {
         }
         
 
-        fun getPanel(project: Project): ChatToolPanel? {
+        fun getPanel(project: Project): ChatPanel? {
             return LLMChatToolWindowFactory.getToolWindow(project)
-                ?.contentManager?.getContent(0)?.component as? ChatToolPanel
+                ?.contentManager?.getContent(0)?.component as? ChatPanel
         }
 
         fun createToolWindowContentStatic(project: Project, toolWindow: ToolWindow, reloadSession: Boolean = false) {
             val contentManager = toolWindow.contentManager
 
             // 创建 Chat Panel
-            val chatPanel = ChatToolPanel(toolWindow.disposable, project)
+            val chatPanel = ChatPanel(toolWindow.disposable, project)
             val chatContent = ContentFactory.getInstance()
                 .createContent(chatPanel, MyBundle.message("chat.title"), false)
             contentManager.addContent(chatContent)
@@ -70,7 +69,7 @@ class LLMNewChatAction : AnAction("New Chat", "New Chat", AllIcons.Actions.Edit)
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val contentPanel = LLMChatToolWindowFactory.getToolWindow(project)
-            ?.contentManager?.getContent(0)?.component as? ChatToolPanel
+            ?.contentManager?.getContent(0)?.component as? ChatPanel
         if (contentPanel == null) {
             throw IllegalStateException("Content panel is null")
         }

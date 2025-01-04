@@ -8,7 +8,7 @@ import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.chat.MessageView
-import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
+import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatPanel
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.JsonUtils
 import com.intellij.openapi.application.ApplicationManager
@@ -28,7 +28,7 @@ object GenerateDiffAgent {
         projectStructure: String,
         response: String,
         currentSession: ChatSession,
-        ui: ChatToolPanel
+        ui: ChatPanel
     ) {
         ui.progressBar.isVisible = true
         ui.progressBar.isIndeterminate = true  // 设置为不确定状态

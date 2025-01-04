@@ -1,16 +1,13 @@
 package com.github.zjh7890.gpttools.toolWindow.llmChat
 
-import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.components.welcome.WelcomePanel
 import com.github.zjh7890.gpttools.services.*
-import com.github.zjh7890.gpttools.services.SessionListener
+import com.github.zjh7890.gpttools.services.SessionHistoryListener
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
 import com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory
-import com.github.zjh7890.gpttools.utils.DirectoryUtil
-import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
@@ -46,12 +43,12 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 
-class ChatToolPanel(val disposable: Disposable?, val project: Project) :
+class ChatPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
     NullableComponent,
     Disposable {
 
-    private val logger = logger<ChatToolPanel>()
+    private val logger = logger<ChatPanel>()
 
     var progressBar: JProgressBar
     val myTitle = JBLabel("Conversation")
@@ -203,7 +200,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
                     // 重新处理该消息
                     chatCodingService.handlePromptAndResponse(
-                        this@ChatToolPanel,
+                        this@ChatPanel,
                         prompt,
                         trigger == AutoDevInputTrigger.ChatThenDiff,
                         editingMessage,
@@ -212,7 +209,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                     )
                 } else {
                     chatCodingService.handlePromptAndResponse(
-                        this@ChatToolPanel,
+                        this@ChatPanel,
                         prompt,
                         trigger == AutoDevInputTrigger.ChatThenDiff,
                         null,
@@ -294,7 +291,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         setContent(panelContent)
 
         // 添加会话监听器以在会话列表更改时更新 UI（根据需要实现）
-        sessionManager.addSessionListener(object : SessionListener {
+        sessionManager.addSessionListener(object : SessionHistoryListener {
             override fun sessionListChanged() {
                 // 根据需要实现，例如刷新会话列表面板
             }
