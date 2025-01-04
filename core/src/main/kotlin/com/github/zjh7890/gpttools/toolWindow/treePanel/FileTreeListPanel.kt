@@ -1,6 +1,5 @@
-package com.github.zjh7890.gpttools.java.toolWindow.treePanel
+package com.github.zjh7890.gpttools.toolWindow.treePanel
 
-import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.application.ApplicationManager
@@ -34,11 +33,11 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         layout = java.awt.BorderLayout()
         root.add(rootClassNode)
         root.add(dependenciesNode)
-        
+
         tree.isRootVisible = false
         tree.showsRootHandles = true
         tree.cellRenderer = CheckboxTreeCellRenderer()
-        
+
         add(JScrollPane(tree), java.awt.BorderLayout.CENTER)
 
         tree.expandPath(TreePath(arrayOf(root, rootClassNode)))
@@ -60,7 +59,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                         }
                     }
                 }
-                
+
                 if (e.clickCount == 2) {
                     val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
                     val className = node?.userObject.toString()
@@ -79,7 +78,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
     fun runAnalysis(project: Project, onComplete: () -> Unit = {}) {
         dependenciesNode.removeAllChildren()
-        
+
         val selectedClasses = getSelectedClasses()
         if (selectedClasses.isEmpty()) {
             (tree.model as DefaultTreeModel).reload(root)
@@ -249,6 +248,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 is PsiMethodCallExpression -> {
                     e.resolveMethod()?.let { used.add(it) }
                 }
+
                 is PsiReferenceExpression -> {
                     val resolved = e.resolve()
                     if (resolved is PsiField) {
@@ -477,7 +477,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             val expandedPaths = getExpandedPaths()
             val node = CheckboxTreeNode(psiClass.name ?: "Unnamed Class")
             node.isChecked = selected // 默认不选中
-            
+
             if (!isDataClass(psiClass)) {
                 psiClass.methods.forEach { method ->
                     if (!ifGetterOrSetter(method) && !method.isStandardClassMethod()) {
@@ -487,12 +487,12 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                     }
                 }
             }
-            
+
             rootClassNode.add(node)
             addedClasses.add(psiClass)
             (tree.model as DefaultTreeModel).reload(root)
             restoreExpandedPaths(expandedPaths)
-            
+
             // 展开到方法级别
             val classPath = TreePath(arrayOf(root, rootClassNode, node))
             tree.expandPath(classPath)
@@ -502,7 +502,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     fun addMethod(psiClass: PsiClass, method: PsiMethod) {
         // 先添加类及其所有方法
         addClass(psiClass, false)
-        
+
         // 找到对应的类节点
         var classNode: CheckboxTreeNode? = null
         for (i in 0 until rootClassNode.childCount) {
@@ -512,7 +512,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 break
             }
         }
-        
+
         if (classNode != null) {
             // 找到对应的方法节点并设置选中状态
             for (i in 0 until classNode.childCount) {
@@ -522,7 +522,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                     break
                 }
             }
-            
+
             // 展开到方法级别
             val classPath = TreePath(arrayOf(root, rootClassNode, classNode))
             tree.expandPath(classPath)
@@ -537,13 +537,13 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         // 展开根节点
         tree.expandPath(TreePath(arrayOf(root, rootClassNode)))
         tree.expandPath(TreePath(arrayOf(root, dependenciesNode)))
-        
+
         // 展开 Root Classes 下的所有节点到方法级别
         for (i in 0 until rootClassNode.childCount) {
             val classNode = rootClassNode.getChildAt(i)
             val classPath = TreePath(arrayOf(root, rootClassNode, classNode))
             tree.expandPath(classPath)
-            
+
             // 展开类节点下的所有方法节点
             for (j in 0 until (classNode as DefaultMutableTreeNode).childCount) {
                 val methodNode = classNode.getChildAt(j)
@@ -551,11 +551,11 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 tree.expandPath(methodPath)
             }
         }
-        
+
         // 展开 Dependencies 节点
         for (i in 0 until dependenciesNode.childCount) {
             val node = dependenciesNode.getChildAt(i) as DefaultMutableTreeNode
-            if (node.userObject.toString() != "Maven Dependencies" && 
+            if (node.userObject.toString() != "Maven Dependencies" &&
                 node.userObject.toString() != "Externals") {
                 expandNodeRecursively(node)
             } else if (node.userObject.toString() == "Maven Dependencies") {
@@ -568,7 +568,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         if (node.childCount > 0) {
             val path = getPathToNode(node)
             tree.expandPath(TreePath(path.toTypedArray()))
-            
+
             for (i in 0 until node.childCount) {
                 expandNodeRecursively(node.getChildAt(i) as DefaultMutableTreeNode)
             }
@@ -578,12 +578,12 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     private fun getPathToNode(node: DefaultMutableTreeNode): List<DefaultMutableTreeNode> {
         val path = mutableListOf<DefaultMutableTreeNode>()
         var current: DefaultMutableTreeNode? = node
-        
+
         while (current != null) {
             path.add(0, current)
             current = current.parent as? DefaultMutableTreeNode
         }
-        
+
         return path
     }
 
@@ -669,7 +669,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         if (node.childCount > 0) {
             val path = getPathToNode(node)
             tree.collapsePath(TreePath(path.toTypedArray()))
-            
+
             for (i in 0 until node.childCount) {
                 collapseNodeRecursively(node.getChildAt(i) as DefaultMutableTreeNode)
             }
@@ -733,8 +733,8 @@ private class CheckboxTreeNode(val text: String) : DefaultMutableTreeNode(text) 
 
     private fun updateParentState() {
         val parent = parent as? CheckboxTreeNode ?: return
-        val newState = parent.children().asSequence().all { 
-            (it as? CheckboxTreeNode)?._isChecked == true 
+        val newState = parent.children().asSequence().all {
+            (it as? CheckboxTreeNode)?._isChecked == true
         }
         if (parent._isChecked != newState) {
             parent._isChecked = newState  // 直接设置内部字段，避免触发 setter
@@ -743,9 +743,10 @@ private class CheckboxTreeNode(val text: String) : DefaultMutableTreeNode(text) 
     }
 }
 
+
 private class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
     private val checkbox = JCheckBox()
-    
+
     override fun getTreeCellRendererComponent(
         tree: JTree,
         value: Any?,
@@ -756,7 +757,7 @@ private class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
         hasFocus: Boolean
     ): Component {
         val component = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
-        
+
         if (value is CheckboxTreeNode) {
             // 检查是否是 Root Classes 下的节点或其子节点
             var parent = value.parent as? DefaultMutableTreeNode
@@ -770,7 +771,7 @@ private class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
                 parent = parent.parent as? DefaultMutableTreeNode
             }
         }
-        
+
         return component
     }
 }
