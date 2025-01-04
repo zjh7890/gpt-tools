@@ -18,7 +18,15 @@
 
         <toolWindow id="GptFileTree"
                     anchor="right"
-                    factoryClass="com.github.zjh7890.gpttools.java.toolWindow.treePanel.GptToolsContextToolWindowFactory"
+                    factoryClass="com.github.zjh7890.gpttools.toolWindow.treePanel.GptToolsContextToolWindowFactory"
+                    canCloseContent="false"
+                    canWorkInDumbMode="false"
+                    icon="/icons/icon_dark_16px.svg">
+        </toolWindow>
+
+        <toolWindow id="ContextFileToolWindow"
+                    anchor="right"
+                    factoryClass="com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory"
                     canCloseContent="false"
                     canWorkInDumbMode="false"
                     icon="/icons/icon_dark_16px.svg">

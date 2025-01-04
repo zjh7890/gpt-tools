@@ -36,7 +36,7 @@ class WelcomePanel: JPanel(BorderLayout()) {
             row {
                 icon(GptToolsIcon.PRIMARY).gap(RightGap.SMALL)
                 val linkPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
-                    add(JLabel("设置 LLM, 推荐用 claude sonnet 3.5").apply {
+                    add(JLabel("设置 LLM, 推荐用 deepseek v3, 便宜好用").apply {
                         cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                         foreground = java.awt.Color(0x6a, 0x9b, 0xfa)
                         addMouseListener(object : MouseAdapter() {
@@ -51,6 +51,9 @@ class WelcomePanel: JPanel(BorderLayout()) {
                     add(JLabel(AllIcons.Ide.External_link_arrow))
                 }
                 cell(linkPanel)
+            }
+            row {
+                text("<a href=\"https://platform.deepseek.com/api_keys\">Get deepseek token</a>")
             }
             row {
                 text("<a href=\"https://gpt-tools.yuque.com/pfm3um/doc\">How to use ?</a>")

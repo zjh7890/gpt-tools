@@ -8,6 +8,7 @@ import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
+import com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory
 import com.github.zjh7890.gpttools.utils.DirectoryUtil
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
@@ -23,7 +24,6 @@ import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.*
 import com.intellij.openapi.util.Disposer
@@ -40,12 +40,16 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.flow.Flow
 import java.awt.BorderLayout
-import java.awt.Dimension
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+
+data class ProjectFileTree(
+    val projectName: String,
+    val files: List<VirtualFile>
+)
 
 class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
@@ -100,34 +104,6 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         add(editingLabel, BorderLayout.WEST)
         add(exitEditingButton, BorderLayout.EAST)
     }
-
-    // 新增变量
-    private val fileListPanel = JPanel().apply {
-        layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        isVisible = true
-    }
-
-    private val toggleFileListButton = ActionButton(
-        object : AnAction() {
-            override fun actionPerformed(e: AnActionEvent) {
-                fileListPanel.isVisible = !fileListPanel.isVisible
-                // 更新 presentation 的图标
-                e.presentation.icon = if (fileListPanel.isVisible) {
-                    AllIcons.Actions.Collapseall
-                } else {
-                    AllIcons.Actions.Expandall
-                }
-                refreshFileList()
-            }
-        },
-        Presentation().apply {
-            icon = AllIcons.Actions.Collapseall
-            text = "Toggle file list"
-            description = "Toggle file list"
-        },
-        "",
-        JBUI.size(16)
-    )
 
     init {
         // 订阅设置变更
@@ -315,9 +291,6 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                     JBUI.size(16)
                 ))
             }
-            row {
-                cell(fileListPanel)
-            }
         }
 
         setContent(panelContent)
@@ -338,45 +311,11 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     }
 
 
-    // 新增方法
     fun refreshFileList() {
-        fileListPanel.removeAll()
-        chatCodingService.getCurrentSession().fileList.forEach { file ->
-            val filePanel = JPanel(BorderLayout()).apply {
-                maximumSize = Dimension(Int.MAX_VALUE, 30)
-                
-                // 创建文件名标签
-                val fileLabel = JLabel(file.name)
-                add(fileLabel, BorderLayout.WEST)
-
-                // 添加鼠标监听器处理双击事件
-                fileLabel.addMouseListener(object : MouseAdapter() {
-                    override fun mouseClicked(e: MouseEvent) {
-                        if (e.clickCount == 2) {
-                            // 双击时打开文件
-                            ApplicationManager.getApplication().invokeLater {
-                                FileEditorManager.getInstance(project).openFile(file, true)
-                            }
-                        }
-                    }
-                })
-
-                // 定义移除文件的动作
-                val removeAction = object : AnAction("Remove File", "Remove File", AllIcons.Actions.Close) {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        chatCodingService.getCurrentSession().fileList.remove(file)
-                        refreshFileList()
-                    }
-                }
-                // 创建移除按钮
-                val removeButton = ActionButton(removeAction, removeAction.templatePresentation.clone(), "", JBUI.size(16))
-
-                add(removeButton, BorderLayout.EAST)
-            }
-            fileListPanel.add(filePanel)
-        }
-        fileListPanel.revalidate()
-        fileListPanel.repaint()
+        val session = chatCodingService.getCurrentSession()
+        // 获取并刷新 panel 的 file list
+        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
+        fileTreePanel?.updateFileTree(session.projectFileTrees)
     }
 
     private fun showFileSelectionPopup() {
@@ -423,7 +362,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 setOkOperation {
                     val selectedFile = fileList.selectedValue
                     if (selectedFile != null) {
-                        chatCodingService.getCurrentSession().fileList.add(selectedFile)
+                        chatCodingService.addFileToCurrentSession(selectedFile)
                         refreshFileList()
                     }
                 }
@@ -433,7 +372,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         val addSelectedFile: () -> Unit = {
             val selectedFile = fileList.selectedValue
             if (selectedFile != null) {
-                chatCodingService.getCurrentSession().fileList.add(selectedFile)
+                chatCodingService.addFileToCurrentSession(selectedFile)
                 refreshFileList()
             }
         }
@@ -645,9 +584,10 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         // 移除所有监听器
         withFilesCheckbox.removeActionListener { }
         generateDiffCheckbox.removeActionListener { }
-        
+
         // 清除文件列表
-        fileListPanel.removeAll()
+        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
+        fileTreePanel?.removeAll()
     }
 
     fun addMessageBoth(role: ChatRole, message: String) {

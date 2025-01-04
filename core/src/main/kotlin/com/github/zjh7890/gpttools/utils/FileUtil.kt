@@ -26,8 +26,8 @@ object FileUtil {
         } ?: "未找到文件默认内容"
     }
 
-    fun readFileInfoForLLM(virtualFile: VirtualFile?, project: Project): String? {
-        virtualFile ?: return null
+    fun readFileInfoForLLM(virtualFile: VirtualFile?, project: Project): String {
+        virtualFile ?: return ""
         var document: Document? = null
         ApplicationManager.getApplication().runReadAction {
             document = FileDocumentManager.getInstance().getDocument(virtualFile)
@@ -36,7 +36,7 @@ object FileUtil {
         val border = determineBorder(text)
         
         // 获取项目根目录的路径
-        val projectPath = project?.basePath
+        val projectPath = project.basePath
         // 获取文件相对于项目根目录的路径
         val relativePath = if (projectPath != null) {
             VfsUtil.getRelativePath(virtualFile, VfsUtil.findFileByIoFile(File(projectPath), true)!!) ?: virtualFile.name

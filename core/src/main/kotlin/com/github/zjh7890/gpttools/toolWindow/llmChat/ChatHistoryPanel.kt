@@ -102,6 +102,7 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionListener {
     private fun loadConversationList() {
         conversationListModel.clear()
         val sessions = chatCodingService.getSessionList()
+            .filter { it.project == project.name }
         val sortedSessions = sessions.sortedByDescending { it.startTime }
         sortedSessions.forEach { session ->
             conversationListModel.addElement(session)

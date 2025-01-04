@@ -47,7 +47,7 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
                     name = "claude-3.5-sonnet - Trial",
                     temperature = 0.0,
                     apiHost = "https://api.zyai.online/v1/chat/completions",
-                    apiToken = "",
+                    apiToken = "sk-tOedSsr00qxzCyUUF672C2E0850f4483Bd82A1625bC53379",
                     modelName = "claude-3-5-sonnet-20241022",
                     azureEndpoint = "https://{deploymentName}.openai.azure.com",
                     azureApiKey = "",
@@ -99,7 +99,7 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
     fun getDefaultSetting(): LLMSetting? {
         return settings.find { it.isDefault } ?: settings.firstOrNull()
     }
-
+    
     companion object {
         fun getInstance(): LLMSettingsState {
             return ApplicationManager.getApplication().getService(LLMSettingsState::class.java)

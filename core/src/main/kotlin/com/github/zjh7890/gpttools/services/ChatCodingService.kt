@@ -19,6 +19,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
@@ -35,15 +36,13 @@ import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.valueParameters
 
 @Service(Service.Level.PROJECT)
-class ChatCodingService(val project: Project) : Disposable{
+class ChatCodingService(val project: Project) : Disposable {
     var currentJob: Job? = null
     val sessions = mutableMapOf<String, ChatSession>()
     var currentSessionId: String = ""
 
     init {
         loadSessions()
-//        ApplicationManager.getApplication().executeOnPooledThread {
-//        }
     }
 
     private val sessionListeners = mutableListOf<SessionListener>()
@@ -140,18 +139,6 @@ class ChatCodingService(val project: Project) : Disposable{
         messageView.scrollToBottom()
 
         ApplicationManager.getApplication().executeOnPooledThread {
-//            if (withDiff) {
-//                val fileList =
-//                    ContextCollectAgent.collectContext(session, prompter, llmConfig, projectStructure, project)
-//                val fileContents = FileUtil.readFileInfoForLLM(project, fileList)
-//
-//                val contextMessage = ChatContextMessage(ChatRole.user, "下面是文件的上下文信息: \n" + FileUtil.wrapBorder(fileContents))
-//                getCurrentSession().add(contextMessage)
-//                ApplicationManager.getApplication().invokeLater {
-//                    ui.addMessage(fileList.joinToString("\n"), chatMessage = message)
-//                }
-//            }
-
             addContextToMessages(message!!, project)
             val messages: MutableList<ChatMessage> = getCurrentSession().transformMessages()
             exportChatHistory()
@@ -186,7 +173,7 @@ class ChatCodingService(val project: Project) : Disposable{
                 getCurrentSession().add(ChatContextMessage(ChatRole.assistant, text))
                 exportChatHistory()
                 saveSessions()
-                
+
                 // 只在没有错误时执行 GenerateDiffAgent
                 if (!hasError && withDiff) {
                     ApplicationManager.getApplication().executeOnPooledThread {
@@ -199,29 +186,42 @@ class ChatCodingService(val project: Project) : Disposable{
 
     private fun addContextToMessages(message: ChatContextMessage, project: Project) {
         val contextBuilder = StringBuilder()
-        
+
         // 添加文件内容（如果启用且有文件）
-        if (CommonSettings.getInstance().withFiles && getCurrentSession().fileList.isNotEmpty()) {
-            val fileContent = getCurrentSession().fileList.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString("\n\n")
-            contextBuilder.append("""
-                相关文件内容：
-                ${FileUtil.wrapBorder(fileContent)}
-                
-            """.trimIndent())
+        if (CommonSettings.getInstance().withFiles && getCurrentSession().projectFileTrees.isNotEmpty()) {
+            contextBuilder.append("相关项目文件内容：\n")
+            val fileContents = getCurrentSession().projectFileTrees.joinToString("\n\n") { projectFileTree ->
+                """
+                === Project: ${projectFileTree.projectName} ===
+                ${collectFileContents(projectFileTree.files).joinToString("\n")}
+                """.trimIndent()
+            }
+            contextBuilder.append(FileUtil.wrapBorder(fileContents))
+            contextBuilder.append("\n\n")
         }
-        
+
         // 添加项目目录结构（如果启用）
         if (CommonSettings.getInstance().withDir) {
             val projectStructure = DirectoryUtil.getProjectStructure(project)
             contextBuilder.append("""
-项目目录结构：
-${FileUtil.wrapBorder(projectStructure)}
+                项目目录结构：
+                ${FileUtil.wrapBorder(projectStructure)}
             """.trimIndent())
         }
-        
+
         val context = contextBuilder.toString().trim()
         if (context.isNotBlank()) {
             message.context = context
+        }
+    }
+
+    private fun collectFileContents(files: List<VirtualFile>): List<String> {
+        return files.mapNotNull { file ->
+            if (!file.isDirectory) {
+                FileUtil.readFileInfoForLLM(file, project)
+            } else {
+                null // 忽略目录
+            }
         }
     }
 
@@ -273,7 +273,7 @@ ${FileUtil.wrapBorder(projectStructure)}
 
             if (trimmedLine.startsWith("```")) {
                 if (captureCommand) {
-                    actions.add(Action(actionDesc ?: "", commandType, actionCommand.joinToString("")))
+                    actions.add(Action(actionDesc ?: "", commandType, actionCommand.joinToString("\n")))
                     captureCommand = false
                     actionCommand.clear()
                     commandType = ""
@@ -351,7 +351,7 @@ ${FileUtil.wrapBorder(projectStructure)}
     fun newSession(keepContext: Boolean = false) {
         val sessionId = UUID.randomUUID().toString()
         val newSession = ChatSession(
-            id = sessionId, 
+            id = sessionId,
             type = "chat",
             project = project.name
         )
@@ -378,7 +378,9 @@ ${FileUtil.wrapBorder(projectStructure)}
     }
 
     override fun dispose() {
-        TODO("Not yet implemented")
+        // 清理资源
+        stop()
+        sessionListeners.clear()
     }
 
     fun truncateMessagesAfter(chatMessage: ChatContextMessage) {
@@ -402,14 +404,32 @@ ${FileUtil.wrapBorder(projectStructure)}
         }
     }
 
-    fun addFileToCurrentSession(virtualFile: VirtualFile) {
+    fun addFileToCurrentSession(file: VirtualFile) {
         val currentSession = getCurrentSession()
-        if (!currentSession.fileList.contains(virtualFile)) {
-            currentSession.fileList.add(virtualFile)
-            val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-            contentPanel?.refreshFileList()
-            saveSessions()
+        val projectTree = currentSession.projectFileTrees.find { it.projectName == project.name }
+
+        if (projectTree != null) {
+            // 如果文件不在列表中才添加
+            if (!projectTree.files.contains(file)) {
+                currentSession.projectFileTrees = currentSession.projectFileTrees.map {
+                    if (it.projectName == project.name) {
+                        it.copy(files = it.files + file)
+                    } else {
+                        it
+                    }
+                }.toMutableList()
+            }
+        } else {
+            // 如果项目不存在，创建新的 ProjectFileTree
+            currentSession.projectFileTrees = (currentSession.projectFileTrees +
+                    ProjectFileTree(project.name, listOf(file))).toMutableList()
         }
+
+        saveSessions()
+
+        // 获取并刷新 panel 的 file list
+        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
+        contentPanel?.refreshFileList()
     }
 }
 
@@ -420,7 +440,7 @@ data class ChatSession(
     val messages: MutableList<ChatContextMessage> = mutableListOf(),
     val startTime: Long = System.currentTimeMillis(),
     val type: String,
-    var fileList: MutableList<VirtualFile> = mutableListOf(),
+    var projectFileTrees: MutableList<ProjectFileTree> = mutableListOf(),
     var withFiles: Boolean = true,
     val project: String
 ) {
@@ -432,7 +452,7 @@ data class ChatSession(
             startTime = startTime,
             type = type,
             withFiles = withFiles,
-            filePaths = fileList.map { it.path }.toMutableList(),
+            projectFileTrees = projectFileTrees.map { it.toSerializable() }.toMutableList(),
             projectName = project
         )
     }
@@ -451,10 +471,10 @@ data class ChatSession(
         val chatHistory = transformMessages(invalidContext).joinToString("\n\n") {
             val border = FileUtil.determineBorder(it.content)
             """
-${it.role}:
-${border}
-${it.content}
-${border}
+    ${it.role}:
+    ${border}
+    ${it.content}
+    ${border}
             """.trimIndent()
         }
         saveChatHistoryToFile(chatHistory)
@@ -478,7 +498,7 @@ ${border}
     // 根据时间和类型格式化文件名
     private fun formatFileName(type: String): String {
         val date = Date(startTime)
-        val dateFormat = SimpleDateFormat("yy-MM-dd HH:mm:ss.SSS")
+        val dateFormat = SimpleDateFormat("yy-MM-dd HH-mm-ss")
         val formattedDate = dateFormat.format(date)
         return "$formattedDate-$type.txt"
     }
@@ -492,63 +512,47 @@ ${border}
     fun transformMessages(invalidContext: Boolean = false): MutableList<ChatMessage> {
         val chatMessages: MutableList<ChatMessage>
         // 找到最后一个用户消息的索引
-            val lastUserMessageIndex = messages.indexOfLast { it.role == ChatRole.user }
+        val lastUserMessageIndex = messages.indexOfLast { it.role == ChatRole.user }
 
-            // 映射每条消息，根据是否有 context 以及是否是最后一个用户消息进行处理
-            chatMessages = messages.mapIndexed { index, it ->
-                when {
-                    // 1. 没有 context
-                    it.context.isBlank() -> ChatMessage(it.role, it.content)
+        // 映射每条消息，根据是否有 context 以及是否是最后一个用户消息进行处理
+        chatMessages = messages.mapIndexed { index, it ->
+            when {
+                // 1. 没有 context
+                it.context.isBlank() -> ChatMessage(it.role, it.content)
 
-                    // 2. 有 context 但不是最后一个用户消息
-                    index != lastUserMessageIndex || invalidContext -> {
-                        ChatMessage(
-                            it.role,
-                            """
-${it.content}
----
-上下文信息：
-```
-上下文已失效
-```
+                // 2. 有 context 但不是最后一个用户消息
+                index != lastUserMessageIndex || invalidContext -> {
+                    ChatMessage(
+                        it.role,
+                        """
+    ${it.content}
+    ---
+    上下文信息：
+    ```
+    上下文已失效
+    ```
                         """.trimIndent()
-                        )
-                    }
-                    // 3. 有 context 且是最后一个用户消息
-                    else -> {
-                        ChatMessage(
-                            it.role,
-                            """
-${it.content}
----
-上下文信息：
-${FileUtil.wrapBorder(it.context)}
-                        """.trimIndent()
-                        )
-                    }
+                    )
                 }
-            }.toMutableList()
+                // 3. 有 context 且是最后一个用户消息
+                else -> {
+                    ChatMessage(
+                        it.role,
+                        """
+    ${it.content}
+    ---
+    上下文信息：
+    ${FileUtil.wrapBorder(it.context)}
+                        """.trimIndent()
+                    )
+                }
+            }
+        }.toMutableList()
         return chatMessages
     }
 
     companion object {
         private val logger = logger<ChatCodingService>()
-
-        fun fromSerializable(data: SerializableChatSession, project: Project): ChatSession {
-            val virtualFiles = data.filePaths.mapNotNull { path ->
-                LocalFileSystem.getInstance().findFileByPath(path)
-            }.toMutableList()
-
-            return ChatSession(
-                id = data.id,
-                messages = data.messages,
-                startTime = data.startTime,
-                type = data.type,
-                fileList = virtualFiles,  // 新增
-                withFiles = CommonSettings.getInstance().withFiles,
-                data.projectName
-            )
-        }
     }
 }
 
@@ -566,10 +570,47 @@ data class SerializableChatSession @JvmOverloads constructor(
     val startTime: Long = 0L,
     val type: String = "",
     val withFiles: Boolean = true,
-    val filePaths: MutableList<String> = mutableListOf(),
+    val projectFileTrees: List<SerializableProjectFileTree> = emptyList(),
     val projectName: String = ""
 ) {
     fun toChatSession(project: Project): ChatSession {
-        return ChatSession.fromSerializable(this, project)
+        val projectFileTrees = projectFileTrees.map { it.toProjectFileTree() }.toMutableList()
+        return ChatSession(
+            id = id,
+            messages = messages,
+            startTime = startTime,
+            type = type,
+            withFiles = withFiles,
+            projectFileTrees = projectFileTrees,
+            project = projectName
+        )
+    }
+}
+
+data class ProjectFileTree(
+    val projectName: String,
+    val files: List<VirtualFile>
+) {
+    fun toSerializable(): SerializableProjectFileTree {
+        return SerializableProjectFileTree(
+            projectName = projectName,
+            filePaths = files.map { it.path }
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectFileTree(
+    val projectName: String,
+    val filePaths: List<String>
+) {
+    fun toProjectFileTree(): ProjectFileTree {
+        val files = filePaths.mapNotNull { path ->
+            LocalFileSystem.getInstance().findFileByPath(path)
+        }
+        return ProjectFileTree(
+            projectName = projectName,
+            files = files
+        )
     }
 }

@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.java.toolWindow.treePanel
+package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.intellij.icons.AllIcons

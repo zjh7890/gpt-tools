@@ -1,7 +1,7 @@
 package com.github.zjh7890.gpttools.java.action
 
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
-import com.github.zjh7890.gpttools.java.toolWindow.treePanel.FileTreeListPanel
+import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction

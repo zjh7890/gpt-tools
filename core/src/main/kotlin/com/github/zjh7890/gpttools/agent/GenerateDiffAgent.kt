@@ -37,8 +37,12 @@ object GenerateDiffAgent {
         val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply", project = project.name)
 
         var fileContent = "No files."
-        if (currentSession.fileList.isNotEmpty()) {
-            fileContent = currentSession.fileList.map { FileUtil.readFileInfoForLLM(it, project) }.joinToString("\n\n")
+        if (currentSession.projectFileTrees.isNotEmpty()) {
+            fileContent = currentSession.projectFileTrees.joinToString("\n\n=== Project: ${project.name} ===\n\n") { projectTree ->
+                projectTree.files.joinToString("\n\n") { file ->
+                    FileUtil.readFileInfoForLLM(file, project)
+                }
+            }
         }
 
         chatSession.add(
@@ -135,7 +139,7 @@ changeType: DELETE
 3. MODIFY 类型时，ORIGINAL 必须是文件中实际存在的内容
 4. REWRITE 类型时，会直接使用 UPDATED 的内容替换整个文件，使用时 ORIGINAL 直接置空，UPDATED 块直接重写文件，所以 UPDATED 块要包含文件所有数据，如要使用，一个文件只会有一个 REWRITE 块
 
-原文件:
+原项目文件:
 ${FileUtil.wrapBorder(fileContent)}
 
 下面是修改意见：
