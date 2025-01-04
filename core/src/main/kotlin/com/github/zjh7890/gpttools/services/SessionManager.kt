@@ -1,6 +1,7 @@
 package com.github.zjh7890.gpttools.services
 
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
+import com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
@@ -48,12 +49,17 @@ class SessionManager(private val project: Project) : Disposable {
      * 创建一个新的会话
      */
     fun createNewSession() {
+        // 先从当前会话中移除 project
+        val currentSession = sessions[currentSessionId]
+        currentSession?.projects?.remove(project)
+
         val sessionId = UUID.randomUUID().toString()
         val newSession = ChatSession(
             id = sessionId,
             type = "chat",
             project = project.name,
-            startTime = System.currentTimeMillis()
+            startTime = System.currentTimeMillis(),
+            projects = mutableListOf(project)
         )
 
         currentSessionId = sessionId
@@ -80,9 +86,18 @@ class SessionManager(private val project: Project) : Disposable {
     /**
      * 设置当前激活的会话
      */
-    fun setCurrentSession(sessionId: String) {
+    fun setCurrentSession(sessionId: String, project: Project) {
         if (sessions.containsKey(sessionId)) {
             currentSessionId = sessionId
+            // 添加project到当前session
+            val currentSession = getCurrentSession()
+            if (!currentSession.projects.contains(project)) {
+                currentSession.projects.add(project)
+            }
+
+            // 获取并刷新 panel 的 file list
+            val fileTreePanel = ContextFileToolWindowFactory.getPanel(this.project)
+            fileTreePanel?.updateFileTree(currentSession)
             notifySessionListChanged()
         } else {
             logger.warn("Attempted to set a non-existent session: $sessionId")
@@ -116,7 +131,10 @@ class SessionManager(private val project: Project) : Disposable {
      * 将文件添加到当前会话
      */
     fun addFileToCurrentSession(file: VirtualFile) {
-        val currentSession = getCurrentSession()
+        // 获取并刷新 panel 的 file list
+        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
+
+        val currentSession = fileTreePanel?.currentSession ?: getCurrentSession()
         val projectTree = currentSession.projectFileTrees.find { it.projectName == project.name }
 
         if (projectTree != null) {
@@ -127,6 +145,7 @@ class SessionManager(private val project: Project) : Disposable {
             currentSession.projectFileTrees += ProjectFileTree(project.name, listOf(file).toMutableList())
         }
 
+        fileTreePanel?.updateFileTree(currentSession)
         saveSessions()
         notifySessionListChanged()
     }
@@ -163,6 +182,9 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     override fun dispose() {
+        // 销毁时移除当前project
+        val currentSession = sessions[currentSessionId]
+        currentSession?.projects?.remove(project)
         sessionHistoryListeners.clear()
     }
 

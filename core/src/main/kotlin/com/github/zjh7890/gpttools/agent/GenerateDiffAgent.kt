@@ -34,7 +34,8 @@ object GenerateDiffAgent {
         ui.progressBar.isIndeterminate = true  // 设置为不确定状态
         ui.inputSection.showStopButton()
         val border = FileUtil.determineBorder(response)
-        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply", project = project.name)
+        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply",
+            project = project.name, projects =  mutableListOf(project))
 
         var fileContent = "No files."
         if (currentSession.projectFileTrees.isNotEmpty()) {

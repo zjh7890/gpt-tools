@@ -1,7 +1,6 @@
-package com.github.zjh7890.gpttools.toolWindow.llmChat
+package com.github.zjh7890.gpttools.toolWindow.context
 
 import com.github.zjh7890.gpttools.services.ChatSession
-import com.github.zjh7890.gpttools.services.ProjectFileTree
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -16,9 +15,9 @@ import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JTree
-import javax.swing.JOptionPane
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
@@ -124,7 +123,12 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
             val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
             if (node.parent == root) {
                 // 不允许移除包节点
-                JOptionPane.showMessageDialog(this, "无法移除包节点。请仅移除文件节点。", "移除节点", JOptionPane.ERROR_MESSAGE)
+                JOptionPane.showMessageDialog(
+                    this,
+                    "无法移除包节点。请仅移除文件节点。",
+                    "移除节点",
+                    JOptionPane.ERROR_MESSAGE
+                )
                 return@forEach
             }
             val parent = node.parent as? DefaultMutableTreeNode ?: return@forEach
@@ -154,7 +158,12 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
         if (filePaths.isNotEmpty()) {
             val clipboardContent = filePaths.joinToString("\n")
             ClipboardUtils.copyToClipboard(clipboardContent)
-            JOptionPane.showMessageDialog(this, "已复制 ${filePaths.size} 个文件路径到剪贴板。", "复制成功", JOptionPane.INFORMATION_MESSAGE)
+            JOptionPane.showMessageDialog(
+                this,
+                "已复制 ${filePaths.size} 个文件路径到剪贴板。",
+                "复制成功",
+                JOptionPane.INFORMATION_MESSAGE
+            )
         } else {
             JOptionPane.showMessageDialog(this, "选中的节点下没有文件。", "复制文件", JOptionPane.INFORMATION_MESSAGE)
         }
@@ -219,6 +228,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
         }
     }
 }
+
 
 /**
  * 自定义树节点渲染器，以显示不同类型的节点图标和文本

@@ -4,6 +4,7 @@ import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.project.Project
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -14,7 +15,8 @@ data class ChatSession(
     val type: String,
     var projectFileTrees: MutableList<ProjectFileTree> = mutableListOf(),
     var withFiles: Boolean = true,
-    val project: String
+    val project: String,
+    val projects : MutableList<Project> = mutableListOf()
 ) {
     // 添加序列化方法
     fun toSerializable(): SerializableChatSession {

@@ -31,7 +31,7 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener 
         addActionListener {
             val selectedSession = conversationList.selectedValue
             if (selectedSession != null) {
-                sessionManager.setCurrentSession(selectedSession.id)
+                sessionManager.setCurrentSession(selectedSession.id, project)
                 val contentPanel = LLMChatToolWindowFactory.getPanel(project)
                 contentPanel?.reloadConversation()
 

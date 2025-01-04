@@ -1,9 +1,7 @@
 package com.github.zjh7890.gpttools.toolWindow.context
 
-import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.services.SessionManager
-import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatFileTreeListPanel
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
@@ -130,7 +128,7 @@ class ContextFileToolWindowFactory : ToolWindowFactory {
                 if (dialog.showAndGet()) {
                     val selectedSession = dialog.getSelectedSession()
                     if (selectedSession != null) {
-                        panel.updateFileTree(selectedSession)
+                        SessionManager.getInstance(project).setCurrentSession(selectedSession.id, project)
                     }
                 }
             }

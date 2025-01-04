@@ -25,7 +25,8 @@ data class SerializableChatSession @JvmOverloads constructor(
             type = type,
             withFiles = withFiles,
             projectFileTrees = projectFileTrees,
-            project = projectName
+            project = projectName,
+            projects =  mutableListOf(project)
         )
     }
 }
