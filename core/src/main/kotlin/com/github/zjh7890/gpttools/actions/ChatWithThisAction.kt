@@ -1,6 +1,7 @@
 package com.github.zjh7890.gpttools.actions
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.codeInsight.intention.IntentionAction
@@ -34,8 +35,8 @@ class ChatWithThisAction : IntentionAction, Iconable {
 
         // 更新发送到聊天窗口的内容
         ChatUtils.sendToChatWindow(project, { contentPanel, chatCodingService ->
-            chatCodingService.newSession(true)
-            chatCodingService.addFileToCurrentSession(virtualFile)
+            SessionManager.getInstance(project).createNewSession()
+            SessionManager.getInstance(project).addFileToCurrentSession(virtualFile)
             contentPanel.setInput("")
         })
     }

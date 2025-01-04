@@ -2,6 +2,7 @@ package com.github.zjh7890.gpttools.toolWindow.context
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatSession
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatFileTreeListPanel
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -94,7 +95,7 @@ class ContextFileToolWindowFactory : ToolWindowFactory {
                 
                 // 为每个项目获取其当前 ChatSession
                 val projectSessions = openProjects.mapNotNull { proj ->
-                    val service = ChatCodingService.getInstance(proj)
+                    val service = SessionManager.getInstance(proj)
                     val session = service.getCurrentSession()
                     "${proj.name} - ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(session.startTime))}" to session
                 }
@@ -147,7 +148,7 @@ class ContextFileToolWindowFactory : ToolWindowFactory {
      */
     companion object {
         fun getPanel(project: Project): ChatFileTreeListPanel? {
-            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ContextFileToolWindow")
+            val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("ContextFileTool")
             return toolWindow?.contentManager?.getContent(0)?.component as? ChatFileTreeListPanel
         }
     }

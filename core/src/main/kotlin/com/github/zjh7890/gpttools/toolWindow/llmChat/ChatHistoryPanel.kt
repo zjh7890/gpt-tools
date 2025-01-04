@@ -2,6 +2,8 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatSession
+import com.github.zjh7890.gpttools.services.SessionListener
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBList
@@ -22,13 +24,14 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionListener {
 
     private val messageListModel = DefaultListModel<String>()
     private val messageList = JBList<String>(messageListModel)
+    val sessionManager = SessionManager.getInstance(project)
 
     // 新增按钮字段
     private val restoreButton = JButton("Restore Session").apply {
         addActionListener {
             val selectedSession = conversationList.selectedValue
             if (selectedSession != null) {
-                chatCodingService.setCurrentSession(selectedSession.id)
+                sessionManager.setCurrentSession(selectedSession.id)
                 val contentPanel = LLMChatToolWindowFactory.getPanel(project)
                 contentPanel?.reloadConversation()
 
@@ -51,7 +54,7 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionListener {
         // 初始化对话列表
         loadConversationList()
 
-        chatCodingService.addSessionListener(this)
+        sessionManager.addSessionListener(this)
 
         conversationList.selectionMode = ListSelectionModel.SINGLE_SELECTION
         conversationList.addListSelectionListener {
@@ -101,7 +104,7 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionListener {
 
     private fun loadConversationList() {
         conversationListModel.clear()
-        val sessions = chatCodingService.getSessionList()
+        val sessions = sessionManager.getSessionList()
             .filter { it.project == project.name }
         val sortedSessions = sessions.sortedByDescending { it.startTime }
         sortedSessions.forEach { session ->
@@ -122,8 +125,4 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionListener {
             loadConversationList()
         }
     }
-}
-
-interface SessionListener {
-    fun sessionListChanged()
 }

@@ -24,7 +24,7 @@
                     icon="/icons/icon_dark_16px.svg">
         </toolWindow>
 
-        <toolWindow id="ContextFileToolWindow"
+        <toolWindow id="ContextFileTool"
                     anchor="right"
                     factoryClass="com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory"
                     canCloseContent="false"

@@ -2,6 +2,7 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.MyBundle
 import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.intellij.icons.AllIcons
@@ -80,8 +81,8 @@ class LLMNewChatAction : AnAction("New Chat", "New Chat", AllIcons.Actions.Edit)
 class ExportChatHistoryAction : AnAction("Export Chat History", "Export the chat history", AllIcons.ToolbarDecorator.Export) {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val chatCodingService = ChatCodingService.getInstance(project)
-        val exportedContent = chatCodingService.exportChatHistory()
+        val sessionManager = SessionManager.getInstance(project)
+        val exportedContent = sessionManager.exportChatHistory()
         ClipboardUtils.copyToClipboard(exportedContent)
     }
 }

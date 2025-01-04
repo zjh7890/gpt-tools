@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools.actions
 import com.github.zjh7890.gpttools.context.builder.PromptContext
 import com.github.zjh7890.gpttools.context.builder.PromptContextProvider
 import com.github.zjh7890.gpttools.context.builder.WrapBorder
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.settings.template.PromptTemplate
 import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.github.zjh7890.gpttools.utils.ClipboardUtils.copyToClipboard
@@ -97,7 +98,7 @@ class CommonTemplateAction(val promptTemplate: PromptTemplate) : AnAction(prompt
         val result = TemplateUtils.replacePlaceholders(promptTemplate.value, mergedMap)
         if (promptTemplate.newChat) {
             ChatUtils.sendToChatWindow(project) { contentPanel, chatCodingService ->
-                chatCodingService.newSession()
+                SessionManager.getInstance(project).createNewSession()
                 contentPanel.setInput("\n" + result)
             }
         } else {

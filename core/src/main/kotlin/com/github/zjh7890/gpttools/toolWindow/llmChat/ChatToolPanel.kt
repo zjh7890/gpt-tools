@@ -2,8 +2,8 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.components.welcome.WelcomePanel
-import com.github.zjh7890.gpttools.services.ChatCodingService
-import com.github.zjh7890.gpttools.services.ChatContextMessage
+import com.github.zjh7890.gpttools.services.*
+import com.github.zjh7890.gpttools.services.SessionListener
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
@@ -14,10 +14,6 @@ import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.ui.DocumentAdapter
-import javax.swing.event.DocumentEvent
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.Presentation
@@ -27,7 +23,10 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.*
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.IdeFocusManager
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.Gray
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -45,11 +44,13 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.event.DocumentEvent
 
 class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
     NullableComponent,
     Disposable {
+
     private val logger = logger<ChatToolPanel>()
 
     var progressBar: JProgressBar
@@ -82,6 +83,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     var suggestionPanel: JPanel = JPanel(BorderLayout())
 
     val chatCodingService: ChatCodingService = ChatCodingService.getInstance(project)
+    val sessionManager: SessionManager = project.getService(SessionManager::class.java)
 
     var editingMessageView: MessageView? = null
     private val editingLabel = JLabel()
@@ -117,7 +119,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         // 注册到 project 的 Disposable 树中
         project.messageBus.connect(this)
-        
+
         focusMouseListener = object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent?) {
                 focusInput()
@@ -186,7 +188,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
                     // 截断 ChatSession 中的消息
                     val chatCodingService = ChatCodingService.getInstance(project)
-                    chatCodingService.truncateMessagesAfter(editingMessageView!!.chatMessage!!)
+                    sessionManager.truncateMessagesAfter(editingMessageView!!.chatMessage!!)
 
                     // 删除 UI 中的后续 MessageView
                     removeMessageViewsAfter(editingMessageView!!)
@@ -224,7 +226,8 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         // 添加监听器
         withFilesCheckbox.addActionListener {
             CommonSettings.getInstance().withFiles = withFilesCheckbox.isSelected
-            chatCodingService.updateWithFiles(withFilesCheckbox.isSelected)
+            sessionManager.getCurrentSession().withFiles = withFilesCheckbox.isSelected
+            sessionManager.saveSessions()
         }
 
         withDirCheckbox.addActionListener {
@@ -290,14 +293,21 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         setContent(panelContent)
 
+        // 添加会话监听器以在会话列表更改时更新 UI（根据需要实现）
+        sessionManager.addSessionListener(object : SessionListener {
+            override fun sessionListChanged() {
+                // 根据需要实现，例如刷新会话列表面板
+            }
+        })
     }
 
-    // 重新加载当前对话
+    /**
+     * 重新加载当前对话
+     */
     fun reloadConversation() {
         myList.removeAll()
         myList.add(WelcomePanel())
-        val chatCodingService = ChatCodingService.getInstance(project)
-        val currentSession = chatCodingService.getCurrentSession()
+        val currentSession = sessionManager.getCurrentSession()
         currentSession.messages.forEach { message ->
             addMessage(message.content, message.role == ChatRole.user, render = true, chatMessage = message)
         }
@@ -305,14 +315,19 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         updateUI()
     }
 
-
+    /**
+     * 刷新文件列表
+     */
     fun refreshFileList() {
-        val session = chatCodingService.getCurrentSession()
+        val session = sessionManager.getCurrentSession()
         // 获取并刷新 panel 的 file list
         val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
         fileTreePanel?.updateFileTree(session)
     }
 
+    /**
+     * 显示文件选择弹出窗口
+     */
     private fun showFileSelectionPopup() {
         val textField = JTextField()
         val listModel = DefaultListModel<VirtualFile>()
@@ -357,7 +372,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 setOkOperation {
                     val selectedFile = fileList.selectedValue
                     if (selectedFile != null) {
-                        chatCodingService.addFileToCurrentSession(selectedFile)
+                        sessionManager.addFileToCurrentSession(selectedFile)
                         refreshFileList()
                     }
                 }
@@ -367,7 +382,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         val addSelectedFile: () -> Unit = {
             val selectedFile = fileList.selectedValue
             if (selectedFile != null) {
-                chatCodingService.addFileToCurrentSession(selectedFile)
+                sessionManager.addFileToCurrentSession(selectedFile)
                 refreshFileList()
             }
         }
@@ -390,7 +405,10 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
 
         dialog.show()
     }
-    
+
+    /**
+     * 聚焦到输入区域
+     */
     fun focusInput() {
         val focusManager = IdeFocusManager.getInstance(chatCodingService.project)
         focusManager.doWhenFocusSettlesDown {
@@ -399,7 +417,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     }
 
     /**
-     * Add a message to the chat panel and update ui
+     * 在聊天面板中添加一条消息，并更新 UI
      */
     fun addMessage(
         message: String,
@@ -420,6 +438,9 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         return messageView
     }
 
+    /**
+     * 更新布局
+     */
     private fun updateLayout() {
         val layout = myList.layout
         for (i in 0 until myList.componentCount) {
@@ -428,6 +449,9 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         }
     }
 
+    /**
+     * 滚动到底部
+     */
     private fun scrollToBottom() {
         SwingUtilities.invokeLater {
             val verticalScrollBar = myScrollPane.verticalScrollBar
@@ -440,45 +464,44 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     }
 
     /**
-     * Updates the replaceable content in the UI using the provided `Flow<String>`.
+     * 使用提供的 Flow 更新 UI 中可替换的内容
      *
      * @param content The flow of strings to update the UI with.
      * @param postAction A function that is called when the "Replace Selection" button is clicked,
-     *                            passing the current text to be replaced in the editor.
+     *                   passing the current text to be replaced in the editor.
      */
     suspend fun updateReplaceableContent(content: Flow<String>, postAction: (text: String) -> Unit) {
-//        myList.remove(myList.componentCount - 1)
-//        val text = updateMessageInUi(content, messageView)
-//
-//        progressBar.isIndeterminate = false
-//        progressBar.isVisible = false
-//        updateUI()
-//
-//        postAction(text)
+        // 实现内容更新逻辑（根据需求）
     }
 
+    /**
+     * 设置输入区域的文本内容，并聚焦到输入区域
+     */
     fun setInput(trimMargin: String) {
         inputSection.text = trimMargin
         this.focusInput()
     }
 
     /**
-     * Resets the chat session by clearing the current session and updating the UI.
+     * 重置聊天会话，清空当前会话并创建一个新的会话
      */
     fun newChatSession() {
-        progressBar.isVisible = false
-        myList.removeAll()
-        myList.add(WelcomePanel())
-        chatCodingService.newSession()
-        this.hiddenProgressBar()
-        chatCodingService.saveSessions()
-        updateUI()
+        sessionManager.createNewSession()
+        hiddenProgressBar()
+        sessionManager.saveSessions()
+        reloadConversation()
     }
 
+    /**
+     * 隐藏进度条
+     */
     fun hiddenProgressBar() {
         progressBar.isVisible = false
     }
 
+    /**
+     * 移除聊天列表中的最后一条消息
+     */
     fun removeLastMessage() {
         if (myList.componentCount > 0) {
             myList.remove(myList.componentCount - 1)
@@ -487,21 +510,24 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         updateUI()
     }
 
+    /**
+     * 在聊天面板中添加一个 Web 视图（根据需求实现）
+     */
     fun appendWebView(content: String, project: Project) {
-//        val msg = SimpleMessage(content, content, ChatRole.System)
-//        val webBlock = WebBlock(msg)
-//        val blockView = WebBlockView(webBlock, project)
-//        val codeView = CodeBlockView(CodeBlock(msg, language = HTMLLanguage.INSTANCE), project, {})
-//
-//        myList.add(FrontendCodeView(blockView, codeView))
-
+        // 实现 WebView 添加逻辑
         updateUI()
     }
 
+    /**
+     * 将光标移动到输入区域的起始位置
+     */
     fun moveCursorToStart() {
         inputSection.moveCursorToStart()
     }
 
+    /**
+     * 显示建议消息，用户点击后将建议内容填入输入区域
+     */
     fun showSuggestion(msg: String) {
         val label = panel {
             row {
@@ -521,7 +547,9 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         updateUI()
     }
 
-    // 设置编辑模式
+    /**
+     * 设置当前正在编辑的消息视图，并更新编辑状态
+     */
     fun setEditingMessage(messageView: MessageView?) {
         editingMessageView = messageView
         if (messageView != null) {
@@ -535,7 +563,9 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         focusInput()
     }
 
-    // 更新编辑状态标签
+    /**
+     * 更新编辑状态标签的文本和可见性
+     */
     private fun updateEditingStatus(status: String?) {
         if (status != null) {
             editingLabel.text = status
@@ -560,123 +590,25 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
             updateUI()
         }
     }
-    
+
     override fun dispose() {
-        // 清除所有消息视图
         myList.removeAll()
-        
-        // 停止所有正在进行的操作
         chatCodingService.stop()
-        
-        // 取消所有订阅
         if (disposable is Disposable) {
             Disposer.dispose(disposable)
         }
-        
-        // 清除引用
         editingMessageView = null
-        
-        // 移除所有监听器
         withFilesCheckbox.removeActionListener { }
         generateDiffCheckbox.removeActionListener { }
-
-        // 清除文件列表
         val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
         fileTreePanel?.removeAll()
     }
 
+    /**
+     * 同时在本地会话和 UI 中添加一条消息
+     */
     fun addMessageBoth(role: ChatRole, message: String) {
-        val chatMessage = chatCodingService.appendLocalMessage(role, message)
+        val chatMessage = sessionManager.appendLocalMessage(role, message)
         addMessage(message, role == ChatRole.user, render = true, chatMessage = chatMessage)
     }
 }
-
-private class ApplyCopyAction(
-    private val project: Project,
-    private val progressBar: JProgressBar,
-    private val inputSection: AutoDevInputSection,
-    private val chatCodingService: ChatCodingService
-) : AnAction("Apply copy content", "Apply copy content", GptToolsIcon.ApplyCopyIcon) {
-
-    override fun actionPerformed(e: AnActionEvent) {
-        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-        
-        // 创建一个包含多行文本框的面板
-        val textArea = JTextArea(10, 50) // 10行, 50列
-        textArea.lineWrap = true // 自动换行
-        textArea.wrapStyleWord = true // 按单词换行
-        
-        // 添加滚动条
-        val scrollPane = JBScrollPane(textArea)
-        
-        // 创建对话框
-        val dialog = DialogBuilder(project)
-        dialog.setCenterPanel(scrollPane)
-        dialog.setTitle("Apply Copy Content")
-        dialog.addOkAction()
-        dialog.addCancelAction()
-        
-        // 显示对话框
-        val result = dialog.show()
-        
-        // 如果用户点击确定且输入不为空
-        if (result == DialogWrapper.OK_EXIT_CODE) {
-            val message = textArea.text
-            if (message.isNotBlank()) {
-                ApplicationManager.getApplication().executeOnPooledThread {
-                    progressBar.isVisible = true
-                    progressBar.isIndeterminate = true
-
-                    ApplicationManager.getApplication().invokeAndWait {
-                        // 添加用户消息
-                        contentPanel?.addMessageBoth(ChatRole.assistant, FileUtil.wrapBorder(message))
-                    }
-
-                    // 调用 GenerateDiffAgent.apply
-                    val projectStructure = DirectoryUtil.getDirectoryContents(project)
-                    GenerateDiffAgent.apply(
-                        project,
-                        LLMSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
-                        projectStructure,
-                        message,
-                        chatCodingService.getCurrentSession(),
-                        contentPanel!!
-                    )
-                    
-                    progressBar.isIndeterminate = false
-                    progressBar.isVisible = false
-                }
-            }
-        }
-    }
-}
-
-private class GenerateDiffAction(
-    private val project: Project,
-    private val progressBar: JProgressBar,
-    private val inputSection: AutoDevInputSection,
-    private val chatCodingService: ChatCodingService
-) : AnAction("Generate diff based on this chat", "Generate diff based on this chat", AllIcons.Actions.ToggleVisibility) {
-
-    override fun actionPerformed(e: AnActionEvent) {
-        val projectStructure = DirectoryUtil.getDirectoryContents(project)
-        val chatHistory = chatCodingService.exportChatHistory(true)
-        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-
-        ApplicationManager.getApplication().executeOnPooledThread {
-            progressBar.isVisible = true
-            progressBar.isIndeterminate = true
-            GenerateDiffAgent.apply(
-                project,
-                LLMSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
-                projectStructure,
-                chatHistory,
-                chatCodingService.getCurrentSession(),
-                contentPanel!!
-            )
-            progressBar.isIndeterminate = false
-            progressBar.isVisible = false
-        }
-    }
-}
-

@@ -9,26 +9,19 @@ import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.toolWindow.chat.AutoDevInputTrigger
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
-import com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatToolPanel
-import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
-import com.github.zjh7890.gpttools.toolWindow.llmChat.SessionListener
 import com.github.zjh7890.gpttools.utils.*
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import java.text.SimpleDateFormat
-import java.util.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.findAnnotation
@@ -39,76 +32,15 @@ import kotlin.reflect.full.valueParameters
 @Service(Service.Level.PROJECT)
 class ChatCodingService(val project: Project) : Disposable {
     var currentJob: Job? = null
-    val sessions = mutableMapOf<String, ChatSession>()
-    var currentSessionId: String = ""
+    val sessionManager: SessionManager = project.getService(SessionManager::class.java)
 
     init {
-        loadSessions()
+        // Initialize any necessary components
     }
 
-    private val sessionListeners = mutableListOf<SessionListener>()
-
-    fun getCurrentSession(): ChatSession {
-        return sessions[currentSessionId]!!
-    }
-
-    fun getSessionList(): List<ChatSession> {
-        return sessions.values.toList()
-    }
-
-    fun setCurrentSession(sessionId: String) {
-        if (sessions.containsKey(sessionId)) {
-            currentSessionId = sessionId
-            // 如果有需要，通知其他监听器
-        }
-    }
-
-    fun saveSessions() {
-        // 序列化 sessions 并保存到文件
-        val sessionsData = sessions.values.map { it.toSerializable() }
-        val filePath = getSessionsFilePath()
-        FileUtil.writeJsonToFile(filePath, sessionsData)
-        // 通知监听器会话列表已更新
-        notifySessionListChanged()
-    }
-
-    private fun loadSessions() {
-        val filePath = getSessionsFilePath()
-        val sessionsData: List<SerializableChatSession>? = FileUtil.readJsonFromFile(filePath)
-        sessionsData?.forEach { data ->
-            val session = data.toChatSession(project)
-            sessions[session.id] = session
-        }
-        // 获取当前项目的会话列表
-        val currentProjectSessions = sessions.values
-            .filter { it.project == project.name }
-
-        if (currentProjectSessions.isEmpty()) {
-            // 如果当前项目没有会话，创建新会话
-            newSession()
-        } else {
-            // 设置当前项目最新的会话为当前会话
-            currentSessionId = currentProjectSessions
-                .maxByOrNull { it.startTime }
-                ?.id
-                ?: currentProjectSessions.first().id
-        }
-    }
-
-    private fun getSessionsFilePath(): String {
-        val userHome = System.getProperty("user.home")
-        return "$userHome/.gpttools/chat_sessions.json"
-    }
-
-    fun stop() {
-        currentJob?.cancel()
-    }
-
-    fun updateWithFiles(withFiles: Boolean) {
-        CommonSettings.getInstance().withFiles = withFiles
-        getCurrentSession().withFiles = withFiles
-    }
-
+    /**
+     * 处理用户输入的提示，并与 LLM 交互获取响应
+     */
     fun handlePromptAndResponse(
         ui: ChatToolPanel,
         prompter: String,
@@ -117,7 +49,7 @@ class ChatCodingService(val project: Project) : Disposable {
         llmConfig: LlmConfig,
         trigger: AutoDevInputTrigger
     ) {
-        val session = getCurrentSession()
+        val session = sessionManager.getCurrentSession()
         currentJob?.cancel()
         val projectStructure = DirectoryUtil.getDirectoryContents(project)
 
@@ -126,12 +58,12 @@ class ChatCodingService(val project: Project) : Disposable {
             message = ChatContextMessage(ChatRole.user, prompter)
             val addMessage = ui.addMessage(prompter, true, prompter, null, message)
             addMessage.scrollToBottom()
-            getCurrentSession().add(message)
+            session.add(message)
         }
 
         if (trigger == AutoDevInputTrigger.CopyPrompt) {
             addContextToMessages(message!!, project)
-            val chatHistory = exportChatHistory(false)
+            val chatHistory = sessionManager.exportChatHistory(false)
             ClipboardUtils.copyToClipboard(chatHistory)
             return
         }
@@ -141,9 +73,8 @@ class ChatCodingService(val project: Project) : Disposable {
 
         ApplicationManager.getApplication().executeOnPooledThread {
             addContextToMessages(message!!, project)
-            val messages: MutableList<ChatMessage> = getCurrentSession().transformMessages()
-            exportChatHistory()
-            saveSessions()
+            val messages: MutableList<ChatMessage> = session.transformMessages()
+            sessionManager.saveSessions()
             ui.progressBar.isVisible = true
             ui.progressBar.isIndeterminate = true  // 设置为不确定状态
             ui.updateUI()
@@ -171,27 +102,28 @@ class ChatCodingService(val project: Project) : Disposable {
                 ui.progressBar.isVisible = false
                 ui.updateUI()
 
-                getCurrentSession().add(ChatContextMessage(ChatRole.assistant, text))
-                exportChatHistory()
-                saveSessions()
+                sessionManager.appendLocalMessage(ChatRole.assistant, text)
+                sessionManager.saveSessions()
 
                 // 只在没有错误时执行 GenerateDiffAgent
                 if (!hasError && withDiff) {
                     ApplicationManager.getApplication().executeOnPooledThread {
-                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, getCurrentSession(), ui)
+                        GenerateDiffAgent.apply(project, llmConfig, projectStructure, text, session, ui)
                     }
                 }
             }
         }
     }
 
+    /**
+     * 为消息添加上下文信息，包括文件内容和项目目录结构
+     */
     private fun addContextToMessages(message: ChatContextMessage, project: Project) {
         val contextBuilder = StringBuilder()
 
-        // 添加文件内容（如果启用且有文件）
-        if (CommonSettings.getInstance().withFiles && getCurrentSession().projectFileTrees.isNotEmpty()) {
+        if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().projectFileTrees.isNotEmpty()) {
             contextBuilder.append("相关项目文件内容：\n")
-            val fileContents = getCurrentSession().projectFileTrees.joinToString("\n\n") { projectFileTree ->
+            val fileContents = sessionManager.getCurrentSession().projectFileTrees.joinToString("\n\n") { projectFileTree ->
 """
 === Project: ${projectFileTree.projectName} ===
 ${collectFileContents(projectFileTree.files).joinToString("\n")}
@@ -205,8 +137,8 @@ ${collectFileContents(projectFileTree.files).joinToString("\n")}
         if (CommonSettings.getInstance().withDir) {
             val projectStructure = DirectoryUtil.getProjectStructure(project)
             contextBuilder.append("""
-项目目录结构：
-${FileUtil.wrapBorder(projectStructure)}
+        项目目录结构：
+        ${FileUtil.wrapBorder(projectStructure)}
             """.trimIndent())
         }
 
@@ -216,6 +148,9 @@ ${FileUtil.wrapBorder(projectStructure)}
         }
     }
 
+    /**
+     * 收集指定文件的内容，供 LLM 使用
+     */
     private fun collectFileContents(files: List<VirtualFile>): List<String> {
         return files.mapNotNull { file ->
             if (!file.isDirectory) {
@@ -226,150 +161,6 @@ ${FileUtil.wrapBorder(projectStructure)}
         }
     }
 
-    private fun confirmAndExecuteActions(actions: List<Action>, ui: ChatToolPanel) {
-        ApplicationManager.getApplication().invokeLater {
-            actions.forEachIndexed { idx, action ->
-                val (actionDesc, commandType, cmd) = action
-                val dialog = CommandDialog(project, actionDesc, cmd)
-                if (dialog.showAndGet()) {
-                    val modifiedCommand = dialog.getModifiedCommand()
-                    if (modifiedCommand.isNotEmpty()) {
-                        ApplicationManager.getApplication().executeOnPooledThread {
-                            ApplicationManager.getApplication().runReadAction {
-                                val result = CmdUtils.executeCmd(modifiedCommand, commandType, project)
-                                ui.addMessage(result, chatMessage = null)
-                                appendLocalMessage(ChatRole.assistant, result)
-                            }
-                        }
-                    } else {
-                        ui.addMessage("修改后的命令无效，跳过执行。", chatMessage = null)
-                    }
-                } else {
-                    ui.addMessage("用户取消了命令 $idx 的执行。", chatMessage = null)
-                }
-            }
-        }
-    }
-
-    private fun parseModelReply(reply: String): Pair<String, List<Action>> {
-        val actions = mutableListOf<Action>()
-        val lines = reply.split('\n')
-        var captureCommand = false
-        var commandType = ""
-        var actionDesc: String? = null
-        val actionCommand = mutableListOf<String>()
-        var foundActionResponse = false
-
-        for (line in lines) {
-            val trimmedLine = line.trim()
-
-            if ("GPT_ACTION_RESPONSE" in trimmedLine) {
-                foundActionResponse = true
-                continue
-            }
-
-            if (!foundActionResponse) {
-                continue
-            }
-
-            if (trimmedLine.startsWith("```")) {
-                if (captureCommand) {
-                    actions.add(Action(actionDesc ?: "", commandType, actionCommand.joinToString("\n")))
-                    captureCommand = false
-                    actionCommand.clear()
-                    commandType = ""
-                    actionDesc = ""
-                } else {
-                    captureCommand = true
-                    // 提取命令类型，例如 shell 或 custom
-                    val codeFencePattern = Regex("""```(\w+)?""")
-                    val match = codeFencePattern.matchEntire(trimmedLine)
-                    commandType = match?.groupValues?.get(1) ?: ""
-                }
-                continue
-            }
-
-            if (captureCommand) {
-                actionCommand.add(trimmedLine)
-            } else if(trimmedLine.isNotEmpty()) {
-                actionDesc = trimmedLine
-            }
-        }
-
-        return "执行动作" to actions
-    }
-
-    fun appendLocalMessage(role: ChatRole, msg: String): ChatContextMessage {
-        val message = ChatContextMessage(role, msg)
-        getCurrentSession().add(message)
-        return message
-    }
-
-    fun getTools(): String {
-        val builder = StringBuilder()
-        val objectMapper = jacksonObjectMapper()
-        val functions = ToolsService::class.memberFunctions.filter { function ->
-            function.findAnnotation<Desc>() != null
-        }
-        functions.forEachIndexed { index, function ->
-            val methodDescription = function.findAnnotation<Desc>()?.description ?: "No description"
-            val name = function.name
-            val parameters = function.valueParameters.associate { subParam ->
-                val key: String = subParam.name ?: "unknown"
-                val value: Any? = generateSampleParameterValues(subParam)
-                key to value
-            }
-            val parametersJson = objectMapper.writeValueAsString(parameters)
-            builder.append("${index + 1}. $name\n")
-            builder.append("描述：$methodDescription\n")
-            builder.append("入参：$parametersJson\n")
-        }
-        return builder.toString()
-    }
-
-    fun generateSampleParameterValues(parameter: KParameter): Any? {
-        val type = parameter.type
-        val classifier = type.classifier as? KClass<*>
-
-        return when (classifier) {
-            String::class -> "exampleString"
-            Int::class, Long::class, Float::class, Double::class, Short::class, Byte::class -> 0
-            Boolean::class -> true
-            List::class, Set::class, Collection::class -> listOf("item1", "item2")
-            else -> if (classifier != null && classifier.isData) {
-                // For data classes, generate a map of property names to sample values
-                val paramMap = mutableMapOf<String, Any?>()
-                classifier.primaryConstructor?.parameters?.forEach { param ->
-                    val paramName = param.name ?: "unknown"
-                    val paramValue = generateSampleParameterValues(param)
-                    paramMap[paramName] = paramValue
-                }
-                paramMap
-            } else "unknown"
-        }
-    }
-
-    fun newSession(keepContext: Boolean = false) {
-        val sessionId = UUID.randomUUID().toString()
-        val newSession = ChatSession(
-            id = sessionId,
-            type = "chat",
-            project = project.name
-        )
-
-        currentSessionId = sessionId
-        sessions[sessionId] = newSession
-        saveSessions()
-
-        // 获取并刷新 panel 的 file list
-        val contentPanel = LLMChatToolWindowFactory.getPanel(project)
-        contentPanel?.refreshFileList()
-    }
-
-    fun exportChatHistory(invalidContext: Boolean = false): String {
-        return getCurrentSession().exportChatHistory(invalidContext)
-    }
-
     companion object {
         fun getInstance(project: Project): ChatCodingService {
             return project.getService(ChatCodingService::class.java)
@@ -377,123 +168,15 @@ ${FileUtil.wrapBorder(projectStructure)}
 
         private val logger = logger<ChatCodingService>()
     }
+    /**
+     * 停止当前正在执行的协程任务
+     */
+    fun stop() {
+        currentJob?.cancel()
+    }
+
 
     override fun dispose() {
-        // 清理资源
         stop()
-        sessionListeners.clear()
-    }
-
-    fun truncateMessagesAfter(chatMessage: ChatContextMessage) {
-        val index = getCurrentSession()!!.messages.indexOf(chatMessage)
-        if (index >= 0 && index < getCurrentSession().messages.size - 1) {
-            // 保留到指定消息（包括它本身）
-            getCurrentSession().messages.subList(index + 1, getCurrentSession().messages.size).clear()
-        }
-    }
-
-    fun addSessionListener(listener: SessionListener) {
-        sessionListeners.add(listener)
-    }
-
-    private fun notifySessionListChanged() {
-        if (sessionListeners == null) {
-            return
-        }
-        sessionListeners.forEach { listener ->
-            listener.sessionListChanged()
-        }
-    }
-
-    fun addFileToCurrentSession(file: VirtualFile) {
-        // 从 ContextFileToolWindowFactory 获取 panel
-        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
-        // 使用 panel 中记录的 session
-        val currentSession = fileTreePanel?.currentSession ?: getCurrentSession()
-        
-        val projectTree = currentSession.projectFileTrees.find { it.projectName == project.name }
-
-        if (projectTree != null) {
-            // 如果文件不在列表中才添加
-            if (!projectTree.files.contains(file)) {
-                currentSession.projectFileTrees = currentSession.projectFileTrees.map {
-                    if (it.projectName == project.name) {
-                        it.copy(files = it.files + file)
-                    } else {
-                        it
-                    }
-                }.toMutableList()
-            }
-        } else {
-            // 如果项目不存在，创建新的 ProjectFileTree
-            currentSession.projectFileTrees = (currentSession.projectFileTrees +
-                    ProjectFileTree(project.name, listOf(file))).toMutableList()
-        }
-
-        saveSessions()
-
-        // 刷新 panel 的 file list
-        fileTreePanel?.updateFileTree(currentSession)
-    }
-}
-
-data class Action(val description: String, val commandType: String, val command: String)
-
-@Serializable
-data class ChatContextMessage @JvmOverloads constructor(
-    val role: ChatRole = ChatRole.user,
-    var content: String = "",
-    var context: String = "",
-)
-
-@Serializable
-data class SerializableChatSession @JvmOverloads constructor(
-    val id: String = "",
-    val messages: MutableList<ChatContextMessage> = mutableListOf(),
-    val startTime: Long = 0L,
-    val type: String = "",
-    val withFiles: Boolean = true,
-    val projectFileTrees: List<SerializableProjectFileTree> = emptyList(),
-    val projectName: String = ""
-) {
-    fun toChatSession(project: Project): ChatSession {
-        val projectFileTrees = projectFileTrees.map { it.toProjectFileTree() }.toMutableList()
-        return ChatSession(
-            id = id,
-            messages = messages,
-            startTime = startTime,
-            type = type,
-            withFiles = withFiles,
-            projectFileTrees = projectFileTrees,
-            project = projectName
-        )
-    }
-}
-
-data class ProjectFileTree(
-    val projectName: String = "",
-    val files: List<VirtualFile> = emptyList()
-) {
-    fun toSerializable(): SerializableProjectFileTree {
-        return SerializableProjectFileTree(
-            projectName = projectName,
-            filePaths = files.map { it.path }
-        )
-    }
-}
-
-@Serializable
-data class SerializableProjectFileTree(
-    val projectName: String = "",
-    val filePaths: List<String> = emptyList()
-) {
-    fun toProjectFileTree(): ProjectFileTree {
-        val files = filePaths.mapNotNull { path ->
-            LocalFileSystem.getInstance().findFileByPath(path)
-        }
-        return ProjectFileTree(
-            projectName = projectName,
-            files = files
-        )
     }
 }

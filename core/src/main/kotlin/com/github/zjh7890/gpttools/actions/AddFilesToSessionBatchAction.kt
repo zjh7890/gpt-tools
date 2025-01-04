@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
@@ -29,7 +30,9 @@ class AddFilesToSessionBatchAction : AnAction("Add Files to Session") {
         }
 
         ChatUtils.activateToolWindowRun(project) { panel, service ->
-            filesToAdd.forEach { service.addFileToCurrentSession(it) }
+            filesToAdd.forEach {
+                SessionManager.getInstance(project).addFileToCurrentSession(it)
+            }
         }
     }
 

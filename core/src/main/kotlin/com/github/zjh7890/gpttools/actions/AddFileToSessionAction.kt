@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -18,7 +19,7 @@ class AddFileToSessionAction : AnAction("Add File to Session") {
         }
 
         ChatUtils.activateToolWindowRun(project) { panel, service ->
-            service.addFileToCurrentSession(virtualFile)
+            SessionManager.getInstance(project).addFileToCurrentSession(virtualFile)
         }
     }
 }

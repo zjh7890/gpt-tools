@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.actions
 
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.utils.ChatUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
@@ -52,7 +53,7 @@ class CompleteThisAction : IntentionAction, Iconable {
 
         // Update the content to send to the chat window
         ChatUtils.sendToChatWindow(project, { contentPanel, chatCodingService ->
-            chatCodingService.newSession()
+            SessionManager.getInstance(project).createNewSession()
             val inputText = """
 在 ${'$'}{GPT_GENERATE_CODE_HERE} 处自动补全代码。
 严格只返回占位符处新增的内容。
