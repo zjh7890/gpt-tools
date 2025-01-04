@@ -1,21 +1,34 @@
 package com.github.zjh7890.gpttools.toolWindow.context
 
+import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatFileTreeListPanel
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.ui.components.JBList
+import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
+import java.awt.BorderLayout
+import java.awt.Dimension
+import java.text.SimpleDateFormat
+import java.util.Date
+import javax.swing.JComponent
+import javax.swing.JPanel
 
 class ContextFileToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val contentFactory = ContentFactory.getInstance()
         val panel = ChatFileTreeListPanel(project)
-        val content = contentFactory.createContent(panel, "Context Files", false)
+        val content = contentFactory.createContent(panel, "Files", false)
         toolWindow.contentManager.addContent(content)
 
         // 添加工具窗口操作按钮（如移除节点、复制文件等）
@@ -75,7 +88,58 @@ class ContextFileToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        toolWindow.setTitleActions(listOf(copyFilesAction, removeAction, expandAction, collapseAction))
+        val switchSessionAction = object : AnAction("Switch Session", "Switch to current IDEA project session", AllIcons.Actions.Refresh) {
+            override fun actionPerformed(e: AnActionEvent) {
+                val openProjects = ProjectManager.getInstance().openProjects
+                
+                // 为每个项目获取其当前 ChatSession
+                val projectSessions = openProjects.mapNotNull { proj ->
+                    val service = ChatCodingService.getInstance(proj)
+                    val session = service.getCurrentSession()
+                    "${proj.name} - ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(session.startTime))}" to session
+                }
+
+                if (projectSessions.isEmpty()) {
+                    Messages.showInfoMessage(project, "No available sessions found.", "Switch Session")
+                    return
+                }
+
+                // 创建选择对话框
+                val dialog = object : DialogWrapper(project, true) {
+                    private val sessionList = JBList(projectSessions.map { it.first })
+                    
+                    init {
+                        title = "Select Session"
+                        init()
+                    }
+
+                    override fun createCenterPanel(): JComponent {
+                        val panel = JPanel(BorderLayout())
+                        panel.add(JBScrollPane(sessionList), BorderLayout.CENTER)
+                        panel.preferredSize = Dimension(400, 300)
+                        return panel
+                    }
+
+                    fun getSelectedSession(): ChatSession? {
+                        val selectedIndex = sessionList.selectedIndex
+                        return if (selectedIndex >= 0) projectSessions[selectedIndex].second else null
+                    }
+                }
+
+                if (dialog.showAndGet()) {
+                    val selectedSession = dialog.getSelectedSession()
+                    if (selectedSession != null) {
+                        panel.updateFileTree(selectedSession)
+                    }
+                }
+            }
+
+            override fun getActionUpdateThread(): ActionUpdateThread {
+                return ActionUpdateThread.BGT
+            }
+        }
+
+        toolWindow.setTitleActions(listOf(switchSessionAction, copyFilesAction, removeAction, expandAction, collapseAction))
     }
 
     /**

@@ -1,10 +1,12 @@
 package com.github.zjh7890.gpttools.toolWindow.llmChat
 
+import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.services.ProjectFileTree
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBScrollPane
@@ -26,6 +28,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
     private val treeModel: DefaultTreeModel
     val tree: Tree
     private val root: DefaultMutableTreeNode
+    var currentSession: ChatSession? = null
 
     init {
         root = DefaultMutableTreeNode("Files")
@@ -53,60 +56,58 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
         })
     }
 
-    fun updateFileTree(projectFileTrees: List<ProjectFileTree>) {
+    /**
+     * 更新文件树，采用扁平化包结构展示
+     */
+    fun updateFileTree(session: ChatSession) {
+        currentSession = session
         root.removeAllChildren()
 
-        projectFileTrees.forEach { projectTree ->
+        session.projectFileTrees.forEach { projectTree ->
+            // 创建项目名称节点
             val projectNode = DefaultMutableTreeNode(projectTree.projectName)
-            projectTree.files.forEach { file ->
-                addFileToProjectNode(projectNode, file)
-            }
             root.add(projectNode)
+
+            // 按全路径分组文件
+            val packageToFilesMap = projectTree.files.groupBy { file ->
+                getFullPackageName(file)
+            }
+
+            // 创建包节点，添加到项目节点下
+            packageToFilesMap.forEach { (packageName, files) ->
+                val packageNode = DefaultMutableTreeNode(packageName)
+                files.forEach { file ->
+                    packageNode.add(DefaultMutableTreeNode(file))
+                }
+                projectNode.add(packageNode)
+            }
         }
 
         treeModel.reload()
         TreeUtil.expandAll(tree)
     }
 
-    private fun addFileToProjectNode(projectNode: DefaultMutableTreeNode, file: VirtualFile) {
-        // 获取文件相对于项目根目录的相对路径
-        val baseDir = project.basePath ?: ""
-        val relativePath = VfsUtilCore.getRelativePath(file, project.baseDir)
-        if (relativePath == null) {
-            // 如果无法确定相对路径，直接添加到项目节点下
-            projectNode.add(DefaultMutableTreeNode(file))
-            return
-        }
+    /**
+     * 获取文件的全包名
+     */
+    private fun getFullPackageName(file: VirtualFile): String {
+        val currentSession = currentSession ?: return ""
+        // 查找文件所属的项目树
+        val projectTree = currentSession.projectFileTrees.find { tree ->
+            tree.files.contains(file)
+        } ?: return ""
 
-        val pathComponents = relativePath.split('/')
+        // 通过项目名找到对应的 Project 实例
+        val targetProject = ProjectManager.getInstance().openProjects.find {
+            it.name == projectTree.projectName
+        } ?: return ""
 
-        var currentNode = projectNode
-        for (i in pathComponents.indices) {
-            val component = pathComponents[i]
-            val isLast = i == pathComponents.size - 1
-            val existingChild = (0 until currentNode.childCount)
-                .mapNotNull { currentNode.getChildAt(it) as? DefaultMutableTreeNode }
-                .firstOrNull { childNode ->
-                    val obj = childNode.userObject
-                    when (obj) {
-                        is String -> obj == component
-                        is VirtualFile -> obj.name == component
-                        else -> false
-                    }
-                }
+        // 使用项目的根路径计算相对路径
+        val packagePath = file.parent?.let {
+            VfsUtilCore.getRelativePath(it, targetProject.baseDir, '/')
+        } ?: ""
 
-            if (existingChild != null) {
-                currentNode = existingChild
-            } else {
-                val newNode = if (isLast && !file.isDirectory) {
-                    DefaultMutableTreeNode(file)
-                } else {
-                    DefaultMutableTreeNode(component)
-                }
-                currentNode.add(newNode)
-                currentNode = newNode
-            }
-        }
+        return packagePath.replace('/', '.')
     }
 
     /**
@@ -122,7 +123,8 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
         selectedPaths.forEach { path ->
             val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
             if (node.parent == root) {
-                // 不允许移除项目根节点
+                // 不允许移除包节点
+                JOptionPane.showMessageDialog(this, "无法移除包节点。请仅移除文件节点。", "移除节点", JOptionPane.ERROR_MESSAGE)
                 return@forEach
             }
             val parent = node.parent as? DefaultMutableTreeNode ?: return@forEach
@@ -218,6 +220,9 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
     }
 }
 
+/**
+ * 自定义树节点渲染器，以显示不同类型的节点图标和文本
+ */
 private class FileTreeCellRenderer : DefaultTreeCellRenderer() {
     override fun getTreeCellRendererComponent(
         tree: JTree,
@@ -235,10 +240,10 @@ private class FileTreeCellRenderer : DefaultTreeCellRenderer() {
 
         when (userObject) {
             is String -> {
-                // 判断是否为项目节点（父节点为 root）
+                // 判断是否为包节点（父节点为 root）
                 if (node.parent == root) {
-                    // 项目节点
-                    icon = AllIcons.Nodes.Module
+                    // 包节点
+                    icon = AllIcons.Nodes.Package
                 } else {
                     // 目录节点
                     icon = if (expanded) AllIcons.Nodes.Folder else AllIcons.Nodes.ExtractedFolder

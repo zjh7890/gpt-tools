@@ -46,11 +46,6 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
 
-data class ProjectFileTree(
-    val projectName: String,
-    val files: List<VirtualFile>
-)
-
 class ChatToolPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
     NullableComponent,
@@ -113,10 +108,10 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
                 CommonSettingsListener.TOPIC,
                 object : CommonSettingsListener {
                     override fun onSettingsChanged() {
-                    generateDiffCheckbox.isSelected = CommonSettings.getInstance().generateDiff
-                    withFilesCheckbox.isSelected = CommonSettings.getInstance().withFiles
-                    withDirCheckbox.isSelected = CommonSettings.getInstance().withDir
-                }
+                        generateDiffCheckbox.isSelected = CommonSettings.getInstance().generateDiff
+                        withFilesCheckbox.isSelected = CommonSettings.getInstance().withFiles
+                        withDirCheckbox.isSelected = CommonSettings.getInstance().withDir
+                    }
                 }
             )
 
@@ -315,7 +310,7 @@ class ChatToolPanel(val disposable: Disposable?, val project: Project) :
         val session = chatCodingService.getCurrentSession()
         // 获取并刷新 panel 的 file list
         val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
-        fileTreePanel?.updateFileTree(session.projectFileTrees)
+        fileTreePanel?.updateFileTree(session)
     }
 
     private fun showFileSelectionPopup() {
