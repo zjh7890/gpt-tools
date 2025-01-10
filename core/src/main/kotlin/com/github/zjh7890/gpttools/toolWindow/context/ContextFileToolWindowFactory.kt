@@ -25,120 +25,124 @@ import javax.swing.JPanel
 
 class ContextFileToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val contentFactory = ContentFactory.getInstance()
-        val panel = ChatFileTreeListPanel(project)
-        val content = contentFactory.createContent(panel, "Files", false)
-        toolWindow.contentManager.addContent(content)
-
-        // 添加工具窗口操作按钮（如移除节点、复制文件等）
-        val removeAction = object : AnAction("Remove Node", "Remove the selected node", AllIcons.Actions.DeleteTag) {
-            override fun actionPerformed(e: AnActionEvent) {
-                panel.removeSelectedNodes()
-            }
-
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = panel.tree.selectionPath != null
-            }
-
-            override fun getActionUpdateThread(): ActionUpdateThread {
-                return ActionUpdateThread.BGT
-            }
-        }
-
-        val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
-            override fun actionPerformed(e: AnActionEvent) {
-                panel.copyAllFiles()
-            }
-
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = panel.tree.selectionPath != null
-            }
-
-            override fun getActionUpdateThread(): ActionUpdateThread {
-                return ActionUpdateThread.BGT
-            }
-        }
-
-        val expandAction = object : AnAction("Expand Selected", "Expand selected nodes recursively", AllIcons.Actions.Expandall) {
-            override fun actionPerformed(e: AnActionEvent) {
-                panel.expandSelectedNodes()
-            }
-
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = panel.tree.selectionPath != null
-            }
-
-            override fun getActionUpdateThread(): ActionUpdateThread {
-                return ActionUpdateThread.BGT
-            }
-        }
-
-        val collapseAction = object : AnAction("Collapse Selected", "Collapse selected nodes recursively", AllIcons.Actions.Collapseall) {
-            override fun actionPerformed(e: AnActionEvent) {
-                panel.collapseSelectedNodes()
-            }
-
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = panel.tree.selectionPath != null
-            }
-
-            override fun getActionUpdateThread(): ActionUpdateThread {
-                return ActionUpdateThread.BGT
-            }
-        }
-
-        val switchSessionAction = object : AnAction("Switch Session", "Switch to current IDEA project session", AllIcons.Actions.Refresh) {
-            override fun actionPerformed(e: AnActionEvent) {
-                val openProjects = ProjectManager.getInstance().openProjects
-                
-                // 为每个项目获取其当前 ChatSession
-                val projectSessions = openProjects.mapNotNull { proj ->
-                    val service = SessionManager.getInstance(proj)
-                    val session = service.getCurrentSession()
-                    "${proj.name} - ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(session.startTime))}" to session
-                }
-
-                if (projectSessions.isEmpty()) {
-                    Messages.showInfoMessage(project, "No available sessions found.", "Switch Session")
-                    return
-                }
-
-                // 创建选择对话框
-                val dialog = object : DialogWrapper(project, true) {
-                    private val sessionList = JBList(projectSessions.map { it.first })
-                    
-                    init {
-                        title = "Select Session"
-                        init()
-                    }
-
-                    override fun createCenterPanel(): JComponent {
-                        val panel = JPanel(BorderLayout())
-                        panel.add(JBScrollPane(sessionList), BorderLayout.CENTER)
-                        panel.preferredSize = Dimension(400, 300)
-                        return panel
-                    }
-
-                    fun getSelectedSession(): ChatSession? {
-                        val selectedIndex = sessionList.selectedIndex
-                        return if (selectedIndex >= 0) projectSessions[selectedIndex].second else null
-                    }
-                }
-
-                if (dialog.showAndGet()) {
-                    val selectedSession = dialog.getSelectedSession()
-                    if (selectedSession != null) {
-                        SessionManager.getInstance(project).setCurrentSession(selectedSession.id, project)
-                    }
-                }
-            }
-
-            override fun getActionUpdateThread(): ActionUpdateThread {
-                return ActionUpdateThread.BGT
-            }
-        }
-
-        toolWindow.setTitleActions(listOf(switchSessionAction, copyFilesAction, removeAction, expandAction, collapseAction))
+//        val contentFactory = ContentFactory.getInstance()
+//        val panel = ChatFileTreeListPanel(project)
+//        val content = contentFactory.createContent(panel, "Files", false)
+//        toolWindow.contentManager.addContent(content)
+//
+//        // 添加工具窗口操作按钮（如移除节点、复制文件等）
+//        val removeAction = object : AnAction("Remove Node", "Remove the selected node", AllIcons.Actions.DeleteTag) {
+//            override fun actionPerformed(e: AnActionEvent) {
+//                val selectedFiles = panel.getSelectedFiles()
+//                if (selectedFiles.isNotEmpty()) {
+//                    // 使用 SessionManager 处理移除操作
+//                    SessionManager.getInstance(project).removeSelectedNodes(selectedFiles)
+//                }
+//            }
+//
+//            override fun update(e: AnActionEvent) {
+//                e.presentation.isEnabled = panel.tree.selectionPath != null
+//            }
+//
+//            override fun getActionUpdateThread(): ActionUpdateThread {
+//                return ActionUpdateThread.BGT
+//            }
+//        }
+//
+//        val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
+//            override fun actionPerformed(e: AnActionEvent) {
+//                panel.copyAllFiles()
+//            }
+//
+//            override fun update(e: AnActionEvent) {
+//                e.presentation.isEnabled = panel.tree.selectionPath != null
+//            }
+//
+//            override fun getActionUpdateThread(): ActionUpdateThread {
+//                return ActionUpdateThread.BGT
+//            }
+//        }
+//
+//        val expandAction = object : AnAction("Expand Selected", "Expand selected nodes recursively", AllIcons.Actions.Expandall) {
+//            override fun actionPerformed(e: AnActionEvent) {
+//                panel.expandSelectedNodes()
+//            }
+//
+//            override fun update(e: AnActionEvent) {
+//                e.presentation.isEnabled = panel.tree.selectionPath != null
+//            }
+//
+//            override fun getActionUpdateThread(): ActionUpdateThread {
+//                return ActionUpdateThread.BGT
+//            }
+//        }
+//
+//        val collapseAction = object : AnAction("Collapse Selected", "Collapse selected nodes recursively", AllIcons.Actions.Collapseall) {
+//            override fun actionPerformed(e: AnActionEvent) {
+//                panel.collapseSelectedNodes()
+//            }
+//
+//            override fun update(e: AnActionEvent) {
+//                e.presentation.isEnabled = panel.tree.selectionPath != null
+//            }
+//
+//            override fun getActionUpdateThread(): ActionUpdateThread {
+//                return ActionUpdateThread.BGT
+//            }
+//        }
+//
+//        val switchSessionAction = object : AnAction("Switch Session", "Switch to current IDEA project session", AllIcons.Actions.Refresh) {
+//            override fun actionPerformed(e: AnActionEvent) {
+//                val openProjects = ProjectManager.getInstance().openProjects
+//
+//                // 为每个项目获取其当前 ChatSession
+//                val projectSessions = openProjects.mapNotNull { proj ->
+//                    val service = SessionManager.getInstance(proj)
+//                    val session = service.getCurrentSession()
+//                    "${proj.name} - ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date(session.startTime))}" to session
+//                }
+//
+//                if (projectSessions.isEmpty()) {
+//                    Messages.showInfoMessage(project, "No available sessions found.", "Switch Session")
+//                    return
+//                }
+//
+//                // 创建选择对话框
+//                val dialog = object : DialogWrapper(project, true) {
+//                    private val sessionList = JBList(projectSessions.map { it.first })
+//
+//                    init {
+//                        title = "Select Session"
+//                        init()
+//                    }
+//
+//                    override fun createCenterPanel(): JComponent {
+//                        val panel = JPanel(BorderLayout())
+//                        panel.add(JBScrollPane(sessionList), BorderLayout.CENTER)
+//                        panel.preferredSize = Dimension(400, 300)
+//                        return panel
+//                    }
+//
+//                    fun getSelectedSession(): ChatSession? {
+//                        val selectedIndex = sessionList.selectedIndex
+//                        return if (selectedIndex >= 0) projectSessions[selectedIndex].second else null
+//                    }
+//                }
+//
+//                if (dialog.showAndGet()) {
+//                    val selectedSession = dialog.getSelectedSession()
+//                    if (selectedSession != null) {
+//                        SessionManager.getInstance(project).setCurrentSession(selectedSession, project)
+//                    }
+//                }
+//            }
+//
+//            override fun getActionUpdateThread(): ActionUpdateThread {
+//                return ActionUpdateThread.BGT
+//            }
+//        }
+//
+//        toolWindow.setTitleActions(listOf(switchSessionAction, copyFilesAction, removeAction, expandAction, collapseAction))
     }
 
     /**

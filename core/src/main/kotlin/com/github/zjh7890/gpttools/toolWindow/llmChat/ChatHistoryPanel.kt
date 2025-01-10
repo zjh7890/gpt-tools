@@ -2,7 +2,6 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatSession
-import com.github.zjh7890.gpttools.services.SessionHistoryListener
 import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.intellij.openapi.project.Project
@@ -15,7 +14,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.swing.*
 
-class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener {
+class ChatHistoryPanel(val project: Project) : JPanel() {
 
     private val chatCodingService = ChatCodingService.getInstance(project)
 
@@ -31,7 +30,7 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener 
         addActionListener {
             val selectedSession = conversationList.selectedValue
             if (selectedSession != null) {
-                sessionManager.setCurrentSession(selectedSession.id, project)
+                sessionManager.setCurrentSession(selectedSession, project)
                 val contentPanel = LLMChatToolWindowFactory.getPanel(project)
                 contentPanel?.reloadConversation()
 
@@ -53,8 +52,6 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener 
 
         // 初始化对话列表
         loadConversationList()
-
-        sessionManager.addSessionListener(this)
 
         conversationList.selectionMode = ListSelectionModel.SINGLE_SELECTION
         conversationList.addListSelectionListener {
@@ -102,13 +99,15 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener 
         add(splitPane, BorderLayout.CENTER)
     }
 
-    private fun loadConversationList() {
-        conversationListModel.clear()
-        val sessions = sessionManager.getSessionList()
-            .filter { it.project == project.name }
-        val sortedSessions = sessions.sortedByDescending { it.startTime }
-        sortedSessions.forEach { session ->
-            conversationListModel.addElement(session)
+    fun loadConversationList() {
+        SwingUtilities.invokeLater {
+            conversationListModel.clear()
+            val sessions = sessionManager.getSessionList()
+                .filter { it.project == project.name }
+            val sortedSessions = sessions.sortedByDescending { it.startTime }
+            sortedSessions.forEach { session ->
+                conversationListModel.addElement(session)
+            }
         }
     }
 
@@ -117,12 +116,6 @@ class ChatHistoryPanel(val project: Project) : JPanel(), SessionHistoryListener 
         session.messages.forEach { message ->
             val role = if (message.role == ChatRole.user) "用户" else "助手"
             messageListModel.addElement("$role: ${message.content}")
-        }
-    }
-
-    override fun sessionListChanged() {
-        SwingUtilities.invokeLater {
-            loadConversationList()
         }
     }
 }

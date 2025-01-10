@@ -51,6 +51,7 @@ class MessageView(
             ChatRole.user -> JBColor(0xE0EEF7, 0x393b41)
         }
 
+
         val authorLabel = JLabel()
         authorLabel.font = JBFont.h4()
         authorLabel.text = when (role) {

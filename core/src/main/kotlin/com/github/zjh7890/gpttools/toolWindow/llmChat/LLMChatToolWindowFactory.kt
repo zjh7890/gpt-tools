@@ -40,8 +40,13 @@ class LLMChatToolWindowFactory : ToolWindowFactory, DumbAware {
         
 
         fun getPanel(project: Project): ChatPanel? {
-            return LLMChatToolWindowFactory.getToolWindow(project)
+            return getToolWindow(project)
                 ?.contentManager?.getContent(0)?.component as? ChatPanel
+        }
+
+        fun getHistoryPanel(project: Project): ChatHistoryPanel? {
+            return getToolWindow(project)
+                ?.contentManager?.getContent(1)?.component as? ChatHistoryPanel
         }
 
         fun createToolWindowContentStatic(project: Project, toolWindow: ToolWindow, reloadSession: Boolean = false) {

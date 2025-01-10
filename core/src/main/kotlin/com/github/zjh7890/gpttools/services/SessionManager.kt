@@ -2,11 +2,13 @@ package com.github.zjh7890.gpttools.services
 
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory
+import com.github.zjh7890.gpttools.toolWindow.llmChat.LLMChatToolWindowFactory
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import java.util.UUID
 
@@ -15,9 +17,7 @@ class SessionManager(private val project: Project) : Disposable {
     private val logger = logger<SessionManager>()
 
     private val sessions = mutableMapOf<String, ChatSession>()
-    private var currentSessionId: String = ""
-    private val sessionHistoryListeners = mutableListOf<SessionHistoryListener>()
-
+    private var currentSession: ChatSession = ChatSession(project = project.name, projects = mutableListOf(project))
     private val sessionFilePath: String = getSessionFilePath()
 
     init {
@@ -40,8 +40,8 @@ class SessionManager(private val project: Project) : Disposable {
         if (currentProjectSessions.isEmpty()) {
             createNewSession()
         } else {
-            currentSessionId = currentProjectSessions.maxByOrNull { it.startTime }?.id
-                ?: currentProjectSessions.first().id
+            currentSession = currentProjectSessions.maxByOrNull { it.startTime }
+                ?: currentProjectSessions.first()
         }
     }
 
@@ -50,7 +50,6 @@ class SessionManager(private val project: Project) : Disposable {
      */
     fun createNewSession() {
         // 先从当前会话中移除 project
-        val currentSession = sessions[currentSessionId]
         currentSession?.projects?.remove(project)
 
         val sessionId = UUID.randomUUID().toString()
@@ -62,7 +61,7 @@ class SessionManager(private val project: Project) : Disposable {
             projects = mutableListOf(project)
         )
 
-        currentSessionId = sessionId
+        currentSession = newSession
         sessions[sessionId] = newSession
         saveSessions()
 
@@ -73,7 +72,7 @@ class SessionManager(private val project: Project) : Disposable {
      * 获取当前激活的会话
      */
     fun getCurrentSession(): ChatSession {
-        return sessions[currentSessionId] ?: throw IllegalStateException("No current session found")
+        return currentSession!!
     }
 
     /**
@@ -86,22 +85,16 @@ class SessionManager(private val project: Project) : Disposable {
     /**
      * 设置当前激活的会话
      */
-    fun setCurrentSession(sessionId: String, project: Project) {
-        if (sessions.containsKey(sessionId)) {
-            currentSessionId = sessionId
-            // 添加project到当前session
-            val currentSession = getCurrentSession()
-            if (!currentSession.projects.contains(project)) {
-                currentSession.projects.add(project)
-            }
-
-            // 获取并刷新 panel 的 file list
-            val fileTreePanel = ContextFileToolWindowFactory.getPanel(this.project)
-            fileTreePanel?.updateFileTree(currentSession)
-            notifySessionListChanged()
-        } else {
-            logger.warn("Attempted to set a non-existent session: $sessionId")
+    fun setCurrentSession(session: ChatSession, project: Project) {
+        // 添加project到当前session
+        currentSession = session
+        if (!currentSession.projects.contains(project)) {
+            currentSession.projects.add(project)
         }
+
+        // 获取并刷新所有项目的 fileTreePanel 的 file list
+        notifyAllFileTreePanels(currentSession)
+        notifySessionListChanged()
     }
 
     /**
@@ -114,40 +107,63 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     /**
-     * 添加会话监听器
-     */
-    fun addSessionListener(listener: SessionHistoryListener) {
-        sessionHistoryListeners.add(listener)
-    }
-
-    /**
      * 通知所有监听器会话列表已更改
      */
     private fun notifySessionListChanged() {
-        sessionHistoryListeners.forEach { it.sessionListChanged() }
+        LLMChatToolWindowFactory.getHistoryPanel(project)?.loadConversationList()
     }
 
     /**
      * 将文件添加到当前会话
      */
     fun addFileToCurrentSession(file: VirtualFile) {
-        // 获取并刷新 panel 的 file list
-        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
-
-        val currentSession = fileTreePanel?.currentSession ?: getCurrentSession()
-        val projectTree = currentSession.projectFileTrees.find { it.projectName == project.name }
+        // 获取当前 session
+        val projectTree = currentSession!!.projectFileTrees.find { it.projectName == project.name }
 
         if (projectTree != null) {
             if (!projectTree.files.contains(file)) {
                 projectTree.files += file
             }
         } else {
-            currentSession.projectFileTrees += ProjectFileTree(project.name, listOf(file).toMutableList())
+            currentSession!!.projectFileTrees += ProjectFileTree(project.name, listOf(file).toMutableList())
         }
 
-        fileTreePanel?.updateFileTree(currentSession)
         saveSessions()
         notifySessionListChanged()
+
+        // 通知所有项目的 fileTreePanel 更新
+        notifyAllFileTreePanels(currentSession!!)
+    }
+
+    /**
+     * 移除选中的文件节点
+     */
+    fun removeSelectedNodes(filesToRemove: List<VirtualFile>) {
+        val currentSession = getCurrentSession()
+        filesToRemove.forEach { file ->
+            // 从 projectFileTrees 中移除文件
+            currentSession.projectFileTrees.forEach { projectTree ->
+                projectTree.files.remove(file)
+            }
+        }
+
+        saveSessions()
+        notifySessionListChanged()
+
+        // 通知所有项目的 fileTreePanel 更新
+        notifyAllFileTreePanels(currentSession)
+    }
+
+    /**
+     * 通知所有项目的 fileTreePanel 更新文件树
+     */
+    private fun notifyAllFileTreePanels(session: ChatSession) {
+        val openProjects = ProjectManager.getInstance().openProjects
+        openProjects.forEach { proj ->
+            val panel = LLMChatToolWindowFactory.getPanel(proj)?.chatFileTreeListPanel
+            panel?.updateFileTree(session)
+            panel?.scrollPanel?.updateUI()
+        }
     }
 
     /**
@@ -182,10 +198,8 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     override fun dispose() {
-        // 销毁时移除当前project
-        val currentSession = sessions[currentSessionId]
-        currentSession?.projects?.remove(project)
-        sessionHistoryListeners.clear()
+        // 销毁时移除当前 project
+        currentSession.projects.remove(project)
     }
 
     companion object {

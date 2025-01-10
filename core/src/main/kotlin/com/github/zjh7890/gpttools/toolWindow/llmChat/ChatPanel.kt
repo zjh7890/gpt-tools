@@ -2,11 +2,11 @@ package com.github.zjh7890.gpttools.toolWindow.llmChat
 
 import com.github.zjh7890.gpttools.components.welcome.WelcomePanel
 import com.github.zjh7890.gpttools.services.*
-import com.github.zjh7890.gpttools.services.SessionHistoryListener
 import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.settings.common.CommonSettingsListener
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.*
+import com.github.zjh7890.gpttools.toolWindow.context.ChatFileTreeListPanel
 import com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory
 import com.github.zjh7890.gpttools.utils.GptToolsIcon
 import com.intellij.icons.AllIcons
@@ -31,17 +31,20 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.util.preferredHeight
 import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.coroutines.flow.Flow
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.event.DocumentEvent
+import javax.swing.tree.DefaultMutableTreeNode
 
 class ChatPanel(val disposable: Disposable?, val project: Project) :
     SimpleToolWindowPanel(true, true),
@@ -54,6 +57,8 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
     val myTitle = JBLabel("Conversation")
     val myList = JPanel(VerticalLayout(JBUI.scale(10)))
     var inputSection: AutoDevInputSection
+    val chatFileTreeListPanel: ChatFileTreeListPanel = ChatFileTreeListPanel(project)
+
     private val addFileButton = ActionButton(
         object : AnAction() {
             override fun actionPerformed(e: AnActionEvent) {
@@ -236,7 +241,9 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
         }
 
         panelContent = panel {
-            row { cell(myScrollPane).fullWidth().fullHeight() }.resizableRow()
+            row { cell(myScrollPane).fullWidth().fullHeight() }
+                .resizableRow()
+
             row { cell(progressBar).fullWidth() }
             row {
                 border = JBUI.Borders.empty(8)
@@ -257,7 +264,6 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
                     "",
                     JBUI.size(16)
                 ))
-                // 添加发送并复制按钮
                 cell(ActionButton(
                     object : AnAction() {
                         override fun actionPerformed(e: AnActionEvent) {
@@ -286,16 +292,78 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
                     JBUI.size(16)
                 ))
             }
+            // 添加树形面板
+            row {
+                val tree = JTree(DefaultMutableTreeNode("Root").apply {
+                    add(DefaultMutableTreeNode("Child 1").apply {
+                        add(DefaultMutableTreeNode("Grandchild 1.1"))
+                        add(DefaultMutableTreeNode("Grandchild 1.2"))
+                    })
+                    add(DefaultMutableTreeNode("Child 2").apply {
+                        add(DefaultMutableTreeNode("Grandchild 2.1"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+                    })
+                })
+
+                cell(chatFileTreeListPanel.scrollPanel)
+//                    .constraints(preferredHeight(JBUI.scale(200))) // 确保这里正确设置
+                    .fullWidth()
+            }
         }
 
-        setContent(panelContent)
+//        // 创建一个分割面板来容纳主面板和树形面板
+//        val splitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT).apply {
+//            leftComponent = panelContent
+//            rightComponent = JBScrollPane(JTree(DefaultMutableTreeNode("Root").apply {
+//                add(DefaultMutableTreeNode("Child 1").apply {
+//                    add(DefaultMutableTreeNode("Grandchild 1.1"))
+//                    add(DefaultMutableTreeNode("Grandchild 1.2"))
+//
+//                })
+//                add(DefaultMutableTreeNode("Child 2").apply {
+//                    add(DefaultMutableTreeNode("Grandchild 2.1"))
+//                    add(DefaultMutableTreeNode("Grandchild 2.2"))
+//                })
+//            }))
+//            dividerLocation = 600 // 设置分隔条位置
+//        }
 
-        // 添加会话监听器以在会话列表更改时更新 UI（根据需要实现）
-        sessionManager.addSessionListener(object : SessionHistoryListener {
-            override fun sessionListChanged() {
-                // 根据需要实现，例如刷新会话列表面板
-            }
-        })
+
+//        val tree = JTree(DefaultMutableTreeNode("Root").apply {
+//                    add(DefaultMutableTreeNode("Child 1").apply {
+//                        add(DefaultMutableTreeNode("Grandchild 1.1"))
+//                        add(DefaultMutableTreeNode("Grandchild 1.2"))
+//                    })
+//                    add(DefaultMutableTreeNode("Child 2").apply {
+//                        add(DefaultMutableTreeNode("Grandchild 2.1"))
+//                        add(DefaultMutableTreeNode("Grandchild 2.2"))
+//                    })
+//                })
+//
+//
+//        val treeScrollPane = JBScrollPane(tree)
+//        treeScrollPane.preferredSize = Dimension(treeScrollPane.preferredSize.width, JBUI.scale(200))
+////        treeScrollPane.maximumSize = Dimension(treeScrollPane.preferredSize.width, JBUI.scale(200))  // 限制最大尺寸
+//        treeScrollPane.minimumSize = Dimension(treeScrollPane.preferredSize.width, JBUI.scale(200))  // 限制最大尺寸
+//
+//
+//        // 创建一个垂直分割的 Splitter，调整比例
+//        val splitter = Splitter(true, 0.8f) // 调整为 70/30 的比例
+//
+//// 设置上半部分为主面板
+//        splitter.firstComponent = panelContent
+//
+//// 设置下半部分为带滚动条的树形面板
+//        splitter.secondComponent = treeScrollPane
+
+// 设置分割面板为内容
+        setContent(panelContent)
     }
 
     /**
@@ -318,8 +386,9 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
     fun refreshFileList() {
         val session = sessionManager.getCurrentSession()
         // 获取并刷新 panel 的 file list
-        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
-        fileTreePanel?.updateFileTree(session)
+        val fileTreePanel = chatFileTreeListPanel
+        fileTreePanel.updateFileTree(session)
+        fileTreePanel.scrollPanel.updateUI()
     }
 
     /**
@@ -597,8 +666,8 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
         editingMessageView = null
         withFilesCheckbox.removeActionListener { }
         generateDiffCheckbox.removeActionListener { }
-        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
-        fileTreePanel?.removeAll()
+//        val fileTreePanel = ContextFileToolWindowFactory.getPanel(project)
+//        fileTreePanel?.removeAll()
     }
 
     /**

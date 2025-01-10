@@ -10,6 +10,7 @@
     <content>
 <!--        <module name="cpp"/>-->
         <module name="goland"/>
+
         <module name="java"/>
         <module name="javascript"/>
         <module name="kotlin"/>

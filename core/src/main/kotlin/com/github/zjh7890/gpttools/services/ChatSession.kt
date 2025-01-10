@@ -9,10 +9,10 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 data class ChatSession(
-    val id: String,
+    val id: String = UUID.randomUUID().toString(),
     val messages: MutableList<ChatContextMessage> = mutableListOf(),
     val startTime: Long = System.currentTimeMillis(),
-    val type: String,
+    val type: String = "chat",
     var projectFileTrees: MutableList<ProjectFileTree> = mutableListOf(),
     var withFiles: Boolean = true,
     val project: String,

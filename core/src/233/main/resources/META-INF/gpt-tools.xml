@@ -11,6 +11,10 @@
 <!--    <depends>com.intellij.modules.vcs</depends>-->
     <depends>Git4Idea</depends>
 
+    <dependencies>
+        <plugin id="org.jetbrains.kotlin"/>
+    </dependencies>
+
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensionPoints>
@@ -117,6 +121,14 @@
                 class="com.github.zjh7890.gpttools.actions.OpenChatLogDirectoryAction"
                 text="gpt-tools 日志"
                 description="gpt-tools 日志"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <action id="FindTopLevelJavaFiles"
+                class="com.github.zjh7890.gpttools.actions.FindTopLevelJavaFilesAction"
+                text="Find Top-level Java Files"
+                description="Find Java files that are not referenced by other Java files (excluding test references)"
                 icon="/icons/icon_16px.svg">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>

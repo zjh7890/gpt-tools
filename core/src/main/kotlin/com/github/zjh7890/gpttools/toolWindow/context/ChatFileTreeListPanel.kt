@@ -10,9 +10,11 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
 import java.awt.BorderLayout
 import java.awt.Component
+import java.awt.Dimension
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JOptionPane
@@ -23,11 +25,12 @@ import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
-class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout()) {
+class ChatFileTreeListPanel(private val project: Project) {
     private val treeModel: DefaultTreeModel
     val tree: Tree
     private val root: DefaultMutableTreeNode
     var currentSession: ChatSession? = null
+    var scrollPanel: JBScrollPane
 
     init {
         root = DefaultMutableTreeNode("Files")
@@ -37,7 +40,11 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
             showsRootHandles = true
             cellRenderer = FileTreeCellRenderer()
         }
-        add(JBScrollPane(tree), BorderLayout.CENTER)
+        scrollPanel = JBScrollPane(tree)
+        scrollPanel.preferredSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))
+        scrollPanel.maximumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最大尺寸
+        scrollPanel.minimumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最大尺寸
+//        add(, BorderLayout.CENTER)
         setupListeners()
     }
 
@@ -115,7 +122,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
     fun removeSelectedNodes() {
         val selectedPaths = tree.selectionPaths
         if (selectedPaths == null || selectedPaths.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请先选择要移除的节点。", "移除节点", JOptionPane.WARNING_MESSAGE)
+//            JOptionPane.showMessageDialog(this, "请先选择要移除的节点。", "移除节点", JOptionPane.WARNING_MESSAGE)
             return
         }
 
@@ -123,12 +130,12 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
             val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
             if (node.parent == root) {
                 // 不允许移除包节点
-                JOptionPane.showMessageDialog(
-                    this,
-                    "无法移除包节点。请仅移除文件节点。",
-                    "移除节点",
-                    JOptionPane.ERROR_MESSAGE
-                )
+//                JOptionPane.showMessageDialog(
+//                    this,
+//                    "无法移除包节点。请仅移除文件节点。",
+//                    "移除节点",
+//                    JOptionPane.ERROR_MESSAGE
+//                )
                 return@forEach
             }
             val parent = node.parent as? DefaultMutableTreeNode ?: return@forEach
@@ -144,7 +151,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
     fun copyAllFiles() {
         val selectedPaths = tree.selectionPaths
         if (selectedPaths == null || selectedPaths.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请先选择要复制的节点。", "复制文件", JOptionPane.WARNING_MESSAGE)
+//            JOptionPane.showMessageDialog(this, "请先选择要复制的节点。", "复制文件", JOptionPane.WARNING_MESSAGE)
             return
         }
 
@@ -158,14 +165,14 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
         if (filePaths.isNotEmpty()) {
             val clipboardContent = filePaths.joinToString("\n")
             ClipboardUtils.copyToClipboard(clipboardContent)
-            JOptionPane.showMessageDialog(
-                this,
-                "已复制 ${filePaths.size} 个文件路径到剪贴板。",
-                "复制成功",
-                JOptionPane.INFORMATION_MESSAGE
-            )
+//            JOptionPane.showMessageDialog(
+//                this,
+//                "已复制 ${filePaths.size} 个文件路径到剪贴板。",
+//                "复制成功",
+//                JOptionPane.INFORMATION_MESSAGE
+//            )
         } else {
-            JOptionPane.showMessageDialog(this, "选中的节点下没有文件。", "复制文件", JOptionPane.INFORMATION_MESSAGE)
+//            JOptionPane.showMessageDialog(this, "选中的节点下没有文件。", "复制文件", JOptionPane.INFORMATION_MESSAGE)
         }
     }
 
@@ -190,7 +197,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
     fun expandSelectedNodes() {
         val selectedPaths = tree.selectionPaths
         if (selectedPaths == null || selectedPaths.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请先选择要展开的节点。", "展开节点", JOptionPane.WARNING_MESSAGE)
+//            JOptionPane.showMessageDialog(this, "请先选择要展开的节点。", "展开节点", JOptionPane.WARNING_MESSAGE)
             return
         }
 
@@ -206,7 +213,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
     fun collapseSelectedNodes() {
         val selectedPaths = tree.selectionPaths
         if (selectedPaths == null || selectedPaths.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请先选择要折叠的节点。", "折叠节点", JOptionPane.WARNING_MESSAGE)
+//            JOptionPane.showMessageDialog(this, "请先选择要折叠的节点。", "折叠节点", JOptionPane.WARNING_MESSAGE)
             return
         }
 
@@ -227,8 +234,23 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel(BorderLayout(
             expandAllChildren(childPath)
         }
     }
-}
 
+    /**
+     * 获取选中的文件
+     */
+    fun getSelectedFiles(): List<VirtualFile> {
+        val selectedPaths = tree.selectionPaths ?: return emptyList()
+        val files = mutableListOf<VirtualFile>()
+        selectedPaths.forEach { path ->
+            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
+            val userObject = node.userObject
+            if (userObject is VirtualFile && !userObject.isDirectory) {
+                files.add(userObject)
+            }
+        }
+        return files
+    }
+}
 
 /**
  * 自定义树节点渲染器，以显示不同类型的节点图标和文本

@@ -327,6 +327,15 @@ project(":core") {
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
         implementation("org.apache.commons:commons-text:1.9")
 
+        implementation("io.github.bonede:tree-sitter:0.22.6")
+        implementation("io.github.bonede:tree-sitter-java:0.23.4")
+
+        // Exposed 核心依赖
+        implementation("org.jetbrains.exposed:exposed-core:0.41.1")
+        // Exposed DAO 依赖
+        implementation("org.jetbrains.exposed:exposed-dao:0.41.1")
+        // Exposed JDBC 依赖
+        implementation("org.jetbrains.exposed:exposed-jdbc:0.41.1")
 
         intellijPlatform {
             intellijPlugins(javaPlugins)
