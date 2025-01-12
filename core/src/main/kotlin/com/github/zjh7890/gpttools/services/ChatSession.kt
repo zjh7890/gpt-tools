@@ -123,9 +123,7 @@ ${border}
 ${it.content}
 ---
 上下文信息：
-```
-上下文已失效
-```
+${FileUtil.wrapBorder("上下文已失效")}
                         """.trimIndent()
                     )
                 }
