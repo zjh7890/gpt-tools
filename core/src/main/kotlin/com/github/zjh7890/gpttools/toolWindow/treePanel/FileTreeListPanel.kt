@@ -268,6 +268,10 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         val mavenDependencies = mutableMapOf<String, MutableList<PsiClass>>()
         val externalsNode = DefaultMutableTreeNode("Externals")
 
+        // 获取项目名称
+        val projectName = project.name
+        val projectNode = DefaultMutableTreeNode(projectName)
+
         // 1. 组织项目内类依赖
         classGraph.keys.forEach { cls ->
             if (!isExternalDependency(cls)) {
@@ -301,12 +305,15 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             }
         }
 
-        // 添加项目内模块依赖到 Dependencies 节点
+        // 将模块节点添加到 projectName 节点
         moduleMap.entries.sortedBy { it.key }.forEach { (_, node) ->
             if (node.childCount > 0) {
-                dependenciesNode.add(node)
+                projectNode.add(node)
             }
         }
+
+        // 添加 projectName 节点到 Dependencies 节点
+        dependenciesNode.add(projectNode)
 
         // 2. 组织 Maven 依赖
         if (mavenDependencies.isNotEmpty()) {
