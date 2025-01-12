@@ -5,6 +5,9 @@ import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
+import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -127,5 +130,93 @@ ${FileUtil.wrapBorder(it.context)}
 
     companion object {
         private val logger = logger<ChatCodingService>()
+    }
+}
+
+data class ProjectFileTree(
+    val projectName: String,
+    val files: MutableList<VirtualFile> = mutableListOf()
+) {
+    /**
+     * 转换为可序列化的文件树对象
+     */
+    fun toSerializable(): SerializableProjectFileTree {
+        return SerializableProjectFileTree(
+            projectName = projectName,
+            filePaths = files.map { it.path }
+        )
+    }
+}
+
+@Serializable
+data class SerializableChatSession @JvmOverloads constructor(
+    val id: String = "",
+    val messages: MutableList<ChatContextMessage> = mutableListOf(),
+    val startTime: Long = 0L,
+    val type: String = "",
+    val withFiles: Boolean = true,
+    val projectFileTrees: List<SerializableProjectFileTree> = emptyList(),
+    val projectName: String = ""
+) {
+    /**
+     * 转换为 ChatSession 实例
+     */
+    fun toChatSession(project: Project): ChatSession {
+        val projectFileTrees = projectFileTrees.map { it.toProjectFileTree() }.toMutableList()
+        return ChatSession(
+            id = id,
+            messages = messages,
+            startTime = startTime,
+            type = type,
+            withFiles = withFiles,
+            projectFileTrees = projectFileTrees,
+            project = projectName,
+            projects =  mutableListOf(project)
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectFileTree(
+    val projectName: String = "",
+    val filePaths: List<String> = emptyList()
+) {
+    /**
+     * 转换为 ProjectFileTree 实例
+     */
+    fun toProjectFileTree(): ProjectFileTree {
+        val files = filePaths.mapNotNull { path ->
+            LocalFileSystem.getInstance().findFileByPath(path)
+        }.toMutableList()
+        return ProjectFileTree(
+            projectName = projectName,
+            files = files
+        )
+    }
+}
+
+@Serializable
+data class ChatContextMessage @JvmOverloads constructor(
+    val role: ChatRole = ChatRole.user,
+    var content: String = "",
+    var context: String = "",
+) {
+    /**
+     * 导出聊天历史为字符串
+     */
+    fun exportChatHistory(invalidContext: Boolean = false): String {
+        // 实现导出逻辑，根据 invalidContext 的值决定是否包含上下文
+        return if (invalidContext) {
+            content
+        } else {
+            "$role: $content\nContext: $context\n"
+        }
+    }
+
+    /**
+     * 添加消息到会话中
+     */
+    fun add(session: ChatSession) {
+        session.messages.add(this)
     }
 }
