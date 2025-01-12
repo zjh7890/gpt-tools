@@ -25,14 +25,12 @@ import javax.swing.tree.TreePath
 class FileTreeListPanel(private val project: Project) : JPanel() {
     private val root = DefaultMutableTreeNode("")
     private val rootClassNode = DefaultMutableTreeNode("Root Classes")
-    private val dependenciesNode = DefaultMutableTreeNode("Dependencies")
     val tree = Tree(root)
     private val addedClasses = mutableSetOf<PsiClass>()
 
     init {
         layout = java.awt.BorderLayout()
         root.add(rootClassNode)
-        root.add(dependenciesNode)
 
         tree.isRootVisible = false
         tree.showsRootHandles = true
@@ -41,7 +39,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         add(JScrollPane(tree), java.awt.BorderLayout.CENTER)
 
         tree.expandPath(TreePath(arrayOf(root, rootClassNode)))
-        tree.expandPath(TreePath(arrayOf(root, dependenciesNode)))
 
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
@@ -77,7 +74,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     }
 
     fun runAnalysis(project: Project, onComplete: () -> Unit = {}) {
-        dependenciesNode.removeAllChildren()
+        // 这里的 dependenciesNode 相关逻辑已移除
 
         val selectedClasses = getSelectedClasses()
         if (selectedClasses.isEmpty()) {
@@ -96,8 +93,12 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 }
             }
 
+            // 在此处可以调用 DependenciesTreePanel 的 updateDependencies 方法
+            // 假设您已经在主界面中实例化了 DependenciesTreePanel
+            // 例如：dependenciesTreePanel.updateDependencies(classDependencyGraph)
+
             ApplicationManager.getApplication().invokeLater {
-                organizeDependenciesFromGraph(classDependencyGraph)
+                // 这里不再处理 dependenciesNode 相关逻辑
                 (tree.model as DefaultTreeModel).reload(root)
                 expandDefaultNodes()
                 onComplete()
@@ -109,6 +110,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         psiClass: PsiClass,
         classGraph: MutableMap<PsiClass, ClassDependencyInfo>
     ) {
+        // 保持原有逻辑不变
         val dataClassFlag = isDataClass(psiClass)
 
         if (dataClassFlag) {
@@ -167,7 +169,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         classGraph: MutableMap<PsiClass, ClassDependencyInfo>
     ) {
         var classInfo = classGraph[currentClass] ?: ClassDependencyInfo()
-        // 如果该方法已经被分析过,直接返回
+
         if (classInfo.usedMethods.contains(method)) {
             return
         }
@@ -198,21 +200,17 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
         var classInfo = classGraph.getOrPut(containingClass) { ClassDependencyInfo() }
 
-        // 如果该字段已经被分析过,直接返回
         if (classInfo.usedFields.contains(field)) {
             return
         }
 
         classInfo.markFieldUsed(field)
 
-        // 检查字段类型是否为数据类
         val fieldTypeClass = resolveClassFromType(field.type)
         if (fieldTypeClass != null && isDataClass(fieldTypeClass)) {
-            // 如果字段类型是数据类，需要递归分析该数据类的依赖
             analyzeDataClass(fieldTypeClass, classGraph)
         }
 
-        // 分析字段初始化器中的依赖
         field.initializer?.let { initializer ->
             val usedElements = findFieldOrMethodUsedElements(initializer)
             for (element in usedElements) {
@@ -261,179 +259,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         return used
     }
 
-    private fun organizeDependenciesFromGraph(classGraph: Map<PsiClass, ClassDependencyInfo>) {
-        dependenciesNode.removeAllChildren()
-
-        val moduleMap = mutableMapOf<String, DefaultMutableTreeNode>()
-        val mavenDependencies = mutableMapOf<String, MutableList<PsiClass>>()
-        val externalsNode = DefaultMutableTreeNode("Externals")
-
-        // 获取项目名称
-        val projectName = project.name
-        val projectNode = DefaultMutableTreeNode(projectName)
-
-        // 1. 组织项目内类依赖
-        classGraph.keys.forEach { cls ->
-            if (!isExternalDependency(cls)) {
-                val moduleName = getModuleName(cls)
-                val moduleNode = moduleMap.getOrPut(moduleName) {
-                    DefaultMutableTreeNode(moduleName)
-                }
-
-                val packageName = cls.qualifiedName?.substringBeforeLast(".")
-                    ?.replace('.', '/')
-                    ?.let { it.substringAfter("src/main/java/") }
-                    ?.replace('/', '.') ?: "(default package)"
-
-                val packageNode = findOrCreatePackageNode(moduleNode, packageName)
-                packageNode.add(DefaultMutableTreeNode(cls.name))
-            } else {
-                // 处理外部依赖
-                val mavenInfo = extractMavenInfo(cls)
-                if (mavenInfo != null) {
-                    val key = mavenInfo.toString()
-                    mavenDependencies.getOrPut(key) { mutableListOf() }.add(cls)
-                } else {
-                    // 无法解析为 Maven 依赖的外部依赖
-                    val packageName = cls.qualifiedName?.substringBeforeLast(".")
-                        ?.replace('.', '/')
-                        ?.let { it.substringAfter("src/main/java/") }
-                        ?.replace('/', '.') ?: "(default package)"
-                    val packageNode = findOrCreatePackageNode(externalsNode, packageName)
-                    packageNode.add(DefaultMutableTreeNode(cls.name))
-                }
-            }
-        }
-
-        // 将模块节点添加到 projectName 节点
-        moduleMap.entries.sortedBy { it.key }.forEach { (_, node) ->
-            if (node.childCount > 0) {
-                projectNode.add(node)
-            }
-        }
-
-        // 添加 projectName 节点到 Dependencies 节点
-        dependenciesNode.add(projectNode)
-
-        // 2. 组织 Maven 依赖
-        if (mavenDependencies.isNotEmpty()) {
-            val mavenNode = DefaultMutableTreeNode("Maven Dependencies")
-            mavenDependencies.entries.sortedBy { it.key }.forEach { (mavenInfo, classes) ->
-                val mavenInfoNode = DefaultMutableTreeNode(mavenInfo)
-
-                // 按包路径组织类
-                val packageMap = classes.groupBy { cls ->
-                    cls.qualifiedName?.substringBeforeLast(".")
-                        ?.ifEmpty { "(default package)" }
-                        ?: "(default package)"
-                }
-
-                packageMap.entries.sortedBy { it.key }.forEach { (packageName, packageClasses) ->
-                    val packageNode = if (packageName == "(default package)") {
-                        mavenInfoNode
-                    } else {
-                        val node = DefaultMutableTreeNode(packageName)
-                        mavenInfoNode.add(node)
-                        node
-                    }
-
-                    packageClasses.sortedBy { it.name }.forEach { cls ->
-                        packageNode.add(DefaultMutableTreeNode(cls.name))
-                    }
-                }
-
-                mavenNode.add(mavenInfoNode)
-            }
-            dependenciesNode.add(mavenNode)
-        }
-
-        // 3. 添加外部依赖节点
-        if (externalsNode.childCount > 0) {
-            dependenciesNode.add(externalsNode)
-        }
-
-        // 刷新树模型并展开节点
-        (tree.model as DefaultTreeModel).reload(root)
-        expandDefaultNodes()
-    }
-
-    private fun getMavenDependencies(): Map<String, List<PsiClass>> {
-        val mavenDependencies = mutableMapOf<String, MutableList<PsiClass>>()
-        addedClasses.forEach { cls ->
-            if (isExternalDependency(cls)) {
-                val mavenInfo = extractMavenInfo(cls)
-                if (mavenInfo != null) {
-                    val key = mavenInfo.toString()
-                    mavenDependencies.getOrPut(key) { mutableListOf() }.add(cls)
-                }
-            }
-        }
-        return mavenDependencies
-    }
-
-    private fun getExternalDependencies(): List<PsiClass> {
-        return addedClasses.filter { isExternalDependency(it) && extractMavenInfo(it) == null }
-    }
-
-    private fun extractMavenInfo(cls: PsiClass): MavenDependency? {
-        val virtualFile = cls.containingFile?.virtualFile ?: return null
-        val path = virtualFile.path
-        // 匹配形如 /.m2/repository/com/yupaopao/platform/config-client/0.10.21/config-client-0.10.21.jar 的路径
-        val regex = ".*/repository/([^/]+)/([^/]+)/([^/]+)/([^/]+!)/.*".toRegex()
-        val matchResult = regex.find(path) ?: return null
-
-        return try {
-            val (groupIdPath, artifactId, version, _) = matchResult.destructured
-            MavenDependency(
-                groupId = groupIdPath.replace('/', '.'),
-                artifactId = artifactId,
-                version = version
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun getModuleName(cls: PsiClass): String {
-        val virtualFile = cls.containingFile?.virtualFile ?: return "Unknown Module"
-        val path = virtualFile.path
-        val projectPath = project.basePath ?: return "Unknown Module"
-        val relativePath = path.removePrefix(projectPath).removePrefix("/")
-        return relativePath.split("/").firstOrNull() ?: "Unknown Module"
-    }
-
-    private fun isExternalDependency(cls: PsiClass): Boolean {
-        val virtualFile = cls.containingFile?.virtualFile ?: return true
-        val projectPath = project.basePath ?: return true
-        return !virtualFile.path.startsWith(projectPath)
-    }
-
-    private fun findOrCreatePackageNode(parentNode: DefaultMutableTreeNode, packageName: String): DefaultMutableTreeNode {
-        // 查找现有节点
-        for (i in 0 until parentNode.childCount) {
-            val child = parentNode.getChildAt(i) as DefaultMutableTreeNode
-            val childPackage = child.userObject.toString()
-            if (childPackage == packageName) {
-                return child
-            }
-            // 如果当前包名应该在这个位置插入
-            if (childPackage > packageName) {
-                val newNode = DefaultMutableTreeNode(packageName)
-                parentNode.insert(newNode, i)
-                return newNode
-            }
-        }
-        // 如果没找到合适的位置，添加到末尾
-        val newNode = DefaultMutableTreeNode(packageName)
-        parentNode.add(newNode)
-        return newNode
-    }
-
-
-    private fun PsiClass.isTopLevelClass(): Boolean {
-        return this.parent is PsiFile
-    }
-
     private fun resolveClassFromType(type: PsiType): PsiClass? {
         return PsiUtil.resolveClassInType(type)
     }
@@ -455,7 +280,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
     private fun ifGetterOrSetter(method: PsiMethod): Boolean {
         val name = method.name
-        return (name.startsWith("get") && method.parameterList.isEmpty && method.returnType != PsiTypes.voidType()) ||
+        return (name.startsWith("get") && method.parameterList.parametersCount == 0 && method.returnType != PsiTypes.voidType()) ||
                 (name.startsWith("set") && method.parameterList.parametersCount == 1 && method.returnType == PsiTypes.voidType())
     }
 
@@ -466,30 +291,17 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         }
     }
 
-    private class ClassDependencyInfo(var isDataClass: Boolean = false) {
-        val usedMethods = mutableSetOf<PsiMethod>()
-        val usedFields = mutableSetOf<PsiField>()
-
-        fun markMethodUsed(method: PsiMethod) {
-            usedMethods.add(method)
-        }
-
-        fun markFieldUsed(field: PsiField) {
-            usedFields.add(field)
-        }
-    }
-
     fun addClass(psiClass: PsiClass, selected: Boolean) {
         if (!isClassInAddedClasses(psiClass)) {
             val expandedPaths = getExpandedPaths()
             val node = CheckboxTreeNode(psiClass.name ?: "Unnamed Class")
-            node.isChecked = selected // 默认不选中
+            node.isChecked = selected // 默认选中状态
 
             if (!isDataClass(psiClass)) {
                 psiClass.methods.forEach { method ->
                     if (!ifGetterOrSetter(method) && !method.isStandardClassMethod()) {
                         val methodNode = CheckboxTreeNode(method.name ?: "Unnamed Method")
-                        methodNode.isChecked = selected // 默认不选中
+                        methodNode.isChecked = selected // 默认选中状态
                         node.add(methodNode)
                     }
                 }
@@ -543,7 +355,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     private fun expandDefaultNodes() {
         // 展开根节点
         tree.expandPath(TreePath(arrayOf(root, rootClassNode)))
-        tree.expandPath(TreePath(arrayOf(root, dependenciesNode)))
 
         // 展开 Root Classes 下的所有节点到方法级别
         for (i in 0 until rootClassNode.childCount) {
@@ -556,28 +367,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 val methodNode = classNode.getChildAt(j)
                 val methodPath = TreePath(arrayOf(root, rootClassNode, classNode, methodNode))
                 tree.expandPath(methodPath)
-            }
-        }
-
-        // 展开 Dependencies 节点
-        for (i in 0 until dependenciesNode.childCount) {
-            val node = dependenciesNode.getChildAt(i) as DefaultMutableTreeNode
-            if (node.userObject.toString() != "Maven Dependencies" &&
-                node.userObject.toString() != "Externals") {
-                expandNodeRecursively(node)
-            } else if (node.userObject.toString() == "Maven Dependencies") {
-                tree.expandPath(TreePath(arrayOf(root, dependenciesNode, node)))
-            }
-        }
-    }
-
-    private fun expandNodeRecursively(node: DefaultMutableTreeNode) {
-        if (node.childCount > 0) {
-            val path = getPathToNode(node)
-            tree.expandPath(TreePath(path.toTypedArray()))
-
-            for (i in 0 until node.childCount) {
-                expandNodeRecursively(node.getChildAt(i) as DefaultMutableTreeNode)
             }
         }
     }
@@ -621,8 +410,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             selectedPaths.forEach { path ->
                 val selectedNode = path.lastPathComponent as? DefaultMutableTreeNode
                 if (selectedNode != null && selectedNode != root &&
-                    selectedNode != rootClassNode && // 保持此逻辑
-                    selectedNode != dependenciesNode) {
+                    selectedNode != rootClassNode) {
                     removeNodeAndChildren(selectedNode)
                 }
             }
@@ -750,7 +538,6 @@ private class CheckboxTreeNode(val text: String) : DefaultMutableTreeNode(text) 
     }
 }
 
-
 private class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
     private val checkbox = JCheckBox()
 
@@ -781,12 +568,4 @@ private class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
 
         return component
     }
-}
-
-private data class MavenDependency(
-    val groupId: String,
-    val artifactId: String,
-    val version: String
-) {
-    override fun toString(): String = "$groupId:$artifactId:$version"
 }
