@@ -2,6 +2,8 @@
 
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
+import com.github.zjh7890.gpttools.toolWindow.treePanel.DependenciesTreePanel.CheckboxTreeNode
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
@@ -300,65 +302,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         }
 
         return path.toTypedArray()
-    }
-
-    private class CheckboxTreeNode(val text: String) : DefaultMutableTreeNode(text) {
-        private var _isChecked = false
-        var isChecked: Boolean
-            get() = _isChecked
-            set(value) {
-                if (_isChecked != value) {
-                    _isChecked = value
-                    // 更新所有子节点状态
-                    updateChildrenState()
-                    // 更新父节点状态
-                    updateParentState()
-                }
-            }
-
-        private fun updateChildrenState() {
-            children().asSequence().forEach { child ->
-                if (child is CheckboxTreeNode) {
-                    child._isChecked = _isChecked  // 直接设置内部字段，避免触发 setter
-                }
-            }
-        }
-
-        private fun updateParentState() {
-            val parent = parent as? CheckboxTreeNode ?: return
-            val newState = parent.children().asSequence().all {
-                (it as? CheckboxTreeNode)?.isChecked == true
-            }
-            if (parent._isChecked != newState) {
-                parent._isChecked = newState  // 直接设置内部字段，避免触发 setter
-                parent.updateParentState()  // 继续向上更新父节点状态
-            }
-        }
-    }
-
-    private class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
-        private val checkbox = JCheckBox()
-
-        override fun getTreeCellRendererComponent(
-            tree: JTree,
-            value: Any?,
-            selected: Boolean,
-            expanded: Boolean,
-            leaf: Boolean,
-            row: Int,
-            hasFocus: Boolean
-        ): Component {
-            val component = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
-
-            if (value is CheckboxTreeNode) {
-                checkbox.isSelected = value.isChecked
-                checkbox.text = value.text
-                checkbox.isOpaque = false
-                return checkbox
-            }
-
-            return component
-        }
     }
 }
 
