@@ -1,3 +1,5 @@
+// core/src/main/kotlin/com/github/zjh7890/gpttools/toolWindow/treePanel/FileTreeListPanel.kt
+
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
@@ -22,7 +24,10 @@ import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
-class FileTreeListPanel(private val project: Project) : JPanel() {
+class FileTreeListPanel(
+    private val project: Project,
+    private val onAnalysisComplete: (Map<PsiClass, ClassDependencyInfo>) -> Unit
+) : JPanel() {
     private val root = DefaultMutableTreeNode("")
     private val rootClassNode = DefaultMutableTreeNode("Root Classes")
     val tree = Tree(root)
@@ -74,8 +79,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     }
 
     fun runAnalysis(project: Project, onComplete: () -> Unit = {}) {
-        // 这里的 dependenciesNode 相关逻辑已移除
-
         val selectedClasses = getSelectedClasses()
         if (selectedClasses.isEmpty()) {
             (tree.model as DefaultTreeModel).reload(root)
@@ -93,12 +96,10 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 }
             }
 
-            // 在此处可以调用 DependenciesTreePanel 的 updateDependencies 方法
-            // 假设您已经在主界面中实例化了 DependenciesTreePanel
-            // 例如：dependenciesTreePanel.updateDependencies(classDependencyGraph)
+            // 通过回调传递分析结果
+            onAnalysisComplete(classDependencyGraph)
 
             ApplicationManager.getApplication().invokeLater {
-                // 这里不再处理 dependenciesNode 相关逻辑
                 (tree.model as DefaultTreeModel).reload(root)
                 expandDefaultNodes()
                 onComplete()
@@ -110,7 +111,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         psiClass: PsiClass,
         classGraph: MutableMap<PsiClass, ClassDependencyInfo>
     ) {
-        // 保持原有逻辑不变
         val dataClassFlag = isDataClass(psiClass)
 
         if (dataClassFlag) {
@@ -295,13 +295,13 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         if (!isClassInAddedClasses(psiClass)) {
             val expandedPaths = getExpandedPaths()
             val node = CheckboxTreeNode(psiClass.name ?: "Unnamed Class")
-            node.isChecked = selected // 默认选中状态
+            node.isChecked = selected // 根据需要设置初始选中状态
 
             if (!isDataClass(psiClass)) {
                 psiClass.methods.forEach { method ->
                     if (!ifGetterOrSetter(method) && !method.isStandardClassMethod()) {
                         val methodNode = CheckboxTreeNode(method.name ?: "Unnamed Method")
-                        methodNode.isChecked = selected // 默认选中状态
+                        methodNode.isChecked = selected // 根据需要设置初始选中状态
                         node.add(methodNode)
                     }
                 }
@@ -367,6 +367,17 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 val methodNode = classNode.getChildAt(j)
                 val methodPath = TreePath(arrayOf(root, rootClassNode, classNode, methodNode))
                 tree.expandPath(methodPath)
+            }
+        }
+    }
+
+    private fun expandNodeRecursively(node: DefaultMutableTreeNode) {
+        if (node.childCount > 0) {
+            val path = getPathToNode(node)
+            tree.expandPath(TreePath(path.toTypedArray()))
+
+            for (i in 0 until node.childCount) {
+                expandNodeRecursively(node.getChildAt(i) as DefaultMutableTreeNode)
             }
         }
     }
@@ -529,7 +540,7 @@ private class CheckboxTreeNode(val text: String) : DefaultMutableTreeNode(text) 
     private fun updateParentState() {
         val parent = parent as? CheckboxTreeNode ?: return
         val newState = parent.children().asSequence().all {
-            (it as? CheckboxTreeNode)?._isChecked == true
+            (it as? CheckboxTreeNode)?.isChecked == true
         }
         if (parent._isChecked != newState) {
             parent._isChecked = newState  // 直接设置内部字段，避免触发 setter
