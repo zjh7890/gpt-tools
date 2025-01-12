@@ -5,8 +5,7 @@ import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.treeStructure.Tree
@@ -17,7 +16,6 @@ import java.awt.Component
 import java.awt.Dimension
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import com.intellij.openapi.ui.Messages
 import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
@@ -44,7 +42,7 @@ class ChatFileTreeListPanel(private val project: Project) {
         scrollPanel = JBScrollPane(tree)
         scrollPanel.preferredSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))
         scrollPanel.maximumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最大尺寸
-        scrollPanel.minimumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最大尺寸
+        scrollPanel.minimumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最小尺寸
         setupListeners()
     }
 
@@ -63,7 +61,7 @@ class ChatFileTreeListPanel(private val project: Project) {
     }
 
     /**
-     * 更新文件树，采用类似 Dependencies 节点的层级结构展示
+     * 更新文件树，采用类似 Dependencies 节点的层级结构展示（project -> module -> package -> file）
      */
     fun updateFileTree(session: ChatSession) {
         currentSession = session
@@ -82,11 +80,24 @@ class ChatFileTreeListPanel(private val project: Project) {
             // 创建模块节点，添加到 projectName 节点下
             moduleToFilesMap.forEach { (moduleName, files) ->
                 val moduleNode = DefaultMutableTreeNode(moduleName)
-                files.forEach { file ->
-                    val fileNode = DefaultMutableTreeNode(file)
-                    moduleNode.add(fileNode)
-                }
                 projectNode.add(moduleNode)
+
+                // 按包分组文件
+                val packageToFilesMap = files.groupBy { file ->
+                    getPackageName(file)
+                }
+
+                // 创建包节点，添加到模块节点下
+                packageToFilesMap.forEach { (packageName, packageFiles) ->
+                    val packageNode = DefaultMutableTreeNode(packageName)
+                    moduleNode.add(packageNode)
+
+                    // 添加文件节点到包节点下
+                    packageFiles.forEach { file ->
+                        val fileNode = DefaultMutableTreeNode(file)
+                        packageNode.add(fileNode)
+                    }
+                }
             }
         }
 
@@ -98,12 +109,43 @@ class ChatFileTreeListPanel(private val project: Project) {
      * 获取文件所属的模块名称
      */
     private fun getModuleName(file: VirtualFile): String {
-        val currentSession = currentSession ?: return "Unknown Module"
         // 假设模块名称可以从文件路径中提取，例如 /project/module/src/...
         val path = file.path
         val segments = path.split("/")
-        val moduleIndex = segments.indexOf("src")
-        return if (moduleIndex > 0) segments[moduleIndex - 1] else "Unknown Module"
+        val srcIndex = segments.indexOf("src")
+        return if (srcIndex > 0 && segments.size > srcIndex) segments[srcIndex - 1] else "Unknown Module"
+    }
+
+    /**
+     * 获取文件的包名
+     */
+    private fun getPackageName(file: VirtualFile): String {
+        val projectPath = project.basePath ?: return "(default package)"
+        val filePath = file.path
+
+        // 支持 src/main/java 或 src/main/kotlin
+        val srcJava = "src/main/java/"
+        val srcKotlin = "src/main/kotlin/"
+        val indexJava = filePath.indexOf(srcJava)
+        val indexKotlin = filePath.indexOf(srcKotlin)
+
+        val startIndex = when {
+            indexJava != -1 -> indexJava + srcJava.length
+            indexKotlin != -1 -> indexKotlin + srcKotlin.length
+            else -> return "(default package)"
+        }
+
+        val relativePath = if (startIndex < filePath.length) {
+            filePath.substring(startIndex, filePath.lastIndexOf('/'))
+        } else {
+            ""
+        }
+
+        return if (relativePath.isNotEmpty()) {
+            relativePath.replace('/', '.')
+        } else {
+            "(default package)"
+        }
     }
 
     /**
@@ -113,16 +155,21 @@ class ChatFileTreeListPanel(private val project: Project) {
         val selectedPaths = tree.selectionPaths
         if (selectedPaths == null || selectedPaths.isEmpty()) {
             // 可以选择显示提示信息
+            Messages.showWarningDialog(
+                project,
+                "请先选择要移除的节点。",
+                "移除节点"
+            )
             return
         }
 
         selectedPaths.forEach { path ->
             val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
             if (node.parent == root) {
-                // 不允许移除包节点
+                // 不允许移除 project 节点
                 Messages.showErrorDialog(
                     project,
-                    "无法移除包节点。请仅移除文件节点。",
+                    "无法移除项目节点。请仅移除文件或包节点。",
                     "移除节点"
                 )
                 return@forEach
@@ -283,6 +330,11 @@ private class DependencyTreeCellRenderer : DefaultTreeCellRenderer() {
             node?.parent?.parent == tree.model.root -> {
                 // module 节点
                 icon = AllIcons.Nodes.Folder
+                text = userObject.toString()
+            }
+            node?.parent?.parent?.parent == tree.model.root -> {
+                // package 节点
+                icon = AllIcons.Nodes.Package
                 text = userObject.toString()
             }
             userObject is VirtualFile -> {
