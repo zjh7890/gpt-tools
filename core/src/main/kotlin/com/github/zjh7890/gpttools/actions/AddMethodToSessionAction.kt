@@ -19,7 +19,7 @@ class AddMethodToSessionAction : AnAction("Add Method to Session") {
         }
 
         ChatUtils.activateToolWindowRun(project) { panel, service ->
-            SessionManager.getInstance(project).addClassAndMethodToCurrentSession(psiMethod)
+            SessionManager.getInstance(project).addMethodToCurrentSession(psiMethod)
         }
     }
 }

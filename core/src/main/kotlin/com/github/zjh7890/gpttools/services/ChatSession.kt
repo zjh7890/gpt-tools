@@ -28,7 +28,7 @@ data class ChatSession(
     var classGraph: MutableMap<PsiClass, ClassDependencyInfo> = mutableMapOf()
 
     // 新增方法用于添加类和方法，并指定文件
-    fun addClass(projectName: String, fileName: String, className: String, methodName: String) {
+    fun addClass(projectName: String, fileName: String, className: String, methodName: String, parameterTypes: List<String> = emptyList()) {
         val projectTree = projectTrees.find { it.projectName == projectName }
             ?: ProjectTree(projectName).also { projectTrees.add(it) }
 
@@ -38,8 +38,8 @@ data class ChatSession(
         val projectClass = projectFile.classes.find { it.className == className }
             ?: ProjectClass(className).also { projectFile.classes.add(it) }
 
-        if (!projectClass.methods.any { it.methodName == methodName }) {
-            projectClass.methods.add(ProjectMethod(methodName))
+        if (!projectClass.methods.any { it.methodName == methodName && it.parameterTypes == parameterTypes }) {
+            projectClass.methods.add(ProjectMethod(methodName, parameterTypes))
         }
     }
 
@@ -152,19 +152,17 @@ ${FileUtil.wrapBorder(it.context)}
         private val logger = logger<ChatCodingService>()
     }
 
-    // 新增方法用于生成 classGraph
-    // 在 ChatSession.kt 中修改 generateClassGraph 方法
     fun generateClassGraph(project: Project) {
         classGraph.clear()
         projectTrees.forEach { projectTree ->
             projectTree.files.forEach { projectFile ->
-                if (projectFile.whole) {
-                    // 如果整个文件被标记为 whole，则需要找到该文件中的所有类
-                    val virtualFile = project.baseDir.findFileByRelativePath(projectFile.fileName)
-                    if (virtualFile != null) {
-                        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-                        if (psiFile != null) {
-                            // 获取文件中的所有类
+                // 获取虚拟文件
+                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.fileName)
+                if (virtualFile != null) {
+                    val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+                    if (psiFile != null) {
+                        if (projectFile.whole) {
+                            // 如果整个文件被标记为 whole，处理文件中的所有类
                             PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).forEach { psiClass ->
                                 val dependencyInfo = ClassDependencyInfo()
                                 psiClass.methods.forEach { method ->
@@ -172,29 +170,40 @@ ${FileUtil.wrapBorder(it.context)}
                                 }
                                 classGraph[psiClass] = dependencyInfo
                             }
-                        }
-                    }
-                } else {
-                    // 如果不是整个文件，则按原来的逻辑处理单个类
-                    projectFile.classes.forEach { projectClass ->
-                        val psiClass = findPsiClass(project, projectClass.className)
-                        if (psiClass != null) {
-                            val dependencyInfo = ClassDependencyInfo()
-                            psiClass.methods.forEach { method ->
-                                dependencyInfo.markMethodUsed(method)
+                        } else {
+                            // 如果不是整个文件，只处理指定的类
+                            projectFile.classes.forEach { projectClass ->
+                                // 在文件中查找指定的类
+                                PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                                    .find { it.name == projectClass.className }
+                                    ?.let { psiClass ->
+                                        val dependencyInfo = ClassDependencyInfo()
+                                        if (projectClass.whole) {
+                                            // 如果整个类被标记为 whole，处理所有方法
+                                            psiClass.methods.forEach { method ->
+                                                dependencyInfo.markMethodUsed(method)
+                                            }
+                                        } else {
+                                            // 只处理指定的方法
+                                            psiClass.methods.forEach { method ->
+                                                if (projectClass.methods.any { 
+                                                    it.methodName == method.name && 
+                                                    it.parameterTypes == method.parameterList.parameters.map { param -> 
+                                                        param.type.canonicalText 
+                                                    }
+                                                }) {
+                                                    dependencyInfo.markMethodUsed(method)
+                                                }
+                                            }
+                                        }
+                                        classGraph[psiClass] = dependencyInfo
+                                    }
                             }
-                            classGraph[psiClass] = dependencyInfo
                         }
                     }
                 }
             }
         }
-    }
-
-    private fun findPsiClass(project: Project, className: String): PsiClass? {
-        val psiFacade = JavaPsiFacade.getInstance(project)
-        val searchScope = GlobalSearchScope.allScope(project)
-        return psiFacade.findClass(className, searchScope)
     }
 }
 
@@ -300,11 +309,26 @@ data class ProjectClass(
 
 @Serializable
 data class ProjectMethod(
-    val methodName: String = ""
+    val methodName: String = "",
+    val parameterTypes: List<String> = emptyList() // 添加参数类型列表
 ) {
     fun toSerializable(): SerializableProjectMethod {
         return SerializableProjectMethod(
-            methodName = methodName
+            methodName = methodName,
+            parameterTypes = parameterTypes
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectMethod(
+    val methodName: String,
+    val parameterTypes: List<String> = emptyList()
+) {
+    fun toProjectMethod(): ProjectMethod {
+        return ProjectMethod(
+            methodName = methodName,
+            parameterTypes = parameterTypes
         )
     }
 }
@@ -319,17 +343,6 @@ data class SerializableProjectClass(
         return ProjectClass(
             className = className,
             methods = methods
-        )
-    }
-}
-
-@Serializable
-data class SerializableProjectMethod(
-    val methodName: String
-) {
-    fun toProjectMethod(): ProjectMethod {
-        return ProjectMethod(
-            methodName = methodName
         )
     }
 }

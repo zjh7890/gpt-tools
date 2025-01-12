@@ -40,7 +40,7 @@ class PsiDependencyByMethodAction : AnAction() {
         val dependency = findMethodDependency(method, project)
 
 //        val psiFields = findDubboReferenceFields(dependency)
-        val callsLinks = generateRpcCallsLinksFromTree(dependency.methodTree)
+        val callsLinks = generateRpcCallsLinksFromTree(dependency.methodTree!!)
         val message = callsLinks.joinToString("\n")
 
 //        val element = simplyFileByDependency(method.containingFile!!, dependency, project)
@@ -259,7 +259,7 @@ class PsiDependencyByMethodAction : AnAction() {
                                     curNode.rpcCalls.add(methodCallExpression)
                                     curNode.calls.add(methodCallExpression)
                                     curNode.hasRpc = true
-                                } 
+                                }
 //                                else if (isMybatisMethodCall(it, project)) {
 //                                    curNode.mybatisCalls.add(methodCallExpression)
 //                                    curNode.calls.add(methodCallExpression)
@@ -532,7 +532,12 @@ data class PsiDependency(
     // 记录依赖 element 的节点，对方可以是 method, field, 或者是 data class
     val elementIncomingList: MutableMap<PsiElement, MutableList<ElementDependInfo>> = mutableMapOf(),
 
-    val methodTree: NodeInfo
+    // 用来存储方法依赖树
+    var methodTree: NodeInfo? = null,
+    // 新增：用于存储类依赖树
+    var classTree: NodeInfo? = null,
+    // 新增：用于存储字段依赖树
+    var fieldTree: NodeInfo? = null,
 )
 
 data class ElementDependInfo (

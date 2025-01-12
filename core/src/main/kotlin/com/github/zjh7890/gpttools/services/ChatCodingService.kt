@@ -16,6 +16,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.coroutines.Job
@@ -153,44 +154,58 @@ ${collectFileContents(projectFileTree.files, project).joinToString("\n")}
          */
         fun collectFileContents(files: List<ProjectFile>, project: Project): List<String> {
             return files.mapNotNull { projectFile ->
+                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.fileName) ?: return@mapNotNull null
+
+                // 如果用户配置了 whole = true，说明整文件都要
                 if (projectFile.whole) {
-                    // 如果整个文件都需要，直接读取文件内容
-                    val virtualFile = FileUtil.findVirtualFile(projectFile.fileName, project) ?: return@mapNotNull null
+                    // 直接读取文件内容
                     FileUtil.readFileInfoForLLM(virtualFile, project)
                 } else {
-                    // 处理单个类或方法级别的内容
-                    val fileContents = StringBuilder()
+                    // 同一个文件内，先把要处理的所有 PsiElement (类、方法等) 都收集到 elementsToProcess
+                    val elementsToProcess = mutableListOf<PsiElement>()
+                    val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return@mapNotNull null
+
+                    // 遍历用户指定的 Class/Method 信息
                     projectFile.classes.forEach { projectClass ->
-                        if (projectClass.whole) {
-                            // 如果整个类都需要
-                            val virtualFile = FileUtil.findVirtualFile(projectFile.fileName, project) ?: return@forEach
-                            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return@forEach
-                            val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
-                                .find { it.qualifiedName == projectClass.className } ?: return@forEach
-
-                            val classContent = ClassDepsInSingleFileAction.classDepsInSingleFile(psiClass, project)
-                            if (classContent != null) {
-                                fileContents.append(classContent).append("\n\n")
+                        // 查找对应的 PsiClass
+                        val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
+                            if (projectClass.whole) {
+                                // 如果指定了 whole = true，则用 qualifiedName 精确匹配
+                                it.qualifiedName == projectClass.className
+                            } else {
+                                // 如果不需要整类，className 可能只写了简单类名，这里做简单匹配
+                                it.name == projectClass.className
                             }
-                        } else {
-                            // 如果只需要特定方法
-                            val virtualFile = FileUtil.findVirtualFile(projectFile.fileName, project) ?: return@forEach
-                            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return@forEach
-                            val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
-                                .find { it.qualifiedName == projectClass.className } ?: return@forEach
+                        } ?: return@forEach
 
+                        // 如果用户配置了对整个类都需要
+                        if (projectClass.whole) {
+                            // 只需要把这个类加进去一次
+                            elementsToProcess.add(psiClass)
+                        } else {
+                            // 如果只需要其中部分方法，则逐个方法查找
                             projectClass.methods.forEach { projectMethod ->
-                                val method = psiClass.findMethodsByName(projectMethod.methodName, false).firstOrNull() ?: return@forEach
-                                val methodContent = MethodDepsInSingleFileAction.methodDepsInSingleFile(method, project)
-                                if (methodContent != null) {
-                                    fileContents.append(methodContent).append("\n\n")
-                                }
+                                val methods = psiClass.findMethodsByName(projectMethod.methodName, false)
+                                // 找到参数类型匹配的方法
+                                val matchedMethod = methods.find { method ->
+                                    val paramTypes = method.parameterList.parameters.map { it.type.canonicalText }
+                                    paramTypes == projectMethod.parameterTypes
+                                } ?: return@forEach
+
+                                elementsToProcess.add(matchedMethod)
                             }
                         }
                     }
 
-                    if (fileContents.isNotEmpty()) {
-                        fileContents.toString().trim()
+                    // 如果本文件收集到了想要处理的 PsiElement
+                    if (elementsToProcess.isNotEmpty()) {
+                        // 此处只调用一次 depsInSingleFile，把当前文件内的所有类和方法一并传入
+                        val fileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
+                        if (!fileContent.isNullOrBlank()) {
+                            fileContent.trim()
+                        } else {
+                            null
+                        }
                     } else {
                         null
                     }

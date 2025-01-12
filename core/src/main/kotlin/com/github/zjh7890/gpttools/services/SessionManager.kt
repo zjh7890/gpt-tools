@@ -141,12 +141,17 @@ class SessionManager(private val project: Project) : Disposable {
         notifyAllFileTreePanels(currentSession)
     }
 
-    fun addClassAndMethodToCurrentSession(psiMethod: PsiMethod) {
+    fun addMethodToCurrentSession(psiMethod: PsiMethod) {
         // 获取文件名、类名和方法名
         val containingFile = psiMethod.containingFile
         val fileName = containingFile.virtualFile.path.removePrefix(project.basePath!! + "/")
         val className = psiMethod.containingClass?.name ?: ""
         val methodName = psiMethod.name
+        
+        // 获取方法参数类型列表
+        val parameterTypes = psiMethod.parameterList.parameters.map { param ->
+            param.type.canonicalText
+        }
 
         // 获取当前 session 对应的 ProjectFileTree
         val projectTree = currentSession.projectTrees.find { it.projectName == project.name }
@@ -160,8 +165,12 @@ class SessionManager(private val project: Project) : Disposable {
         val projectClass = projectFile.classes.find { it.className == className }
             ?: ProjectClass(className).also { projectFile.classes.add(it) }
 
-        if (!projectClass.methods.any { it.methodName == methodName }) {
-            projectClass.methods.add(ProjectMethod(methodName))
+        // 检查是否已存在相同的方法（包括参数类型）
+        if (!projectClass.methods.any { 
+            it.methodName == methodName && 
+            it.parameterTypes == parameterTypes 
+        }) {
+            projectClass.methods.add(ProjectMethod(methodName, parameterTypes))
         }
 
         saveSessions()

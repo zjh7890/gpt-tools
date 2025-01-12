@@ -134,46 +134,4 @@ ${border}
             e.printStackTrace()
         }
     }
-
-    fun findVirtualFile(fileName: String, project: Project): VirtualFile? {
-        // 获取项目的根目录
-        val projectRootManager = ProjectRootManager.getInstance(project)
-        val contentRoots = projectRootManager.contentRoots
-
-        // 遍历项目的所有内容根目录
-        for (root in contentRoots) {
-            // 使用 BFS 遍历目录树查找文件
-            val queue = ArrayDeque<VirtualFile>()
-            queue.add(root)
-
-            while (queue.isNotEmpty()) {
-                val currentFile = queue.removeFirst()
-
-                // 检查当前文件是否匹配
-                if (!currentFile.isDirectory && currentFile.name == fileName) {
-                    return currentFile
-                }
-
-                // 如果是目录，将其子文件添加到队列中
-                if (currentFile.isDirectory) {
-                    currentFile.children.forEach { child ->
-                        queue.add(child)
-                    }
-                }
-            }
-        }
-
-        // 如果找不到文件，尝试使用完整路径查找
-        if (fileName.contains("/")) {
-            val virtualFileManager = VirtualFileManager.getInstance()
-            val projectBasePath = project.basePath
-            if (projectBasePath != null) {
-                // 构建完整的文件路径
-                val fullPath = "file://$projectBasePath/$fileName"
-                return virtualFileManager.findFileByUrl(fullPath)
-            }
-        }
-
-        return null
-    }
 }

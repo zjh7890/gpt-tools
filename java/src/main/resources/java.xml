@@ -24,13 +24,13 @@
                     icon="/icons/icon_dark_16px.svg">
         </toolWindow>
 
-        <toolWindow id="ContextFileTool"
-                    anchor="right"
-                    factoryClass="com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory"
-                    canCloseContent="false"
-                    canWorkInDumbMode="false"
-                    icon="/icons/icon_dark_16px.svg">
-        </toolWindow>
+<!--        <toolWindow id="ContextFileTool"-->
+<!--                    anchor="right"-->
+<!--                    factoryClass="com.github.zjh7890.gpttools.toolWindow.context.ContextFileToolWindowFactory"-->
+<!--                    canCloseContent="false"-->
+<!--                    canWorkInDumbMode="false"-->
+<!--                    icon="/icons/icon_dark_16px.svg">-->
+<!--        </toolWindow>-->
     </extensions>
 
     <extensions defaultExtensionNs="com.github.zjh7890.gpttools">
