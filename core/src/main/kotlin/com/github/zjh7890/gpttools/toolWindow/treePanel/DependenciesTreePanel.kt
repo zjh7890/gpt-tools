@@ -95,8 +95,18 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                     ?.replace('/', '.') ?: "(default package)"
 
                 val packageNode = findOrCreatePackageNode(moduleNode, packageName)
-                packageNode.add(DefaultMutableTreeNode(cls.name))
+
+                // 创建类节点
+                val classNode = CheckboxTreeNode(cls.name!!)
+                packageNode.add(classNode)
                 addedDependencies.add(cls)
+
+                // 添加方法级别的子节点
+                val classDependencyInfo = classGraph[cls]
+                classDependencyInfo?.usedMethods?.forEach { method ->
+                    val methodNode = CheckboxTreeNode(method.name)
+                    classNode.add(methodNode)
+                }
             } else {
                 // 处理外部依赖
                 val mavenInfo = extractMavenInfo(cls)
@@ -353,11 +363,11 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 }
 
 data class MavenDependency(
-        val groupId: String,
-        val artifactId: String,
-        val version: String
-    ) {
-        override fun toString(): String = "$groupId:$artifactId:$version"
+    val groupId: String,
+    val artifactId: String,
+    val version: String
+) {
+    override fun toString(): String = "$groupId:$artifactId:$version"
 }
 
 class ClassDependencyInfo(var isDataClass: Boolean = false) {
