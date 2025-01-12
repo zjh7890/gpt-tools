@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.java.util
+package com.github.zjh7890.gpttools.utils
 
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.roots.ProjectFileIndex

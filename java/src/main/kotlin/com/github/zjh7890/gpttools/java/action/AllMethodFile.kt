@@ -2,7 +2,10 @@ package com.github.zjh7890.gpttools.java.action
 
 import mybatisx.dom.model.IdDomElement
 import mybatisx.service.JavaService
-import com.github.zjh7890.gpttools.java.util.PsiUtils
+import com.github.zjh7890.gpttools.utils.PsiUtils
+import com.github.zjh7890.gpttools.services.ElementDependInfo
+import com.github.zjh7890.gpttools.services.NodeInfo
+import com.github.zjh7890.gpttools.services.PsiDependency
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread

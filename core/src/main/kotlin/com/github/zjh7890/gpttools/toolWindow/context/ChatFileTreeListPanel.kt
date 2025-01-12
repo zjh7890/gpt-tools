@@ -4,33 +4,13 @@ package com.github.zjh7890.gpttools.toolWindow.context
 
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.treePanel.CheckboxTreeNode
-import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.toolWindow.treePanel.DependenciesTreePanel
-import com.github.zjh7890.gpttools.utils.ClipboardUtils
-import com.intellij.icons.AllIcons
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.*
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.util.PsiUtil
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.tree.TreeUtil
 import java.awt.BorderLayout
-import java.awt.Component
 import java.awt.Dimension
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
 import javax.swing.JPanel
-import javax.swing.JTree
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.TreePath
 
 class ChatFileTreeListPanel(private val project: Project) : JPanel() {
     var currentSession: ChatSession? = null
@@ -63,21 +43,38 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel() {
         val root = dependenciesTreePanel.root
         root.removeAllChildren()
 
-        session.projectFileTrees.forEach { projectTree ->
+        // 创建一个映射来存储每个项目的类节点
+        val projectClassNodes = mutableMapOf<String, MutableMap<String, CheckboxTreeNode>>()
+
+        session.projectTrees.forEach { projectTree ->
             // 创建项目节点
             val projectNode = CheckboxTreeNode(projectTree.projectName)
             root.add(projectNode)
 
-            // 遍历类
-            projectTree.classes.forEach { projectClass ->
-                // 创建类节点
-                val classNode = CheckboxTreeNode(projectClass.className)
-                projectNode.add(classNode)
+            // 为当前项目创建类节点映射
+            val classNodes = projectClassNodes.getOrPut(projectTree.projectName) { mutableMapOf() }
 
-                // 遍历方法
-                projectClass.methods.forEach { method ->
-                    val methodNode = CheckboxTreeNode(method.methodName)
-                    classNode.add(methodNode)
+            // 遍历文件
+            projectTree.files.forEach { file ->
+                // 遍历类
+                file.classes.forEach { projectClass ->
+                    // 获取或创建类节点
+                    val classNode = classNodes.getOrPut(projectClass.className) {
+                        val node = CheckboxTreeNode(projectClass.className)
+                        projectNode.add(node)
+                        node
+                    }
+
+                    // 遍历方法
+                    projectClass.methods.forEach { method ->
+                        // 检查该方法是否已经存在
+                        if (!classNode.children().asSequence().any {
+                                (it as? CheckboxTreeNode)?.text == method.methodName
+                            }) {
+                            val methodNode = CheckboxTreeNode(method.methodName)
+                            classNode.add(methodNode)
+                        }
+                    }
                 }
             }
         }

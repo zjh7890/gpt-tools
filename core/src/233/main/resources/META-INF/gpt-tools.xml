@@ -101,6 +101,14 @@
             <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
+        <action id="GptTools.AddClassAndMethodToSession"
+                class="com.github.zjh7890.gpttools.actions.AddMethodToSessionAction"
+                text="Add Method to Session"
+                description="Add selected method to current chat session"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
         <action id="AddToSessionFileListBatchAction"
                 class="com.github.zjh7890.gpttools.actions.AddFilesToSessionBatchAction"
                 text="Add to Session File List"

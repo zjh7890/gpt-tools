@@ -4,6 +4,7 @@ import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
 import com.github.zjh7890.gpttools.services.ChatCodingService
+import com.github.zjh7890.gpttools.services.ChatCodingService.Companion.collectFileContents
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
@@ -34,21 +35,23 @@ object GenerateDiffAgent {
         ui.progressBar.isIndeterminate = true  // 设置为不确定状态
         ui.inputSection.showStopButton()
         val border = FileUtil.determineBorder(response)
-        val chatSession = ChatSession(id = UUID.randomUUID().toString(), type = "apply",
-            project = project.name, projects =  mutableListOf(project))
+        val chatSession = ChatSession(
+            id = UUID.randomUUID().toString(), type = "apply",
+            project = project.name, projects = mutableListOf(project)
+        )
 
         var fileContent = "No files."
-        if (currentSession.projectFileTrees.isNotEmpty()) {
-            fileContent = currentSession.projectFileTrees.joinToString("\n\n=== Project: ${project.name} ===\n\n") { projectTree ->
-                projectTree.files.joinToString("\n\n") { file ->
-                    FileUtil.readFileInfoForLLM(file, project)
-                }
+        if (currentSession.projectTrees.isNotEmpty()) {
+            fileContent = currentSession.projectTrees.joinToString("\n\n") { projectFileTree ->
+                """
+=== Project: ${projectFileTree.projectName} ===
+${collectFileContents(projectFileTree.files, project).joinToString("\n")}
+""".trimIndent()
             }
-        }
 
-        chatSession.add(
-            ChatContextMessage(
-                ChatRole.user, """
+            chatSession.add(
+                ChatContextMessage(
+                    ChatRole.user, """
 你是一个改代码的 agent。别的 agent 已经给出了代码的修改意见，根据代码修改意见按照下面的格式返回文件的变更。
 
 支持以下几种变更类型：
@@ -147,43 +150,45 @@ ${FileUtil.wrapBorder(fileContent)}
 ${border}
 ${response}
 ${border}
-""".trimIndent())
-        )
+""".trimIndent()
+                )
+            )
 
-        var messageView: MessageView? = null
-        // 添加一个空的消息视图用于流式更新
-        ApplicationManager.getApplication().invokeAndWait {
-            messageView = ui.addMessage("Generating Diff", chatMessage = null)
-            messageView!!.scrollToBottom()
-        }
-
-        val applyFlow = LlmProvider.stream(chatSession, llmConfig)
-        val chatCodingService = ChatCodingService.getInstance(project)
-
-        var responseText = ""
-
-        chatCodingService.currentJob = LLMCoroutineScope.scope(project).launch {
-            applyFlow.onCompletion {
-                logger.warn("onCompletion ${it?.message}")
-            }.catch {
-                logger.error("exception happens: ", it)
-                responseText = "exception happens: " + it.message.toString()
-            }.collect {
-                responseText += it
-                messageView!!.updateContent(responseText)
+            var messageView: MessageView? = null
+            // 添加一个空的消息视图用于流式更新
+            ApplicationManager.getApplication().invokeAndWait {
+                messageView = ui.addMessage("Generating Diff", chatMessage = null)
+                messageView!!.scrollToBottom()
             }
 
-            chatCodingService.currentJob = null
-            logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
+            val applyFlow = LlmProvider.stream(chatSession, llmConfig)
+            val chatCodingService = ChatCodingService.getInstance(project)
 
-            // 更新最终内容
-            messageView!!.message = responseText
-            messageView!!.reRender()
+            var responseText = ""
 
-            chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
-            chatSession.exportChatHistory()
-            ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
-            ui.progressBar.isVisible = false
+            chatCodingService.currentJob = LLMCoroutineScope.scope(project).launch {
+                applyFlow.onCompletion {
+                    logger.warn("onCompletion ${it?.message}")
+                }.catch {
+                    logger.error("exception happens: ", it)
+                    responseText = "exception happens: " + it.message.toString()
+                }.collect {
+                    responseText += it
+                    messageView!!.updateContent(responseText)
+                }
+
+                chatCodingService.currentJob = null
+                logger.warn("LLM response, GenerateDiffAgent: ${JsonUtils.toJson(responseText)}")
+
+                // 更新最终内容
+                messageView!!.message = responseText
+                messageView!!.reRender()
+
+                chatSession.add(ChatContextMessage(ChatRole.assistant, responseText))
+                chatSession.exportChatHistory()
+                ui.progressBar.isIndeterminate = false // 处理完成后恢复确定状态
+                ui.progressBar.isVisible = false
+            }
         }
     }
 }

@@ -3,7 +3,7 @@ package com.github.zjh7890.gpttools.java.context
 import com.github.zjh7890.gpttools.context.MethodContext
 import com.github.zjh7890.gpttools.context.builder.ClassContextBuilder
 import com.github.zjh7890.gpttools.context.builder.MethodContextBuilder
-import com.github.zjh7890.gpttools.java.util.JavaTypeUtil
+import com.github.zjh7890.gpttools.utils.JavaTypeUtil
 import com.intellij.openapi.application.runReadAction
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod

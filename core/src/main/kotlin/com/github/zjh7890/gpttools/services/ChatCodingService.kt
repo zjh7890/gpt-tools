@@ -15,7 +15,9 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
@@ -113,12 +115,12 @@ class ChatCodingService(val project: Project) : Disposable {
     private fun addContextToMessages(message: ChatContextMessage, project: Project) {
         val contextBuilder = StringBuilder()
 
-        if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().projectFileTrees.isNotEmpty()) {
+        if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().projectTrees.isNotEmpty()) {
             contextBuilder.append("相关项目文件内容：\n")
-            val fileContents = sessionManager.getCurrentSession().projectFileTrees.joinToString("\n\n") { projectFileTree ->
+            val fileContents = sessionManager.getCurrentSession().projectTrees.joinToString("\n\n") { projectFileTree ->
 """
 === Project: ${projectFileTree.projectName} ===
-${collectFileContents(projectFileTree.files).joinToString("\n")}
+${collectFileContents(projectFileTree.files, project).joinToString("\n")}
 """.trimIndent()
             }
             contextBuilder.append(FileUtil.wrapBorder(fileContents))
@@ -140,22 +142,60 @@ ${collectFileContents(projectFileTree.files).joinToString("\n")}
         }
     }
 
-    /**
-     * 收集指定文件的内容，供 LLM 使用
-     */
-    private fun collectFileContents(files: List<VirtualFile>): List<String> {
-        return files.mapNotNull { file ->
-            if (!file.isDirectory) {
-                FileUtil.readFileInfoForLLM(file, project)
-            } else {
-                null // 忽略目录
-            }
-        }
-    }
-
     companion object {
         fun getInstance(project: Project): ChatCodingService {
             return project.getService(ChatCodingService::class.java)
+        }
+
+
+        /**
+         * 收集指定文件的内容，供 LLM 使用
+         */
+        fun collectFileContents(files: List<ProjectFile>, project: Project): List<String> {
+            return files.mapNotNull { projectFile ->
+                if (projectFile.whole) {
+                    // 如果整个文件都需要，直接读取文件内容
+                    val virtualFile = FileUtil.findVirtualFile(projectFile.fileName, project) ?: return@mapNotNull null
+                    FileUtil.readFileInfoForLLM(virtualFile, project)
+                } else {
+                    // 处理单个类或方法级别的内容
+                    val fileContents = StringBuilder()
+                    projectFile.classes.forEach { projectClass ->
+                        if (projectClass.whole) {
+                            // 如果整个类都需要
+                            val virtualFile = FileUtil.findVirtualFile(projectFile.fileName, project) ?: return@forEach
+                            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return@forEach
+                            val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                                .find { it.qualifiedName == projectClass.className } ?: return@forEach
+
+                            val classContent = ClassDepsInSingleFileAction.classDepsInSingleFile(psiClass, project)
+                            if (classContent != null) {
+                                fileContents.append(classContent).append("\n\n")
+                            }
+                        } else {
+                            // 如果只需要特定方法
+                            val virtualFile = FileUtil.findVirtualFile(projectFile.fileName, project) ?: return@forEach
+                            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return@forEach
+                            val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                                .find { it.qualifiedName == projectClass.className } ?: return@forEach
+
+                            projectClass.methods.forEach { projectMethod ->
+                                val method = psiClass.findMethodsByName(projectMethod.methodName, false).firstOrNull() ?: return@forEach
+                                val methodContent = MethodDepsInSingleFileAction.methodDepsInSingleFile(method, project)
+                                if (methodContent != null) {
+                                    fileContents.append(methodContent).append("\n\n")
+                                }
+                            }
+                        }
+                    }
+
+                    if (fileContents.isNotEmpty()) {
+                        fileContents.toString().trim()
+                    } else {
+                        null
+                    }
+                }
+            }
         }
 
         private val logger = logger<ChatCodingService>()

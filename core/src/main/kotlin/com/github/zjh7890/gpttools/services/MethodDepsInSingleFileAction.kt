@@ -1,10 +1,8 @@
-package com.github.zjh7890.gpttools.java.action
+package com.github.zjh7890.gpttools.services
 
-import mybatisx.dom.model.IdDomElement
-import mybatisx.service.JavaService
-import com.github.zjh7890.gpttools.java.util.PsiUtils
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
+import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -446,10 +444,10 @@ class MethodDepsInSingleFileAction : AnAction() {
 
             // 检查 resolvedElement 是否为 PsiMethod
             if (resolvedElement is PsiMethod) {
-                // 使用属性访问语法代替 getter
-                val processor = CommonProcessors.CollectProcessor<IdDomElement>()
-                JavaService.getInstance(it.project).processMethod(resolvedElement, processor)
-                return processor.getResults().size > 0
+//                // 使用属性访问语法代替 getter
+//                val processor = CommonProcessors.CollectProcessor<IdDomElement>()
+//                JavaService.getInstance(it.project).processMethod(resolvedElement, processor)
+//                return processor.getResults().size > 0
             }
             // 如果 resolvedElement 不是 PsiMethod，返回 false 或者进行其他处理
             return false

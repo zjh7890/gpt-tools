@@ -1,4 +1,4 @@
-package com.github.zjh7890.gpttools.java.util
+package com.github.zjh7890.gpttools.utils
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -187,7 +187,7 @@ object PsiUtils {
                         .split("\n")
                         .filter { it.isNotEmpty() }
                         .map { it.toRegex() }
-                    if (isFileInProject(virtualFile, project) || 
+                    if (isFileInProject(virtualFile, project) ||
                         patterns.any { pattern -> virtualFile.path.matches(pattern) }) {
                         // 在这里继续处理 virtualFile
                         findSourceCode(resolvedFile)?.let { referencedFiles.add(it) }
