@@ -10,6 +10,9 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiMethod
+import com.intellij.psi.util.PsiTreeUtil
 import java.util.UUID
 
 @Service(Service.Level.PROJECT)
@@ -50,7 +53,7 @@ class SessionManager(private val project: Project) : Disposable {
      */
     fun createNewSession() {
         // 先从当前会话中移除 project
-        currentSession?.projects?.remove(project)
+        currentSession.projects.remove(project)
 
         val sessionId = UUID.randomUUID().toString()
         val newSession = ChatSession(
@@ -72,7 +75,7 @@ class SessionManager(private val project: Project) : Disposable {
      * 获取当前激活的会话
      */
     fun getCurrentSession(): ChatSession {
-        return currentSession!!
+        return currentSession
     }
 
     /**
@@ -86,7 +89,7 @@ class SessionManager(private val project: Project) : Disposable {
      * 设置当前激活的会话
      */
     fun setCurrentSession(session: ChatSession, project: Project) {
-        // 添加project到当前session
+        // 设置当前会话
         currentSession = session
         if (!currentSession.projects.contains(project)) {
             currentSession.projects.add(project)
@@ -114,36 +117,102 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     /**
-     * 将文件添加到当前会话
+     * 将文件添加到当前会话，解析文件中的所有类和方法
      */
     fun addFileToCurrentSession(file: VirtualFile) {
-        // 获取当前 session
-        val projectTree = currentSession!!.projectFileTrees.find { it.projectName == project.name }
-
-        if (projectTree != null) {
-            if (!projectTree.files.contains(file)) {
-                projectTree.files += file
-            }
-        } else {
-            currentSession!!.projectFileTrees += ProjectFileTree(project.name, listOf(file).toMutableList())
+        if (!file.isValid || !file.isWritable) {
+            logger.warn("Invalid or unwritable file: ${file.path}")
+            return
         }
+
+        val psiFile = com.intellij.psi.PsiManager.getInstance(project).findFile(file) ?: run {
+            logger.warn("Unable to find PsiFile for: ${file.path}")
+            return
+        }
+
+        // 使用 PsiTreeUtil 查找所有 PsiClass 元素，包括嵌套类
+        val classes: Collection<PsiClass> = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+
+        if (classes.isEmpty()) {
+            logger.info("No classes found in file: ${file.path}")
+            return
+        }
+
+        for (psiClass in classes) {
+            val className = psiClass.name
+            if (className.isNullOrBlank()) {
+                logger.warn("Found a class with no name in file: ${file.path}")
+                continue
+            }
+
+            // 查找所有方法
+            val methods: Array<PsiMethod> = psiClass.methods
+
+            if (methods.isEmpty()) {
+                // 如果类中没有方法，也可以选择只添加类
+                addClassAndMethodToCurrentSession(className, "")
+                logger.info("Added class '$className' with no methods from file: ${file.path}")
+            } else {
+                for (method in methods) {
+                    val methodName = method.name
+                    if (methodName.isNullOrBlank()) {
+                        logger.warn("Found a method with no name in class '$className' from file: ${file.path}")
+                        continue
+                    }
+                    addClassAndMethodToCurrentSession(className, methodName)
+                    logger.info("Added method '$methodName' of class '$className' from file: ${file.path}")
+                }
+            }
+        }
+
+        // 保存会话并通知更新
+        saveSessions()
+        notifySessionListChanged()
+
+        // 通知所有项目的 fileTreePanel 更新
+        notifyAllFileTreePanels(currentSession)
+    }
+
+    /**
+     * 将类和方法添加到当前会话
+     */
+    fun addClassAndMethodToCurrentSession(className: String, methodName: String) {
+        // 获取当前 session 对应的 ProjectFileTree
+        val projectTree = currentSession.projectFileTrees.find { it.projectName == project.name }
+            ?: ProjectFileTree(project.name).also { currentSession.projectFileTrees.add(it) }
+
+        // 添加类和方法
+        currentSession.addClass(project.name, className, methodName)
 
         saveSessions()
         notifySessionListChanged()
 
         // 通知所有项目的 fileTreePanel 更新
-        notifyAllFileTreePanels(currentSession!!)
+        notifyAllFileTreePanels(currentSession)
     }
 
     /**
-     * 移除选中的文件节点
+     * 移除选中的类或方法
+     * @param className 如果为 null，表示移除整个项目的所有内容
+     * @param methodNames 如果提供了 className，则移除对应类下的这些方法；如果为 null，则移除整个类
      */
-    fun removeSelectedNodes(filesToRemove: List<VirtualFile>) {
+    fun removeSelectedNodes(className: String?, methodNames: List<String>?) {
         val currentSession = getCurrentSession()
-        filesToRemove.forEach { file ->
-            // 从 projectFileTrees 中移除文件
-            currentSession.projectFileTrees.forEach { projectTree ->
-                projectTree.files.remove(file)
+        val projectTree = currentSession.projectFileTrees.find { it.projectName == project.name } ?: return
+
+        if (className == null) {
+            // 移除整个项目的所有类和方法
+            currentSession.projectFileTrees.remove(projectTree)
+        } else {
+            val projectClass = projectTree.classes.find { it.className == className }
+            if (projectClass != null) {
+                if (methodNames == null || methodNames.isEmpty()) {
+                    // 移除整个类
+                    projectTree.classes.remove(projectClass)
+                } else {
+                    // 移除指定的方法
+                    projectClass.methods.removeAll { it.methodName in methodNames }
+                }
             }
         }
 

@@ -124,7 +124,7 @@
         </action>
 
         <action id="CopyMethodSingleFile"
-                class="com.github.zjh7890.gpttools.java.action.CopyMethodSingleFile"
+                class="com.github.zjh7890.gpttools.java.action.MethodDepsInSingleFileAction"
                 text="CopyMethodSingleFile"
                 description="CopyMethodSingleFile"
                 icon="/icons/icon_16px.svg">

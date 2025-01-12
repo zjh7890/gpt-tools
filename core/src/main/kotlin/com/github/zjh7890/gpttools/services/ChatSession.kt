@@ -2,11 +2,15 @@ package com.github.zjh7890.gpttools.services
 
 import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
+import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiClass
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.JavaPsiFacade
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.*
@@ -21,6 +25,20 @@ data class ChatSession(
     val project: String,
     val projects : MutableList<Project> = mutableListOf()
 ) {
+    var classGraph: MutableMap<PsiClass, ClassDependencyInfo> = mutableMapOf()
+    
+    // 新增方法用于添加类和方法
+    fun addClass(projectName: String, className: String, methodName: String) {
+        val projectFileTree = projectFileTrees.find { it.projectName == projectName }
+            ?: ProjectFileTree(projectName).also { projectFileTrees.add(it) }
+        
+        val projectClass = projectFileTree.classes.find { it.className == className }
+            ?: ProjectClass(className).also { projectFileTree.classes.add(it) }
+        
+        if (!projectClass.methods.any { it.methodName == methodName }) {
+            projectClass.methods.add(ProjectMethod(methodName))
+        }
+    }
     // 添加序列化方法
     fun toSerializable(): SerializableChatSession {
         return SerializableChatSession(
@@ -131,11 +149,36 @@ ${FileUtil.wrapBorder(it.context)}
     companion object {
         private val logger = logger<ChatCodingService>()
     }
+
+    // 新增方法用于生成 classGraph
+    fun generateClassGraph(project: Project) {
+        classGraph.clear()
+        projectFileTrees.forEach { projectTree ->
+            projectTree.classes.forEach { projectClass ->
+                val psiClass = findPsiClass(project, projectClass.className)
+                if (psiClass != null) {
+                    val dependencyInfo = ClassDependencyInfo()
+                    // 这里您需要实现如何填充 dependencyInfo，比如根据项目逻辑分析类的依赖
+                    // 例如：
+                    psiClass.methods.forEach { method ->
+                        dependencyInfo.markMethodUsed(method)
+                    }
+                    classGraph[psiClass] = dependencyInfo
+                }
+            }
+        }
+    }
+
+    private fun findPsiClass(project: Project, className: String): PsiClass? {
+        val psiFacade = JavaPsiFacade.getInstance(project)
+        val searchScope = GlobalSearchScope.allScope(project)
+        return psiFacade.findClass(className, searchScope)
+    }
 }
 
 data class ProjectFileTree(
     val projectName: String,
-    val files: MutableList<VirtualFile> = mutableListOf()
+    val classes: MutableList<ProjectClass> = mutableListOf()
 ) {
     /**
      * 转换为可序列化的文件树对象
@@ -143,7 +186,7 @@ data class ProjectFileTree(
     fun toSerializable(): SerializableProjectFileTree {
         return SerializableProjectFileTree(
             projectName = projectName,
-            filePaths = files.map { it.path }
+            classData = classes.map { it.toSerializable() }
         )
     }
 }
@@ -179,18 +222,16 @@ data class SerializableChatSession @JvmOverloads constructor(
 @Serializable
 data class SerializableProjectFileTree(
     val projectName: String = "",
-    val filePaths: List<String> = emptyList()
+    val classData: List<SerializableProjectClass> = emptyList()
 ) {
     /**
      * 转换为 ProjectFileTree 实例
      */
     fun toProjectFileTree(): ProjectFileTree {
-        val files = filePaths.mapNotNull { path ->
-            LocalFileSystem.getInstance().findFileByPath(path)
-        }.toMutableList()
+        val classes = classData.map { it.toProjectClass() }.toMutableList()
         return ProjectFileTree(
             projectName = projectName,
-            files = files
+            classes = classes
         )
     }
 }
@@ -218,5 +259,55 @@ data class ChatContextMessage @JvmOverloads constructor(
      */
     fun add(session: ChatSession) {
         session.messages.add(this)
+    }
+}
+
+@Serializable
+data class ProjectClass(
+    val className: String,
+    val methods: MutableList<ProjectMethod> = mutableListOf(),
+    val whole: Boolean = true
+) {
+    fun toSerializable(): SerializableProjectClass {
+        return SerializableProjectClass(
+            className = className,
+            methods = methods.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class ProjectMethod(
+    val methodName: String
+) {
+    fun toSerializable(): SerializableProjectMethod {
+        return SerializableProjectMethod(
+            methodName = methodName
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectClass(
+    val className: String,
+    val methods: List<SerializableProjectMethod> = emptyList()
+) {
+    fun toProjectClass(): ProjectClass {
+        val methods = methods.map { it.toProjectMethod() }.toMutableList()
+        return ProjectClass(
+            className = className,
+            methods = methods
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectMethod(
+    val methodName: String
+) {
+    fun toProjectMethod(): ProjectMethod {
+        return ProjectMethod(
+            methodName = methodName
+        )
     }
 }

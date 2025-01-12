@@ -22,7 +22,7 @@ import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
 class DependenciesTreePanel(private val project: Project) : JPanel() {
-    private val root = DefaultMutableTreeNode("Dependencies")
+    val root = DefaultMutableTreeNode("Dependencies")
     val tree = Tree(root)
     private val addedDependencies = mutableSetOf<PsiClass>()
 
@@ -254,7 +254,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         return addedDependencies.contains(psiClass)
     }
 
-    private fun expandDefaultNodes() {
+    fun expandDefaultNodes() {
         // 展开根节点
         tree.expandPath(TreePath(root.path))
 
