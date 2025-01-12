@@ -11,6 +11,7 @@ import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import com.intellij.ui.treeStructure.Tree
+import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -24,24 +25,29 @@ import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
-class FileTreeListPanel(
-    private val project: Project,
-    private val onAnalysisComplete: (Map<PsiClass, ClassDependencyInfo>) -> Unit
-) : JPanel() {
+class FileTreeListPanel(private val project: Project) : JPanel() {
     private val root = DefaultMutableTreeNode("")
     private val rootClassNode = DefaultMutableTreeNode("Root Classes")
     val tree = Tree(root)
     private val addedClasses = mutableSetOf<PsiClass>()
 
+    // 包含一个 DependenciesTreePanel
+    private val dependenciesTreePanel = DependenciesTreePanel(project)
+
     init {
-        layout = java.awt.BorderLayout()
+        layout = BorderLayout()
         root.add(rootClassNode)
 
         tree.isRootVisible = false
         tree.showsRootHandles = true
         tree.cellRenderer = CheckboxTreeCellRenderer()
 
-        add(JScrollPane(tree), java.awt.BorderLayout.CENTER)
+        // 使用 JSplitPane 分割 FileTreeListPanel 和 DependenciesTreePanel
+        val splitPane =
+            javax.swing.JSplitPane(javax.swing.JSplitPane.VERTICAL_SPLIT, JScrollPane(tree), dependenciesTreePanel)
+        splitPane.dividerLocation = 300 // 设置初始分割位置，可根据需要调整
+
+        add(splitPane, BorderLayout.CENTER)
 
         tree.expandPath(TreePath(arrayOf(root, rootClassNode)))
 
@@ -78,7 +84,7 @@ class FileTreeListPanel(
         })
     }
 
-    fun runAnalysis(project: Project, onComplete: () -> Unit = {}) {
+    fun runAnalysis(onComplete: () -> Unit = {}) {
         val selectedClasses = getSelectedClasses()
         if (selectedClasses.isEmpty()) {
             (tree.model as DefaultTreeModel).reload(root)
@@ -96,10 +102,9 @@ class FileTreeListPanel(
                 }
             }
 
-            // 通过回调传递分析结果
-            onAnalysisComplete(classDependencyGraph)
-
+            // 更新 DependenciesTreePanel
             ApplicationManager.getApplication().invokeLater {
+                dependenciesTreePanel.updateDependencies(classDependencyGraph)
                 (tree.model as DefaultTreeModel).reload(root)
                 expandDefaultNodes()
                 onComplete()
@@ -181,6 +186,7 @@ class FileTreeListPanel(
                     val depClass = element.containingClass ?: continue
                     analyzeMethodDependencies(element, depClass, classGraph)
                 }
+
                 is PsiField -> {
                     val depClass = element.containingClass
                     analyzeFieldDependencies(element, depClass, classGraph)
@@ -219,6 +225,7 @@ class FileTreeListPanel(
                         val depClass = element.containingClass ?: return@let
                         analyzeMethodDependencies(element, depClass, classGraph)
                     }
+
                     is PsiField -> {
                         val depClass = element.containingClass
                         analyzeFieldDependencies(element, depClass, classGraph)
@@ -421,7 +428,8 @@ class FileTreeListPanel(
             selectedPaths.forEach { path ->
                 val selectedNode = path.lastPathComponent as? DefaultMutableTreeNode
                 if (selectedNode != null && selectedNode != root &&
-                    selectedNode != rootClassNode) {
+                    selectedNode != rootClassNode
+                ) {
                     removeNodeAndChildren(selectedNode)
                 }
             }
@@ -448,8 +456,9 @@ class FileTreeListPanel(
         }
     }
 
-    fun copyAllFiles(project: Project) {
-        val classesInfo = addedClasses.map { FileUtil.readFileInfoForLLM(it.containingFile.virtualFile, project) }.joinToString("\n\n")
+    fun copyAllFiles() {
+        val classesInfo = addedClasses.map { FileUtil.readFileInfoForLLM(it.containingFile.virtualFile, project) }
+            .joinToString("\n\n")
         val sb: StringBuilder = StringBuilder()
         sb.append("下面是提供的信息：\n" + FileUtil.wrapBorder(classesInfo))
         ClipboardUtils.copyToClipboard(sb.toString())

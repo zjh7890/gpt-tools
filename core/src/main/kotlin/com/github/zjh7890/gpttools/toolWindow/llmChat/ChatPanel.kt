@@ -311,7 +311,7 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
                     })
                 })
 
-                cell(chatFileTreeListPanel.scrollPanel)
+                cell(chatFileTreeListPanel.dependenciesTreePanel)
 //                    .constraints(preferredHeight(JBUI.scale(200))) // 确保这里正确设置
                     .fullWidth()
             }
@@ -388,7 +388,7 @@ class ChatPanel(val disposable: Disposable?, val project: Project) :
         // 获取并刷新 panel 的 file list
         val fileTreePanel = chatFileTreeListPanel
         fileTreePanel.updateFileTree(session)
-        fileTreePanel.scrollPanel.updateUI()
+        fileTreePanel.dependenciesTreePanel.updateUI()
     }
 
     /**

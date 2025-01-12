@@ -2,19 +2,16 @@
 
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
-import com.github.zjh7890.gpttools.utils.ClipboardUtils
-import com.github.zjh7890.gpttools.utils.FileUtil
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.psi.*
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.util.PsiUtil
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiField
+import com.intellij.psi.PsiMethod
 import com.intellij.ui.treeStructure.Tree
+import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.util.*
 import javax.swing.JCheckBox
 import javax.swing.JPanel
 import javax.swing.JScrollPane
@@ -30,13 +27,13 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
     private val addedDependencies = mutableSetOf<PsiClass>()
 
     init {
-        layout = java.awt.BorderLayout()
+        layout = BorderLayout()
 
         tree.isRootVisible = true
         tree.showsRootHandles = true
         tree.cellRenderer = CheckboxTreeCellRenderer()
 
-        add(JScrollPane(tree), java.awt.BorderLayout.CENTER)
+        add(JScrollPane(tree), BorderLayout.CENTER)
 
         tree.expandPath(TreePath(root.path))
 
@@ -99,6 +96,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 
                 val packageNode = findOrCreatePackageNode(moduleNode, packageName)
                 packageNode.add(DefaultMutableTreeNode(cls.name))
+                addedDependencies.add(cls)
             } else {
                 // 处理外部依赖
                 val mavenInfo = extractMavenInfo(cls)
@@ -113,6 +111,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                         ?.replace('/', '.') ?: "(default package)"
                     val packageNode = findOrCreatePackageNode(externalsNode, packageName)
                     packageNode.add(DefaultMutableTreeNode(cls.name))
+                    addedDependencies.add(cls)
                 }
             }
         }
@@ -318,7 +317,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         private fun updateParentState() {
             val parent = parent as? CheckboxTreeNode ?: return
             val newState = parent.children().asSequence().all {
-                (it as? CheckboxTreeNode)?._isChecked == true
+                (it as? CheckboxTreeNode)?.isChecked == true
             }
             if (parent._isChecked != newState) {
                 parent._isChecked = newState  // 直接设置内部字段，避免触发 setter
@@ -354,11 +353,11 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 }
 
 data class MavenDependency(
-    val groupId: String,
-    val artifactId: String,
-    val version: String
-) {
-    override fun toString(): String = "$groupId:$artifactId:$version"
+        val groupId: String,
+        val artifactId: String,
+        val version: String
+    ) {
+        override fun toString(): String = "$groupId:$artifactId:$version"
 }
 
 class ClassDependencyInfo(var isDataClass: Boolean = false) {

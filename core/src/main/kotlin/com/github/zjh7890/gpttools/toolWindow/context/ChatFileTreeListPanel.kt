@@ -1,12 +1,20 @@
+// core/src/main/kotlin/com/github/zjh7890/gpttools/toolWindow/context/ChatFileTreeListPanel.kt
+
 package com.github.zjh7890.gpttools.toolWindow.context
 
 import com.github.zjh7890.gpttools.services.ChatSession
+import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
+import com.github.zjh7890.gpttools.toolWindow.treePanel.DependenciesTreePanel
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.*
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.PsiUtil
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
@@ -23,41 +31,21 @@ import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
-class ChatFileTreeListPanel(private val project: Project) {
-    private val treeModel: DefaultTreeModel
-    val tree: Tree
-    private val root: DefaultMutableTreeNode
+class ChatFileTreeListPanel(private val project: Project) : JPanel() {
     var currentSession: ChatSession? = null
-    var scrollPanel: JBScrollPane
+    // 实例化 DependenciesTreePanel
+    val dependenciesTreePanel = DependenciesTreePanel(project)
 
     init {
-        // 初始化根节点为 "Dependencies"
-        root = DefaultMutableTreeNode("Dependencies")
-        treeModel = DefaultTreeModel(root)
-        tree = Tree(treeModel).apply {
-            isRootVisible = false
-            showsRootHandles = true
-            cellRenderer = DependencyTreeCellRenderer()
-        }
-        scrollPanel = JBScrollPane(tree)
-        scrollPanel.preferredSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))
-        scrollPanel.maximumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最大尺寸
-        scrollPanel.minimumSize = Dimension(scrollPanel.preferredSize.width, JBUI.scale(250))  // 限制最小尺寸
-        setupListeners()
-    }
+        layout = BorderLayout()
 
-    private fun setupListeners() {
-        tree.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
-                if (e.clickCount == 2) {
-                    val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode
-                    val userObject = node?.userObject
-                    if (userObject is VirtualFile && !userObject.isDirectory) {
-                        FileEditorManager.getInstance(project).openFile(userObject, true)
-                    }
-                }
-            }
-        })
+        dependenciesTreePanel.preferredSize = Dimension(dependenciesTreePanel.preferredSize.width, JBUI.scale(250))
+        dependenciesTreePanel.maximumSize = Dimension(dependenciesTreePanel.preferredSize.width, JBUI.scale(250))  // 限制最大尺寸
+        dependenciesTreePanel.minimumSize = Dimension(dependenciesTreePanel.preferredSize.width, JBUI.scale(250))
+        dependenciesTreePanel.tree.isRootVisible = false
+
+        // 添加到主面板
+        add(dependenciesTreePanel, BorderLayout.CENTER)
     }
 
     /**
@@ -100,9 +88,6 @@ class ChatFileTreeListPanel(private val project: Project) {
                 }
             }
         }
-
-        treeModel.reload()
-        TreeUtil.expandAll(tree)
     }
 
     /**
@@ -149,209 +134,220 @@ class ChatFileTreeListPanel(private val project: Project) {
     }
 
     /**
-     * 移除选中的节点
+     * 运行依赖分析并更新 DependenciesTreePanel
      */
-    fun removeSelectedNodes() {
-        val selectedPaths = tree.selectionPaths
-        if (selectedPaths == null || selectedPaths.isEmpty()) {
-            // 可以选择显示提示信息
-            Messages.showWarningDialog(
-                project,
-                "请先选择要移除的节点。",
-                "移除节点"
-            )
-            return
-        }
-
-        selectedPaths.forEach { path ->
-            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
-            if (node.parent == root) {
-                // 不允许移除 project 节点
-                Messages.showErrorDialog(
-                    project,
-                    "无法移除项目节点。请仅移除文件或包节点。",
-                    "移除节点"
-                )
-                return@forEach
-            }
-            val parent = node.parent as? DefaultMutableTreeNode ?: return@forEach
-            parent.remove(node)
-        }
-
-        treeModel.reload()
-    }
-
-    /**
-     * 将选中的节点及其子节点中的所有文件路径复制到剪贴板
-     */
-    fun copyAllFiles() {
-        val selectedPaths = tree.selectionPaths
-        if (selectedPaths == null || selectedPaths.isEmpty()) {
-            Messages.showWarningDialog(
-                project,
-                "请先选择要复制的节点。",
-                "复制文件"
-            )
-            return
-        }
-
-        val filePaths = mutableListOf<String>()
-
-        selectedPaths.forEach { path ->
-            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
-            collectFilePaths(node, filePaths)
-        }
-
-        if (filePaths.isNotEmpty()) {
-            val clipboardContent = filePaths.joinToString("\n")
-            ClipboardUtils.copyToClipboard(clipboardContent)
+    private fun runAnalysis() {
+        val selectedClasses = getSelectedClasses()
+        if (selectedClasses.isEmpty()) {
             Messages.showInfoMessage(
                 project,
-                "已复制 ${filePaths.size} 个文件路径到剪贴板。",
-                "复制成功"
-            )
-        } else {
-            Messages.showInfoMessage(
-                project,
-                "选中的节点下没有文件。",
-                "复制文件"
-            )
-        }
-    }
-
-    /**
-     * 递归收集节点下所有文件的路径
-     */
-    private fun collectFilePaths(node: DefaultMutableTreeNode, filePaths: MutableList<String>) {
-        val userObject = node.userObject
-        if (userObject is VirtualFile && !userObject.isDirectory) {
-            filePaths.add(userObject.path)
-        }
-
-        for (i in 0 until node.childCount) {
-            val childNode = node.getChildAt(i) as? DefaultMutableTreeNode ?: continue
-            collectFilePaths(childNode, filePaths)
-        }
-    }
-
-    /**
-     * 递归展开选中的节点
-     */
-    fun expandSelectedNodes() {
-        val selectedPaths = tree.selectionPaths
-        if (selectedPaths == null || selectedPaths.isEmpty()) {
-            Messages.showWarningDialog(
-                project,
-                "请先选择要展开的节点。",
-                "展开节点"
+                "未选择任何类进行分析。",
+                "分析结果"
             )
             return
         }
 
-        selectedPaths.forEach { path ->
-            tree.expandPath(path)
-            expandAllChildren(path)
-        }
-    }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val classDependencyGraph = mutableMapOf<PsiClass, ClassDependencyInfo>()
 
-    /**
-     * 递归折叠选中的节点
-     */
-    fun collapseSelectedNodes() {
-        val selectedPaths = tree.selectionPaths
-        if (selectedPaths == null || selectedPaths.isEmpty()) {
-            Messages.showWarningDialog(
-                project,
-                "请先选择要折叠的节点。",
-                "折叠节点"
-            )
-            return
-        }
-
-        selectedPaths.forEach { path ->
-            tree.collapsePath(path)
-        }
-    }
-
-    /**
-     * 递归展开节点下的所有子节点
-     */
-    private fun expandAllChildren(path: TreePath) {
-        val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
-        for (i in 0 until node.childCount) {
-            val childNode = node.getChildAt(i) as? DefaultMutableTreeNode ?: continue
-            val childPath = path.pathByAddingChild(childNode)
-            tree.expandPath(childPath)
-            expandAllChildren(childPath)
-        }
-    }
-
-    /**
-     * 获取选中的文件
-     */
-    fun getSelectedFiles(): List<VirtualFile> {
-        val selectedPaths = tree.selectionPaths ?: return emptyList()
-        val files = mutableListOf<VirtualFile>()
-        selectedPaths.forEach { path ->
-            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@forEach
-            val userObject = node.userObject
-            if (userObject is VirtualFile && !userObject.isDirectory) {
-                files.add(userObject)
-            }
-        }
-        return files
-    }
-}
-
-/**
- * 自定义树节点渲染器，以显示不同类型的节点图标和文本
- */
-private class DependencyTreeCellRenderer : DefaultTreeCellRenderer() {
-    override fun getTreeCellRendererComponent(
-        tree: JTree,
-        value: Any?,
-        selected: Boolean,
-        expanded: Boolean,
-        leaf: Boolean,
-        row: Int,
-        hasFocus: Boolean
-    ): Component {
-        super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
-
-        val node = value as? DefaultMutableTreeNode
-        val userObject = node?.userObject
-
-        when {
-            node?.parent == tree.model.root -> {
-                // projectName 节点
-                icon = AllIcons.Nodes.Module
-                text = userObject.toString()
-            }
-            node?.parent?.parent == tree.model.root -> {
-                // module 节点
-                icon = AllIcons.Nodes.Folder
-                text = userObject.toString()
-            }
-            node?.parent?.parent?.parent == tree.model.root -> {
-                // package 节点
-                icon = AllIcons.Nodes.Package
-                text = userObject.toString()
-            }
-            userObject is VirtualFile -> {
-                if (userObject.isDirectory) {
-                    icon = if (expanded) AllIcons.Nodes.Folder else AllIcons.Nodes.ExtractedFolder
-                } else {
-                    icon = AllIcons.FileTypes.Any_type
+            ApplicationManager.getApplication().runReadAction {
+                for (rootClass in selectedClasses) {
+                    analyzeClassDependencies(rootClass, classDependencyGraph)
                 }
-                text = userObject.name
             }
-            else -> {
-                // 其他情况，使用默认图标和文本
-                icon = AllIcons.FileTypes.Any_type
-                text = userObject?.toString() ?: ""
+
+            // 更新 DependenciesTreePanel
+            ApplicationManager.getApplication().invokeLater {
+                dependenciesTreePanel.updateDependencies(classDependencyGraph)
+            }
+        }
+    }
+
+    private fun analyzeClassDependencies(
+        psiClass: PsiClass,
+        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+    ) {
+        val dataClassFlag = isDataClass(psiClass)
+
+        if (dataClassFlag) {
+            analyzeDataClass(psiClass, classGraph)
+        } else {
+            // 找到对应的类节点
+            var classNode: DefaultMutableTreeNode? = null
+            for (i in 0 until root.childCount) {
+                val node = root.getChildAt(i) as? DefaultMutableTreeNode
+                if (node?.userObject is String && node.userObject == psiClass.name) {
+                    classNode = node
+                    break
+                }
+            }
+
+            if (classNode != null) {
+                // 如果整个类被选中，分析所有方法
+                // 此处需要根据您的实际逻辑判断类是否被选中
+                val isClassSelected = true // 示例，实际应根据树中节点状态判断
+
+                if (isClassSelected) {
+                    val methodsToAnalyze = psiClass.methods.toList()
+                    for (m in methodsToAnalyze) {
+                        analyzeMethodDependencies(m, psiClass, classGraph)
+                    }
+                } else {
+                    // 否则只分析被选中的方法
+                    // 此处需要根据您的实际逻辑获取被选中的方法
+                }
+            }
+        }
+    }
+
+    private fun analyzeDataClass(
+        psiClass: PsiClass,
+        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+    ) {
+        var classInfo = classGraph[psiClass]
+        if (classInfo == null) {
+            val dataClassDeps = extractDataClassDependencies(psiClass)
+            for (depClass in dataClassDeps) {
+                classGraph[depClass] = ClassDependencyInfo(isDataClass = true)
+            }
+        }
+    }
+
+    private fun analyzeMethodDependencies(
+        method: PsiMethod,
+        currentClass: PsiClass,
+        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+    ) {
+        var classInfo = classGraph[currentClass] ?: ClassDependencyInfo()
+
+        if (classInfo.usedMethods.contains(method)) {
+            return
+        }
+        classInfo.markMethodUsed(method)
+        val usedElements = findFieldOrMethodUsedElements(method)
+        for (element in usedElements) {
+            when (element) {
+                is PsiMethod -> {
+                    val depClass = element.containingClass ?: continue
+                    analyzeMethodDependencies(element, depClass, classGraph)
+                }
+                is PsiField -> {
+                    val depClass = element.containingClass
+                    analyzeFieldDependencies(element, depClass, classGraph)
+                }
             }
         }
 
-        return this
+        classGraph[currentClass] = classInfo
+    }
+
+    private fun analyzeFieldDependencies(
+        field: PsiField,
+        containingClass: PsiClass?,
+        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+    ) {
+        if (containingClass == null) return
+
+        var classInfo = classGraph.getOrPut(containingClass) { ClassDependencyInfo() }
+
+        if (classInfo.usedFields.contains(field)) {
+            return
+        }
+
+        classInfo.markFieldUsed(field)
+
+        val fieldTypeClass = resolveClassFromType(field.type)
+        if (fieldTypeClass != null && isDataClass(fieldTypeClass)) {
+            analyzeDataClass(fieldTypeClass, classGraph)
+        }
+
+        field.initializer?.let { initializer ->
+            val usedElements = findFieldOrMethodUsedElements(initializer)
+            for (element in usedElements) {
+                when (element) {
+                    is PsiMethod -> {
+                        val depClass = element.containingClass ?: return@let
+                        analyzeMethodDependencies(element, depClass, classGraph)
+                    }
+                    is PsiField -> {
+                        val depClass = element.containingClass
+                        analyzeFieldDependencies(element, depClass, classGraph)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun extractDataClassDependencies(psiClass: PsiClass): List<PsiClass> {
+        val deps = mutableListOf<PsiClass>()
+        for (field in psiClass.fields) {
+            val fieldTypeClass = resolveClassFromType(field.type)
+            if (fieldTypeClass != null && isDataClass(fieldTypeClass)) {
+                deps.add(fieldTypeClass)
+            }
+        }
+        return deps
+    }
+
+    private fun findFieldOrMethodUsedElements(element: PsiElement): List<PsiElement> {
+        val used = mutableListOf<PsiElement>()
+        PsiTreeUtil.processElements(element) { e ->
+            when (e) {
+                is PsiMethodCallExpression -> {
+                    e.resolveMethod()?.let { used.add(it) }
+                }
+
+                is PsiReferenceExpression -> {
+                    val resolved = e.resolve()
+                    if (resolved is PsiField) {
+                        used.add(resolved)
+                    }
+                }
+            }
+            true
+        }
+        return used
+    }
+
+    private fun resolveClassFromType(type: PsiType): PsiClass? {
+        return PsiUtil.resolveClassInType(type)
+    }
+
+    private fun isDataClass(element: PsiElement?): Boolean {
+        if (element !is PsiClass) return false
+
+        val methods = element.methods
+        val fields = element.fields
+
+        if (fields.isEmpty()) return false
+
+        val allMethodsAreGettersSettersOrStandard = methods.all {
+            ifGetterOrSetter(it) || it.isStandardClassMethod() || it.isConstructor
+        }
+
+        return allMethodsAreGettersSettersOrStandard
+    }
+
+    private fun ifGetterOrSetter(method: PsiMethod): Boolean {
+        val name = method.name
+        return (name.startsWith("get") && method.parameterList.parametersCount == 0 && method.returnType != PsiTypes.voidType()) ||
+                (name.startsWith("set") && method.parameterList.parametersCount == 1 && method.returnType == PsiTypes.voidType())
+    }
+
+    private fun PsiMethod.isStandardClassMethod(): Boolean {
+        return when (this.name) {
+            "equals", "hashCode", "toString", "canEqual" -> true
+            else -> false
+        }
+    }
+
+    /**
+     * 获取选中的类
+     */
+    private fun getSelectedClasses(): List<PsiClass> {
+        // 实现根据树中选中的节点获取对应的 PsiClass
+        // 这里需要根据您的具体实现填充
+        // 示例返回空列表
+        return emptyList()
     }
 }

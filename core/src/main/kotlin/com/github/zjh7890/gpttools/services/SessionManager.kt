@@ -162,7 +162,7 @@ class SessionManager(private val project: Project) : Disposable {
         openProjects.forEach { proj ->
             val panel = LLMChatToolWindowFactory.getPanel(proj)?.chatFileTreeListPanel
             panel?.updateFileTree(session)
-            panel?.scrollPanel?.updateUI()
+            panel?.dependenciesTreePanel?.updateUI()
         }
     }
 

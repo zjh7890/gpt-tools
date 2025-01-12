@@ -36,7 +36,7 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
 
         val copyFilesAction = object : AnAction("Copy Files", "Copy files from the selected node", AllIcons.Actions.Copy) {
             override fun actionPerformed(e: AnActionEvent) {
-                panel.copyAllFiles(e.project!!)
+                panel.copyAllFiles()
             }
 
             override fun getActionUpdateThread(): ActionUpdateThread {
@@ -64,7 +64,7 @@ class GptToolsContextToolWindowFactory : ToolWindowFactory {
                         val toolWindow = ToolWindowManager.getInstance(it).getToolWindow("GptFileTree")
                         toolWindow?.contentManager?.getContent(0)?.component as? FileTreeListPanel
                     }
-                    panel?.runAnalysis(e.project!!) {
+                    panel?.runAnalysis {
                         // 分析完成的回调
                         isAnalyzing = false
                         e.presentation.icon = AllIcons.Actions.Refresh
