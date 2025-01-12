@@ -6,11 +6,9 @@ import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
 import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.JavaPsiFacade
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.*
@@ -23,22 +21,26 @@ data class ChatSession(
     var projectFileTrees: MutableList<ProjectFileTree> = mutableListOf(),
     var withFiles: Boolean = true,
     val project: String,
-    val projects : MutableList<Project> = mutableListOf()
+    val projects: MutableList<Project> = mutableListOf()
 ) {
     var classGraph: MutableMap<PsiClass, ClassDependencyInfo> = mutableMapOf()
-    
-    // 新增方法用于添加类和方法
-    fun addClass(projectName: String, className: String, methodName: String) {
+
+    // 新增方法用于添加类和方法，并指定文件
+    fun addClass(projectName: String, fileName: String, className: String, methodName: String) {
         val projectFileTree = projectFileTrees.find { it.projectName == projectName }
             ?: ProjectFileTree(projectName).also { projectFileTrees.add(it) }
-        
-        val projectClass = projectFileTree.classes.find { it.className == className }
-            ?: ProjectClass(className).also { projectFileTree.classes.add(it) }
-        
+
+        val projectFile = projectFileTree.files.find { it.fileName == fileName }
+            ?: ProjectFile(fileName).also { projectFileTree.files.add(it) }
+
+        val projectClass = projectFile.classes.find { it.className == className }
+            ?: ProjectClass(className).also { projectFile.classes.add(it) }
+
         if (!projectClass.methods.any { it.methodName == methodName }) {
             projectClass.methods.add(ProjectMethod(methodName))
         }
     }
+
     // 添加序列化方法
     fun toSerializable(): SerializableChatSession {
         return SerializableChatSession(
@@ -47,7 +49,7 @@ data class ChatSession(
             startTime = startTime,
             type = type,
             withFiles = withFiles,
-            projectFileTrees = projectFileTrees.map { it.toSerializable() }.toMutableList(),
+            projectFileTrees = projectFileTrees.map { it.toSerializable() },
             projectName = project
         )
     }
@@ -152,16 +154,18 @@ ${FileUtil.wrapBorder(it.context)}
     fun generateClassGraph(project: Project) {
         classGraph.clear()
         projectFileTrees.forEach { projectTree ->
-            projectTree.classes.forEach { projectClass ->
-                val psiClass = findPsiClass(project, projectClass.className)
-                if (psiClass != null) {
-                    val dependencyInfo = ClassDependencyInfo()
-                    // 这里您需要实现如何填充 dependencyInfo，比如根据项目逻辑分析类的依赖
-                    // 例如：
-                    psiClass.methods.forEach { method ->
-                        dependencyInfo.markMethodUsed(method)
+            projectTree.files.forEach { projectFile ->
+                projectFile.classes.forEach { projectClass ->
+                    val psiClass = findPsiClass(project, projectClass.className)
+                    if (psiClass != null) {
+                        val dependencyInfo = ClassDependencyInfo()
+                        // 这里您需要实现如何填充 dependencyInfo，比如根据项目逻辑分析类的依赖
+                        // 例如：
+                        psiClass.methods.forEach { method ->
+                            dependencyInfo.markMethodUsed(method)
+                        }
+                        classGraph[psiClass] = dependencyInfo
                     }
-                    classGraph[psiClass] = dependencyInfo
                 }
             }
         }
@@ -176,7 +180,7 @@ ${FileUtil.wrapBorder(it.context)}
 
 data class ProjectFileTree(
     val projectName: String,
-    val classes: MutableList<ProjectClass> = mutableListOf()
+    val files: MutableList<ProjectFile> = mutableListOf()
 ) {
     /**
      * 转换为可序列化的文件树对象
@@ -184,7 +188,7 @@ data class ProjectFileTree(
     fun toSerializable(): SerializableProjectFileTree {
         return SerializableProjectFileTree(
             projectName = projectName,
-            classData = classes.map { it.toSerializable() }
+            files = files.map { it.toSerializable() }
         )
     }
 }
@@ -212,7 +216,7 @@ data class SerializableChatSession @JvmOverloads constructor(
             withFiles = withFiles,
             projectFileTrees = projectFileTrees,
             project = projectName,
-            projects =  mutableListOf(project)
+            projects = mutableListOf(project)
         )
     }
 }
@@ -220,16 +224,16 @@ data class SerializableChatSession @JvmOverloads constructor(
 @Serializable
 data class SerializableProjectFileTree(
     val projectName: String = "",
-    val classData: List<SerializableProjectClass> = emptyList()
+    val files: List<SerializableProjectFile> = emptyList()
 ) {
     /**
      * 转换为 ProjectFileTree 实例
      */
     fun toProjectFileTree(): ProjectFileTree {
-        val classes = classData.map { it.toProjectClass() }.toMutableList()
+        val files = files.map { it.toProjectFile() }.toMutableList()
         return ProjectFileTree(
             projectName = projectName,
-            classes = classes
+            files = files
         )
     }
 }
@@ -306,6 +310,33 @@ data class SerializableProjectMethod(
     fun toProjectMethod(): ProjectMethod {
         return ProjectMethod(
             methodName = methodName
+        )
+    }
+}
+
+@Serializable
+data class ProjectFile(
+    val fileName: String,
+    val classes: MutableList<ProjectClass> = mutableListOf()
+) {
+    fun toSerializable(): SerializableProjectFile {
+        return SerializableProjectFile(
+            fileName = fileName,
+            classes = classes.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectFile(
+    val fileName: String,
+    val classes: List<SerializableProjectClass> = emptyList()
+) {
+    fun toProjectFile(): ProjectFile {
+        val classes = classes.map { it.toProjectClass() }.toMutableList()
+        return ProjectFile(
+            fileName = fileName,
+            classes = classes
         )
     }
 }
