@@ -2,6 +2,7 @@
 
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
+import com.github.zjh7890.gpttools.services.*
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.application.ApplicationManager
@@ -104,12 +105,108 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
             // 更新 DependenciesTreePanel
             ApplicationManager.getApplication().invokeLater {
-                dependenciesTreePanel.updateDependencies(classDependencyGraph)
+                dependenciesTreePanel.updateDependencies(buildAppFileTreeFromClassGraph(classDependencyGraph))
                 (tree.model as DefaultTreeModel).reload(root)
                 expandDefaultNodes()
                 onComplete()
             }
         }
+    }
+
+    /**
+     * 将 classDependencyGraph 转换为 AppFileTree
+     */
+    fun buildAppFileTreeFromClassGraph(
+        classDependencyGraph: Map<PsiClass, ClassDependencyInfo>
+    ): AppFileTree {
+        // 以 Project 为粒度分组
+        val projectFileTreeMap = mutableMapOf<Project, ProjectFileTree>()
+
+        for ((psiClass, dependencyInfo) in classDependencyGraph) {
+            val vFile = psiClass.containingFile?.virtualFile ?: continue
+            val project = psiClass.project
+
+            // 拿到或创建对应的 ProjectFileTree
+            val projectFileTree = projectFileTreeMap.getOrPut(project) {
+                ProjectFileTree(
+                    projectName = project.name,
+                    files = mutableListOf()
+                )
+            }
+
+            // 计算相对于 project.basePath 的路径
+            val basePath = project.basePath?.removeSuffix("/") ?: ""
+            val absolutePath = vFile.path
+            // 如果不做额外处理，这里只做最简单的 removePrefix
+            val relativePath = absolutePath.removePrefix(basePath).removePrefix("/")
+
+            // 找到或创建对应的 ProjectFile
+            val existingProjectFile = projectFileTree.files.find { it.filePath == relativePath }
+            val projectFile = if (existingProjectFile != null) {
+                existingProjectFile
+            } else {
+                // 构造新的 ProjectFile
+                val psiFile = PsiManager.getInstance(project).findFile(vFile)
+                ProjectFile(
+                    filePath = relativePath,
+                    virtualFile = vFile,
+                    psiFile = psiFile,
+                    classes = mutableListOf(),
+                    whole = false
+                ).also {
+                    projectFileTree.files.add(it)
+                }
+            }
+
+            // 先拿到类中所有方法（可自行排除构造函数、getter/setter等）
+            val allNonConstructorMethods = psiClass.methods.filterNot { it.isConstructor }
+
+            // 取出依赖信息中实际用到的方法
+            val usedNonConstructorMethods = dependencyInfo.usedMethods.filterNot { it.isConstructor }
+
+            // 将 usedMethods 转为 ProjectMethod
+            val projectMethods = usedNonConstructorMethods.map { usedMethod ->
+                ProjectMethod(
+                    methodName = usedMethod.name,
+                    parameterTypes = usedMethod.parameterList.parameters.map { p -> p.type.canonicalText },
+                    psiMethod = usedMethod
+                )
+            }.toMutableList()
+
+            // 判断是否整类使用：这里的判定逻辑示例为 “所用方法数 == 类的全部方法数”
+            val isWholeClass = (
+                    allNonConstructorMethods.isNotEmpty() &&
+                            allNonConstructorMethods.size == usedNonConstructorMethods.size
+                    )
+
+            // 构造并添加新的 ProjectClass
+            val projectClass = ProjectClass(
+                className = psiClass.name ?: "Unnamed",
+                psiClass = psiClass,
+                methods = projectMethods,
+                whole = isWholeClass
+            )
+            projectFile.classes.add(projectClass)
+        }
+
+        // 若某个文件里所有类均被整类使用，则设置该文件为 whole，并把 classes 列表清空
+        // (表示后续反序列化时整文件都要)
+        for ((_, projectFileTree) in projectFileTreeMap) {
+            for (file in projectFileTree.files) {
+                if (
+                    file.classes.isNotEmpty() &&
+                    file.classes.all { it.whole }
+                ) {
+                    file.whole = true
+                    file.classes.clear()
+                }
+            }
+        }
+
+        // 组合结果
+        return AppFileTree(
+            projectFileTrees = projectFileTreeMap.values.toMutableList()
+        )
     }
 
     private fun analyzeClassDependencies(

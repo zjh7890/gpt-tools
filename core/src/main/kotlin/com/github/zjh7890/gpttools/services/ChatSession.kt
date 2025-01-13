@@ -131,63 +131,6 @@ ${FileUtil.wrapBorder(it.context)}
         }.toMutableList()
     }
 
-    /**
-     * 示例：根据反序列化好的 AppFileTree，遍历所有类，生成依赖图
-     */
-    fun generateClassGraph(project: Project) {
-        classGraph.clear()
-        // 遍历所有文件树
-        appFileTree.projectFileTrees.forEach { projectTree ->
-            // 这里简单处理：无论 projectTree 里的 projectName 是否与当前一致，都用同一个 project
-            projectTree.files.forEach { projectFile ->
-                // 根据 filePath 找到 VirtualFile
-                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.filePath)
-                if (virtualFile != null) {
-                    val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-                    if (psiFile != null) {
-                        if (projectFile.whole) {
-                            // 如果整个文件被标记为 whole，处理文件中的所有类
-                            PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).forEach { psiClass ->
-                                val dependencyInfo = ClassDependencyInfo()
-                                psiClass.methods.forEach { method ->
-                                    dependencyInfo.markMethodUsed(method)
-                                }
-                                classGraph[psiClass] = dependencyInfo
-                            }
-                        } else {
-                            // 如果不是整个文件，只处理指定的类
-                            projectFile.classes.forEach { projectClass ->
-                                val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
-                                    .find { it.name == projectClass.className }
-                                    ?: return@forEach // 找不到就跳过
-
-                                val dependencyInfo = ClassDependencyInfo()
-                                if (projectClass.whole) {
-                                    // 如果整个类被标记为 whole，处理所有方法
-                                    foundPsiClass.methods.forEach { method ->
-                                        dependencyInfo.markMethodUsed(method)
-                                    }
-                                } else {
-                                    // 只处理指定的方法
-                                    foundPsiClass.methods.forEach { method ->
-                                        val match = projectClass.methods.any {
-                                            it.methodName == method.name &&
-                                                    it.parameterTypes == method.parameterList.parameters.map { p -> p.type.canonicalText }
-                                        }
-                                        if (match) {
-                                            dependencyInfo.markMethodUsed(method)
-                                        }
-                                    }
-                                }
-                                classGraph[foundPsiClass] = dependencyInfo
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     companion object {
         private val logger = logger<ChatCodingService>()
     }

@@ -2,6 +2,7 @@
 
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
+import com.github.zjh7890.gpttools.services.AppFileTree
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
@@ -87,9 +88,9 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         })
     }
 
-    fun updateDependencies(classGraph: Map<PsiClass, ClassDependencyInfo>) {
-        if (classGraph.isEmpty()) {
-            // 如果没有依赖，显示空面板
+    fun updateDependencies(appFileTree: AppFileTree) {
+        // 1. 若没有任何 projectFileTrees，视为没有依赖
+        if (appFileTree.projectFileTrees.isEmpty()) {
             remove(scrollPane)
             add(emptyPanel, BorderLayout.CENTER)
             revalidate()
@@ -97,118 +98,173 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
             return
         }
 
-        // 如果有依赖，确保显示树面板
+        // 有依赖：确保显示树面板
         remove(emptyPanel)
         add(scrollPane, BorderLayout.CENTER)
-        
         root.removeAllChildren()
 
+        // 原先代码中使用的临时缓存或辅助结构
         val moduleMap = mutableMapOf<String, DefaultMutableTreeNode>()
         val mavenDependencies = mutableMapOf<String, MutableList<PsiClass>>()
         val externalsNode = DefaultMutableTreeNode("Externals")
 
-        // 获取项目名称
+        // 获取当前 DependenciesTreePanel 对应的 Project 名
         val projectName = project.name
+        // 构建最上层的节点
         val projectNode = DefaultMutableTreeNode(projectName)
 
-        // 1. 组织项目内类依赖
-        classGraph.keys.forEach { cls ->
-            if (!isExternalDependency(cls)) {
-                val moduleName = getModuleName(cls)
-                val moduleNode = moduleMap.getOrPut(moduleName) {
-                    DefaultMutableTreeNode(moduleName)
-                }
+        // 每次更新前清空记录
+        addedDependencies.clear()
 
-                val packageName = cls.qualifiedName?.substringBeforeLast(".")
-                    ?.replace('.', '/')
-                    ?.let { it.substringAfter("src/main/java/") }
-                    ?.replace('/', '.') ?: "(default package)"
+        // 2. 遍历 appFileTree 中的每个 ProjectFileTree
+        appFileTree.projectFileTrees.forEach { projectFileTree ->
+            // 2.1 找到对应的 Project（如有跨项目场景，这里可根据名称判断是否是当前 project）
+            val targetProject = com.intellij.openapi.project.ProjectManager.getInstance()
+                .openProjects
+                .find { it.name == projectFileTree.projectName }
+            // 如果找不到就忽略该块，或自行决定如何处理
+                ?: return@forEach
 
-                val packageNode = findOrCreatePackageNode(moduleNode, packageName)
-
-                // 创建类节点
-                val classNode = CheckboxTreeNode(cls.name!!)
-                packageNode.add(classNode)
-                addedDependencies.add(cls)
-
-                // 添加方法级别的子节点
-                val classDependencyInfo = classGraph[cls]
-                classDependencyInfo?.usedMethods?.forEach { method ->
-                    val methodNode = CheckboxTreeNode(method.name)
-                    classNode.add(methodNode)
-                }
-            } else {
-                // 处理外部依赖
-                val mavenInfo = extractMavenInfo(cls)
-                if (mavenInfo != null) {
-                    val key = mavenInfo.toString()
-                    mavenDependencies.getOrPut(key) { mutableListOf() }.add(cls)
+            // 2.2 遍历文件
+            projectFileTree.files.forEach { projectFile ->
+                // 如果整文件已标记为 whole，则取该文件中所有 PSI Class
+                // 否则只处理 projectFile.classes 列表
+                val psiFile = projectFile.psiFile ?: return@forEach
+                val fileClasses: List<PsiClass> = if (projectFile.whole) {
+                    com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).toList()
                 } else {
-                    // 无法解析为 Maven 依赖的外部依赖
-                    val packageName = cls.qualifiedName?.substringBeforeLast(".")
-                        ?.replace('.', '/')
-                        ?.let { it.substringAfter("src/main/java/") }
-                        ?.replace('/', '.') ?: "(default package)"
-                    val packageNode = findOrCreatePackageNode(externalsNode, packageName)
-                    packageNode.add(DefaultMutableTreeNode(cls.name))
-                    addedDependencies.add(cls)
+                    projectFile.classes.map { it.psiClass }
+                }
+
+                // 遍历当前文件中的所有类
+                fileClasses.forEach { psiClass ->
+                    // 判定是否外部依赖
+                    if (!isExternalDependency(psiClass)) {
+                        // 处理项目内的依赖
+                        val moduleName = getModuleName(psiClass)
+                        val moduleNode = moduleMap.getOrPut(moduleName) {
+                            DefaultMutableTreeNode(moduleName)
+                        }
+
+                        val packageName = psiClass.qualifiedName
+                            ?.substringBeforeLast(".")
+                            ?.replace('.', '/')
+                            ?.let { it.substringAfter("src/main/java/") }
+                            ?.replace('/', '.')
+                            ?: "(default package)"
+
+                        val packageNode = findOrCreatePackageNode(moduleNode, packageName)
+
+                        // 创建类节点
+                        val classNode = CheckboxTreeNode(psiClass.name ?: "UnknownClass")
+                        packageNode.add(classNode)
+
+                        // 维护 addedDependencies，表示在 DependenciesTreePanel 中出现的 PsiClass
+                        addedDependencies.add(psiClass)
+
+                        // 处理方法节点
+                        // 如果该 class 是 “整类” (projectClass.whole) 或 projectFile.whole，则把该类全部方法加进去
+                        // 否则只加被选中的 methods
+                        val isWholeClass = projectFile.whole || projectFile.classes.find {
+                            // 找到和 psiClass 对应的那一项
+                            it.psiClass == psiClass
+                        }?.whole == true
+
+                        val selectedMethods = if (isWholeClass) {
+                            psiClass.methods.asList()
+                        } else {
+                            // 找到该类对应的 ProjectClass
+                            val pClass = projectFile.classes.find { it.psiClass == psiClass }
+                            // 若不存在就空列表
+                            pClass?.methods?.map { it.psiMethod } ?: emptyList()
+                        }
+
+                        // 添加方法级别的子节点
+                        selectedMethods.forEach { m ->
+                            val methodNode = CheckboxTreeNode(m.name)
+                            classNode.add(methodNode)
+                        }
+
+                    } else {
+                        // 处理外部依赖
+                        val mavenInfo = extractMavenInfo(psiClass)
+                        if (mavenInfo != null) {
+                            // 加到 mavenDependencies
+                            val key = mavenInfo.toString()
+                            mavenDependencies.getOrPut(key) { mutableListOf() }.add(psiClass)
+                        } else {
+                            // 普通外部依赖
+                            val packageName = psiClass.qualifiedName
+                                ?.substringBeforeLast(".")
+                                ?.replace('.', '/')
+                                ?.let { it.substringAfter("src/main/java/") }
+                                ?.replace('/', '.')
+                                ?: "(default package)"
+                            val packageNode = findOrCreatePackageNode(externalsNode, packageName)
+                            packageNode.add(DefaultMutableTreeNode(psiClass.name))
+                            addedDependencies.add(psiClass)
+                        }
+                    }
                 }
             }
         }
 
-        // 将模块节点添加到 projectName 节点
+        // 3. 将模块节点添加到 projectNode
         moduleMap.entries.sortedBy { it.key }.forEach { (_, node) ->
             if (node.childCount > 0) {
                 projectNode.add(node)
             }
         }
 
-        // 添加 projectName 节点到 Dependencies 节点
+        // 4. 将 projectNode 加到 root
         root.add(projectNode)
 
-        // 2. 组织 Maven 依赖
+        // 5. 处理 Maven 依赖
         if (mavenDependencies.isNotEmpty()) {
             val mavenNode = DefaultMutableTreeNode("Maven Dependencies")
-            mavenDependencies.entries.sortedBy { it.key }.forEach { (mavenInfo, classes) ->
+            mavenDependencies.entries.sortedBy { it.key }.forEach { (mavenInfo, psiClasses) ->
                 val mavenInfoNode = DefaultMutableTreeNode(mavenInfo)
 
                 // 按包路径组织类
-                val packageMap = classes.groupBy { cls ->
-                    cls.qualifiedName?.substringBeforeLast(".")
+                val packageMap = psiClasses.groupBy { cls ->
+                    cls.qualifiedName
+                        ?.substringBeforeLast(".")
                         ?.ifEmpty { "(default package)" }
                         ?: "(default package)"
                 }
 
-                packageMap.entries.sortedBy { it.key }.forEach { (packageName, packageClasses) ->
+                packageMap.entries.sortedBy { it.key }.forEach { (packageName, pkgClsList) ->
+                    // 如果是 (default package)，直接挂在 mavenInfoNode 下
                     val packageNode = if (packageName == "(default package)") {
                         mavenInfoNode
                     } else {
-                        val node = DefaultMutableTreeNode(packageName)
-                        mavenInfoNode.add(node)
-                        node
+                        val pn = DefaultMutableTreeNode(packageName)
+                        mavenInfoNode.add(pn)
+                        pn
                     }
 
-                    packageClasses.sortedBy { it.name }.forEach { cls ->
+                    // 加类节点
+                    pkgClsList.sortedBy { it.name }.forEach { cls ->
                         packageNode.add(DefaultMutableTreeNode(cls.name))
                     }
                 }
-
                 mavenNode.add(mavenInfoNode)
             }
             root.add(mavenNode)
         }
 
-        // 3. 添加外部依赖节点
+        // 6. 添加外部依赖节点
         if (externalsNode.childCount > 0) {
             root.add(externalsNode)
         }
 
-        // 刷新树模型并展开节点
+        // 7. 刷新并展开
         (tree.model as DefaultTreeModel).reload(root)
         expandDefaultNodes()
         revalidate()
         repaint()
     }
+
 
     private fun getMavenDependencies(): Map<String, List<PsiClass>> {
         val mavenDependencies = mutableMapOf<String, MutableList<PsiClass>>()

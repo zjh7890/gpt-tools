@@ -10,7 +10,6 @@ import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JPanel
-import javax.swing.tree.DefaultTreeModel
 
 class ChatFileTreeListPanel(private val project: Project) : JPanel() {
     var currentSession: ChatSession? = null
@@ -33,57 +32,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel() {
      * 更新文件树，采用项目 -> 类 -> 方法的层级结构展示
      */
     fun updateFileTree(session: ChatSession) {
-        currentSession = session
-
-        // 生成 classGraph
-        session.generateClassGraph(project)
-        val classGraph = session.classGraph
-
-        // 清空现有的树节点
-        val root = dependenciesTreePanel.root
-        root.removeAllChildren()
-
-        // 创建一个映射来存储每个项目的类节点
-        val projectClassNodes = mutableMapOf<String, MutableMap<String, CheckboxTreeNode>>()
-
-        session.appFileTree.projectFileTrees.forEach { projectTree ->
-            // 创建项目节点
-            val projectNode = CheckboxTreeNode(projectTree.projectName)
-            root.add(projectNode)
-
-            // 为当前项目创建类节点映射
-            val classNodes = projectClassNodes.getOrPut(projectTree.projectName) { mutableMapOf() }
-
-            // 遍历文件
-            projectTree.files.forEach { file ->
-                // 遍历类
-                file.classes.forEach { projectClass ->
-                    // 获取或创建类节点
-                    val classNode = classNodes.getOrPut(projectClass.className) {
-                        val node = CheckboxTreeNode(projectClass.className)
-                        projectNode.add(node)
-                        node
-                    }
-
-                    // 遍历方法
-                    projectClass.methods.forEach { method ->
-                        // 检查该方法是否已经存在
-                        if (!classNode.children().asSequence().any {
-                                (it as? CheckboxTreeNode)?.text == method.methodName
-                            }) {
-                            val methodNode = CheckboxTreeNode(method.methodName)
-                            classNode.add(methodNode)
-                        }
-                    }
-                }
-            }
-        }
-
-        // 刷新树模型并展开节点
-        (dependenciesTreePanel.tree.model as DefaultTreeModel).reload(root)
-        dependenciesTreePanel.expandDefaultNodes()
-
         // 调用 updateDependencies
-        dependenciesTreePanel.updateDependencies(classGraph)
+        dependenciesTreePanel.updateDependencies(session.appFileTree)
     }
 }
