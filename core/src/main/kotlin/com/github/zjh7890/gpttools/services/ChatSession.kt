@@ -6,10 +6,8 @@ import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiManager
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
@@ -32,7 +30,7 @@ data class ChatSession(
         val projectTree = projectTrees.find { it.projectName == projectName }
             ?: ProjectTree(projectName).also { projectTrees.add(it) }
 
-        val projectFile = projectTree.files.find { it.fileName == fileName }
+        val projectFile = projectTree.files.find { it.filePath == fileName }
             ?: ProjectFile(fileName).also { projectTree.files.add(it) }
 
         val projectClass = projectFile.classes.find { it.className == className }
@@ -157,7 +155,7 @@ ${FileUtil.wrapBorder(it.context)}
         projectTrees.forEach { projectTree ->
             projectTree.files.forEach { projectFile ->
                 // 获取虚拟文件
-                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.fileName)
+                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.filePath)
                 if (virtualFile != null) {
                     val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
                     if (psiFile != null) {
@@ -349,13 +347,13 @@ data class SerializableProjectClass(
 
 @Serializable
 data class ProjectFile(
-    val fileName: String = "",
+    val filePath: String = "",
     val classes: MutableList<ProjectClass> = mutableListOf(),
     val whole: Boolean = false
 ) {
     fun toSerializable(): SerializableProjectFile {
         return SerializableProjectFile(
-            fileName = fileName,
+            fileName = filePath,
             classes = classes.map { it.toSerializable() }
         )
     }
@@ -369,7 +367,7 @@ data class SerializableProjectFile(
     fun toProjectFile(): ProjectFile {
         val classes = classes.map { it.toProjectClass() }.toMutableList()
         return ProjectFile(
-            fileName = fileName,
+            filePath = fileName,
             classes = classes
         )
     }

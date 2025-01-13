@@ -154,7 +154,7 @@ ${collectFileContents(projectFileTree.files, project).joinToString("\n")}
          */
         fun collectFileContents(files: List<ProjectFile>, project: Project): List<String> {
             return files.mapNotNull { projectFile ->
-                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.fileName) ?: return@mapNotNull null
+                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.filePath) ?: return@mapNotNull null
 
                 // 如果用户配置了 whole = true，说明整文件都要
                 if (projectFile.whole) {

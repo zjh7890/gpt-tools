@@ -158,7 +158,7 @@ class SessionManager(private val project: Project) : Disposable {
             ?: ProjectTree(project.name).also { currentSession.projectTrees.add(it) }
 
         // 获取或创建 ProjectFile
-        val projectFile = projectTree.files.find { it.fileName == fileName }
+        val projectFile = projectTree.files.find { it.filePath == fileName }
             ?: ProjectFile(fileName).also { projectTree.files.add(it) }
 
         // 添加类和方法
@@ -194,7 +194,7 @@ class SessionManager(private val project: Project) : Disposable {
             // 移除整个项目的所有文件、类和方法
             currentSession.projectTrees.remove(projectTree)
         } else {
-            val projectFile = projectTree.files.find { it.fileName == fileName }
+            val projectFile = projectTree.files.find { it.filePath == fileName }
             if (projectFile != null) {
                 if (className == null) {
                     // 移除指定文件的所有类和方法
