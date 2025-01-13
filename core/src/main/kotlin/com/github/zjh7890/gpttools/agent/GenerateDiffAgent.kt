@@ -37,7 +37,7 @@ object GenerateDiffAgent {
         val border = FileUtil.determineBorder(response)
         val chatSession = ChatSession(
             id = UUID.randomUUID().toString(), type = "apply",
-            project = project.name, projects = mutableListOf(project)
+            project = project, relevantProjects = mutableListOf(project)
         )
 
         var fileContent = "No files."

@@ -103,7 +103,7 @@ class ChatHistoryPanel(val project: Project) : JPanel() {
         SwingUtilities.invokeLater {
             conversationListModel.clear()
             val sessions = sessionManager.getSessionList()
-                .filter { it.project == project.name }
+                .filter { it.project == project }
             val sortedSessions = sessions.sortedByDescending { it.startTime }
             sortedSessions.forEach { session ->
                 conversationListModel.addElement(session)

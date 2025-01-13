@@ -9,13 +9,11 @@ import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
 import com.intellij.ui.treeStructure.Tree
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import javax.swing.JCheckBox
-import javax.swing.JPanel
-import javax.swing.JScrollPane
-import javax.swing.JTree
+import javax.swing.*
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
@@ -25,18 +23,37 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
     val root = DefaultMutableTreeNode("Dependencies")
     val tree = Tree(root)
     private val addedDependencies = mutableSetOf<PsiClass>()
+    private lateinit var scrollPane: JScrollPane
+    private lateinit var emptyPanel: JPanel
 
     init {
         layout = BorderLayout()
+        border = BorderFactory.createEmptyBorder()
 
+        // 创建空文件面板
+        val emptyPanel = JPanel(BorderLayout())
+        val emptyLabel = JLabel("No files, right click file to add", SwingConstants.CENTER).apply {
+            font = font.deriveFont(14f)
+            foreground = Color.GRAY
+        }
+        emptyPanel.add(emptyLabel, BorderLayout.CENTER)
+
+        // 初始化树相关组件
         tree.isRootVisible = true
         tree.showsRootHandles = true
         tree.cellRenderer = CheckboxTreeCellRenderer()
 
-        add(JScrollPane(tree), BorderLayout.CENTER)
+        val scrollPane = JScrollPane(tree)
+        
+        // 默认显示树面板
+        add(scrollPane, BorderLayout.CENTER)
+        
+        // 保存引用以便后续切换
+        this.scrollPane = scrollPane
+        this.emptyPanel = emptyPanel
 
         tree.expandPath(TreePath(root.path))
-
+        tree.border = BorderFactory.createEmptyBorder()
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 val path = tree.getPathForLocation(e.x, e.y)
@@ -71,6 +88,19 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
     }
 
     fun updateDependencies(classGraph: Map<PsiClass, ClassDependencyInfo>) {
+        if (classGraph.isEmpty()) {
+            // 如果没有依赖，显示空面板
+            remove(scrollPane)
+            add(emptyPanel, BorderLayout.CENTER)
+            revalidate()
+            repaint()
+            return
+        }
+
+        // 如果有依赖，确保显示树面板
+        remove(emptyPanel)
+        add(scrollPane, BorderLayout.CENTER)
+        
         root.removeAllChildren()
 
         val moduleMap = mutableMapOf<String, DefaultMutableTreeNode>()
@@ -176,6 +206,8 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         // 刷新树模型并展开节点
         (tree.model as DefaultTreeModel).reload(root)
         expandDefaultNodes()
+        revalidate()
+        repaint()
     }
 
     private fun getMavenDependencies(): Map<String, List<PsiClass>> {

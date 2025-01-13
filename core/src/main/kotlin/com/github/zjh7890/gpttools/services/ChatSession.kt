@@ -6,15 +6,17 @@ import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiMethod
+import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.serialization.Serializable
 import java.text.SimpleDateFormat
 import java.util.*
 
+// ----------------------------
+// 运行期使用的 ChatSession
+// ----------------------------
 data class ChatSession(
     val id: String = UUID.randomUUID().toString(),
     val messages: MutableList<ChatContextMessage> = mutableListOf(),
@@ -22,8 +24,8 @@ data class ChatSession(
     val type: String = "chat",
     var appFileTree: AppFileTree = AppFileTree(),
     var withFiles: Boolean = true,
-    val project: String,
-    val projects: MutableList<Project> = mutableListOf()
+    val project: Project,                // 对话所属的 Project，就是开启会话的 Project
+    val relevantProjects: MutableList<Project> = mutableListOf()    // 对话中涉及的 Project，可能有跨项目的文件
 ) {
     var classGraph: MutableMap<PsiClass, ClassDependencyInfo> = mutableMapOf()
 
@@ -36,7 +38,8 @@ data class ChatSession(
             type = type,
             withFiles = withFiles,
             appFileTree = appFileTree.toSerializable(),
-            projectName = project
+            projectName = project.name,
+            relevantProjectNames = relevantProjects.map { it.name }.toMutableList() // 添加这一行
         )
     }
 
@@ -73,7 +76,6 @@ ${border}
             // 写入文件
             FileUtil.writeToFile(filePath, chatHistory)
         } catch (e: Exception) {
-            // 处理异常，例如日志记录
             logger.warn("Error saving chat history: ${e.message}")
         }
     }
@@ -93,17 +95,15 @@ ${border}
     }
 
     fun transformMessages(invalidContext: Boolean = false): MutableList<ChatMessage> {
-        val chatMessages: MutableList<ChatMessage>
         // 找到最后一个用户消息的索引
         val lastUserMessageIndex = messages.indexOfLast { it.role == ChatRole.user }
 
-        // 映射每条消息，根据是否有 context 以及是否是最后一个用户消息进行处理
-        chatMessages = messages.mapIndexed { index, it ->
+        return messages.mapIndexed { index, it ->
             when {
                 // 1. 没有 context
                 it.context.isBlank() -> ChatMessage(it.role, it.content)
 
-                // 2. 有 context 但不是最后一个用户消息
+                // 2. 有 context 但不是最后一个用户消息，或上下文失效
                 index != lastUserMessageIndex || invalidContext -> {
                     ChatMessage(
                         it.role,
@@ -129,18 +129,18 @@ ${FileUtil.wrapBorder(it.context)}
                 }
             }
         }.toMutableList()
-        return chatMessages
     }
 
-    companion object {
-        private val logger = logger<ChatCodingService>()
-    }
-
+    /**
+     * 示例：根据反序列化好的 AppFileTree，遍历所有类，生成依赖图
+     */
     fun generateClassGraph(project: Project) {
         classGraph.clear()
+        // 遍历所有文件树
         appFileTree.projectFileTrees.forEach { projectTree ->
+            // 这里简单处理：无论 projectTree 里的 projectName 是否与当前一致，都用同一个 project
             projectTree.files.forEach { projectFile ->
-                // 获取虚拟文件
+                // 根据 filePath 找到 VirtualFile
                 val virtualFile = project.baseDir.findFileByRelativePath(projectFile.filePath)
                 if (virtualFile != null) {
                     val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
@@ -157,31 +157,29 @@ ${FileUtil.wrapBorder(it.context)}
                         } else {
                             // 如果不是整个文件，只处理指定的类
                             projectFile.classes.forEach { projectClass ->
-                                // 在文件中查找指定的类
-                                PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                                val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
                                     .find { it.name == projectClass.className }
-                                    ?.let { psiClass ->
-                                        val dependencyInfo = ClassDependencyInfo()
-                                        if (projectClass.whole) {
-                                            // 如果整个类被标记为 whole，处理所有方法
-                                            psiClass.methods.forEach { method ->
-                                                dependencyInfo.markMethodUsed(method)
-                                            }
-                                        } else {
-                                            // 只处理指定的方法
-                                            psiClass.methods.forEach { method ->
-                                                if (projectClass.methods.any { 
-                                                    it.methodName == method.name && 
-                                                    it.parameterTypes == method.parameterList.parameters.map { param -> 
-                                                        param.type.canonicalText 
-                                                    }
-                                                }) {
-                                                    dependencyInfo.markMethodUsed(method)
-                                                }
-                                            }
-                                        }
-                                        classGraph[psiClass] = dependencyInfo
+                                    ?: return@forEach // 找不到就跳过
+
+                                val dependencyInfo = ClassDependencyInfo()
+                                if (projectClass.whole) {
+                                    // 如果整个类被标记为 whole，处理所有方法
+                                    foundPsiClass.methods.forEach { method ->
+                                        dependencyInfo.markMethodUsed(method)
                                     }
+                                } else {
+                                    // 只处理指定的方法
+                                    foundPsiClass.methods.forEach { method ->
+                                        val match = projectClass.methods.any {
+                                            it.methodName == method.name &&
+                                                    it.parameterTypes == method.parameterList.parameters.map { p -> p.type.canonicalText }
+                                        }
+                                        if (match) {
+                                            dependencyInfo.markMethodUsed(method)
+                                        }
+                                    }
+                                }
+                                classGraph[foundPsiClass] = dependencyInfo
                             }
                         }
                     }
@@ -189,8 +187,15 @@ ${FileUtil.wrapBorder(it.context)}
             }
         }
     }
+
+    companion object {
+        private val logger = logger<ChatCodingService>()
+    }
 }
 
+// ----------------------------
+// 可序列化的 ChatSession
+// ----------------------------
 @Serializable
 data class SerializableChatSession(
     val id: String = "",
@@ -199,36 +204,44 @@ data class SerializableChatSession(
     val type: String = "",
     val withFiles: Boolean = true,
     val appFileTree: SerializableAppFileTree = SerializableAppFileTree(),
-    val projectName: String = ""
+    val projectName: String = "",
+    val relevantProjectNames: MutableList<String> = mutableListOf()    // 改为 String 类型的项目名列表
 ) {
-    /**
-     * 转换为 ChatSession 实例
-     */
-    fun toChatSession(project: Project): ChatSession {
+    fun toChatSession(): ChatSession {
+        // 获取所有打开的项目
+        val openProjects = ProjectManager.getInstance().openProjects
+        // 找到主项目
+        val mainProject = openProjects.find { it.name == projectName }
+            ?: throw IllegalStateException("Cannot find project with name: $projectName")
+        // 找到相关项目
+        val relevantProjects = relevantProjectNames.mapNotNull { name ->
+            openProjects.find { it.name == name }
+        }.toMutableList()
+        // 反序列化出 AppFileTree
+        val realAppFileTree = appFileTree.toAppFileTree()
         return ChatSession(
             id = id,
             messages = messages,
             startTime = startTime,
             type = type,
             withFiles = withFiles,
-            appFileTree = appFileTree.toAppFileTree(project),
-            project = projectName,
-            projects = mutableListOf(project)
+            appFileTree = realAppFileTree,
+            project = mainProject,
+            relevantProjects = relevantProjects
         )
     }
 }
 
+// ----------------------------
+// 聊天消息
+// ----------------------------
 @Serializable
 data class ChatContextMessage(
     val role: ChatRole = ChatRole.user,
     var content: String = "",
     var context: String = "",
 ) {
-    /**
-     * 导出聊天历史为字符串
-     */
     fun exportChatHistory(invalidContext: Boolean = false): String {
-        // 实现导出逻辑，根据 invalidContext 的值决定是否包含上下文
         return if (invalidContext) {
             content
         } else {
@@ -236,14 +249,14 @@ data class ChatContextMessage(
         }
     }
 
-    /**
-     * 添加消息到会话中
-     */
     fun add(session: ChatSession) {
         session.messages.add(this)
     }
 }
 
+// ----------------------------
+// 非可序列化的 & 可序列化的 文件树结构
+// ----------------------------
 data class AppFileTree(
     val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf()
 ) {
@@ -258,20 +271,23 @@ data class AppFileTree(
 data class SerializableAppFileTree(
     val projectTrees: List<SerializableProjectFileTree> = emptyList()
 ) {
-    fun toAppFileTree(project: Project): AppFileTree {
-        return AppFileTree(
-            projectFileTrees = projectTrees.map { it.toProjectFileTree(project) }.toMutableList()
-        )
+    /**
+     * 反序列化 -> 立即遍历所有文件/类/方法，找出对应 PSI 实例
+     * 使得后续使用时保证 psiClass / psiMethod 都不为空
+     */
+    fun toAppFileTree(): AppFileTree {
+        val realProjectFileTrees = projectTrees.map { it.toProjectFileTree() }.toMutableList()
+        return AppFileTree(projectFileTrees = realProjectFileTrees)
     }
 }
 
+// ----------------------------
+// “项目文件树”
+// ----------------------------
 data class ProjectFileTree(
-    val project: Project,
+    val projectName: String = "",    // 原来的 project: Project 改为 projectName
     val files: MutableList<ProjectFile> = mutableListOf()
 ) {
-    /**
-     * 转换为可序列化的文件树对象
-     */
     fun toSerializable(): SerializableProjectFileTree {
         return SerializableProjectFileTree(
             projectName = projectName,
@@ -285,76 +301,224 @@ data class SerializableProjectFileTree(
     val projectName: String = "",
     val files: List<SerializableProjectFile> = emptyList()
 ) {
-    /**
-     * 转换为 ProjectFileTree 实例
-     */
-    fun toProjectFileTree(project: Project): ProjectFileTree {
-        val files = files.map { it.toProjectFile(project) }.toMutableList()
+    fun toProjectFileTree(): ProjectFileTree {
+        // 获取对应的 Project 实例
+        val project = ProjectManager.getInstance().openProjects
+            .find { it.name == projectName }
+            ?: throw IllegalStateException("Cannot find project with name: $projectName")
+        val fileList = files.map { it.toProjectFile(project) }.toMutableList()
         return ProjectFileTree(
             projectName = projectName,
-            files = files
+            files = fileList
         )
     }
 }
 
-data class ProjectClass(
-    val psiClass: PsiClass,
-    val methods: MutableList<ProjectMethod> = mutableListOf(),
-    val whole: Boolean = false
-) {
-    fun toSerializable(): SerializableProjectClass {
-        return SerializableProjectClass(
-            className = psiClass.name!!,
-            methods = methods.map { it.toSerializable() }
-        )
-    }
-}
-
-@Serializable
-data class SerializableProjectClass(
-    val className: String = "",
-    val methods: List<SerializableProjectMethod> = emptyList()
-) {
-    fun toProjectClass(): ProjectClass {
-        val methods = methods.map { it.toProjectMethod() }.toMutableList()
-        return ProjectClass(
-            className = className,
-            methods = methods
-        )
-    }
-}
-
+// ----------------------------
+// “项目文件”
+// ----------------------------
 data class ProjectFile(
-    val filePath: String = "",      // 相对项目根目录路径
+    val filePath: String = "",            // 相对项目根目录路径
     val virtualFile: VirtualFile,
+    val psiFile: PsiFile?,
     val classes: MutableList<ProjectClass> = mutableListOf(),
-    val whole: Boolean = false
+    var whole: Boolean = false
 ) {
     fun toSerializable(): SerializableProjectFile {
         return SerializableProjectFile(
             filePath = filePath,
-            classes = classes.map { it.toSerializable() }
+            classes = classes.map { it.toSerializable() },
+            whole = whole
         )
+    }
+
+    // 获取当前有效的 Classes
+    fun getCurrentClasses(): List<ProjectClass> {
+        return if (whole) {
+            // 如果是 whole，返回文件中所有类
+            psiFile.let {
+                PsiTreeUtil.findChildrenOfType(it, PsiClass::class.java).map { psiClass ->
+                    ProjectClass(
+                        className = psiClass.name ?: "",
+                        psiClass = psiClass,
+                        methods = mutableListOf(),
+                        whole = true
+                    )
+                }
+            }
+        } else {
+            // 否则返回指定的类列表
+            classes
+        }
+    }
+
+    fun removeClasses(classesToRemove: List<ProjectClass>) {
+        if (whole) {
+            // 如果是 whole，需要把 whole 改为 false，并添加除了要移除的类之外的所有类
+            whole = false
+            classes.clear()
+            
+            psiFile.let {
+                PsiTreeUtil.findChildrenOfType(it, PsiClass::class.java).forEach { psiClass ->
+                    // 检查当前类是否在要移除的列表中
+                    val shouldKeep = !classesToRemove.any { it.className == psiClass.name }
+                    
+                    if (shouldKeep) {
+                        classes.add(ProjectClass(
+                            className = psiClass.name ?: "",
+                            psiClass = psiClass,
+                            methods = mutableListOf(),
+                            whole = true
+                        ))
+                    }
+                }
+            }
+        } else {
+            // 如果不是 whole，直接从 classes 列表中移除指定的类
+            classes.removeAll { projectClass ->
+                classesToRemove.any { it.className == projectClass.className }
+            }
+        }
     }
 }
 
 @Serializable
 data class SerializableProjectFile(
     val filePath: String = "",
-    val classes: List<SerializableProjectClass> = emptyList()
+    val classes: List<SerializableProjectClass>? = null,
+    val whole: Boolean = false
 ) {
     fun toProjectFile(project: Project): ProjectFile {
-        val classes = classes.map { it.toProjectClass() }.toMutableList()
+        val vFile = project.baseDir.findFileByRelativePath(filePath)
+            ?: throw IllegalStateException("Cannot find filePath=$filePath in project=${project.name}")
+        val psiFile = PsiManager.getInstance(project).findFile(vFile)
+
+        // 如果是 whole，就不需要转换具体的类
+        val realClasses = if (whole) {
+            mutableListOf()
+        } else {
+            // 只有当文件是 Java/Kotlin/Scala 等支持类的文件时才处理类
+            when {
+                psiFile is PsiJavaFile ||
+                        psiFile?.fileType?.name?.contains("KOTLIN") == true ||
+                        psiFile?.fileType?.name?.contains("SCALA") == true -> {
+                    classes?.map { it.toProjectClass(psiFile) }?.toMutableList() ?: mutableListOf()
+                }
+                else -> mutableListOf()
+            }
+        }
+
         return ProjectFile(
             filePath = filePath,
-            classes = classes
+            virtualFile = vFile,
+            psiFile = psiFile,  // 这里可以为 null
+            classes = realClasses,
+            whole = whole
         )
     }
 }
 
+// ----------------------------
+// “项目类”
+// ----------------------------
+data class ProjectClass(
+    val className: String,
+    val psiClass: PsiClass,               // 现在保证不能为空
+    val methods: MutableList<ProjectMethod>,
+    var whole: Boolean
+) {
+    fun toSerializable(): SerializableProjectClass {
+        return SerializableProjectClass(
+            className = className,
+            methods = methods.map { it.toSerializable() },
+            whole = whole
+        )
+    }
+
+    fun getCurrentMethods(): List<ProjectMethod> {
+        return if (whole) {
+            // 如果是 whole，返回类中所有方法
+            psiClass.methods.map { method ->
+                ProjectMethod(
+                    methodName = method.name,
+                    parameterTypes = method.parameterList.parameters.map { it.type.canonicalText },
+                    psiMethod = method
+                )
+            }
+        } else {
+            // 否则返回指定的方法列表
+            methods
+        }
+    }
+
+    fun removeMethods(methodsToRemove: List<ProjectMethod>) {
+        if (whole) {
+            // 如果是 whole，需要把 whole 改为 false，并添加除了要移除的方法之外的所有方法
+            whole = false
+            methods.clear()
+            psiClass.methods.forEach { method ->
+                // 检查当前方法是否在要移除的列表中
+                val shouldKeep = !methodsToRemove.any {
+                    it.methodName == method.name &&
+                            it.parameterTypes == method.parameterList.parameters.map { p -> p.type.canonicalText }
+                }
+
+                if (shouldKeep) {
+                    methods.add(ProjectMethod(
+                        methodName = method.name,
+                        parameterTypes = method.parameterList.parameters.map { it.type.canonicalText },
+                        psiMethod = method
+                    ))
+                }
+            }
+        } else {
+            // 如果不是 whole，直接从 methods 列表中移除指定的方法
+            methods.removeAll { method ->
+                methodsToRemove.any {
+                    it.methodName == method.methodName &&
+                            it.parameterTypes == method.parameterTypes
+                }
+            }
+        }
+    }
+}
+
+@Serializable
+data class SerializableProjectClass(
+    val className: String = "",
+    val methods: List<SerializableProjectMethod> = emptyList(),
+    val whole: Boolean = false
+) {
+    fun toProjectClass(psiFile: PsiFile): ProjectClass {
+        // 在 psiFile 里查找同名的 PsiClass
+        val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+            .find { it.name == className }
+            ?: throw IllegalStateException("Cannot find class=$className in file=${psiFile.name}")
+
+        // 如果标记了 whole，就返回空的方法列表
+        val realMethods = if (whole) {
+            mutableListOf()
+        } else {
+            // 否则只转换指定的方法
+            methods.map { it.toProjectMethod(foundPsiClass) }.toMutableList()
+        }
+
+        return ProjectClass(
+            className = className,
+            psiClass = foundPsiClass,
+            methods = realMethods,
+            whole = whole
+        )
+    }
+}
+
+// ----------------------------
+// “项目方法”
+// ----------------------------
 data class ProjectMethod(
-    val psiMethod: PsiMethod,
-    val parameterTypes: List<String> = emptyList() // 添加参数类型列表
+    val methodName: String,
+    val parameterTypes: List<String> = emptyList(),
+    val psiMethod: PsiMethod             // 现在保证不能为空
 ) {
     fun toSerializable(): SerializableProjectMethod {
         return SerializableProjectMethod(
@@ -369,10 +533,22 @@ data class SerializableProjectMethod(
     val methodName: String,
     val parameterTypes: List<String> = emptyList()
 ) {
-    fun toProjectMethod(): ProjectMethod {
+    /**
+     * 反序列化：在给定的 PsiClass 中找对应的方法
+     * 如果找不到就抛异常，保证 psiMethod 不为空
+     */
+    fun toProjectMethod(psiClass: PsiClass): ProjectMethod {
+        val foundPsiMethod = psiClass.methods.find { method ->
+            method.name == methodName &&
+                    method.parameterList.parameters.map { p -> p.type.canonicalText } == parameterTypes
+        } ?: throw IllegalStateException(
+            "Cannot find method=$methodName(param=$parameterTypes) in class=${psiClass.name}"
+        )
+
         return ProjectMethod(
             methodName = methodName,
-            parameterTypes = parameterTypes
+            parameterTypes = parameterTypes,
+            psiMethod = foundPsiMethod
         )
     }
 }

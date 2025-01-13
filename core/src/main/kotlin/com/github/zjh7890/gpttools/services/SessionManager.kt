@@ -9,6 +9,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
 import java.util.UUID
 
@@ -17,7 +18,7 @@ class SessionManager(private val project: Project) : Disposable {
     private val logger = logger<SessionManager>()
 
     private val sessions = mutableMapOf<String, ChatSession>()
-    private var currentSession: ChatSession = ChatSession(project = project.name, projects = mutableListOf(project))
+    private var currentSession: ChatSession = ChatSession(project = project, relevantProjects = mutableListOf(project))
     private val sessionFilePath: String = getSessionFilePath()
 
     init {
@@ -29,22 +30,29 @@ class SessionManager(private val project: Project) : Disposable {
         return "$userHome/.gpttools/chat_sessions2.json"
     }
 
-    /**
-     * 加载会话数据，从 JSON 文件中读取并反序列化
-     */
     private fun loadSessions() {
-        val sessionsData: List<SerializableChatSession>? = FileUtil.readJsonFromFile(sessionFilePath)
-        sessionsData?.forEach { data ->
-            val session = data.toChatSession(project)
-            sessions[session.id] = session
-        }
-        val currentProjectSessions = sessions.values.filter { it.project == project.name }
+        try {
+            val sessionsData: List<SerializableChatSession>? = FileUtil.readJsonFromFile(sessionFilePath)
+            sessionsData?.forEach { data ->
+                try {
+                    val session = data.toChatSession()
+                    sessions[session.id] = session
+                } catch (e: Exception) {
+                    logger.error("Failed to deserialize chat session: ${data}", e)
+                }
+            }
+            val currentProjectSessions = sessions.values.filter { it.project == project }
 
-        if (currentProjectSessions.isEmpty()) {
+            if (currentProjectSessions.isEmpty()) {
+                createNewSession()
+            } else {
+                currentSession = currentProjectSessions.maxByOrNull { it.startTime }
+                    ?: currentProjectSessions.first()
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to load chat sessions from file: $sessionFilePath", e)
+            // 如果加载失败，创建新会话
             createNewSession()
-        } else {
-            currentSession = currentProjectSessions.maxByOrNull { it.startTime }
-                ?: currentProjectSessions.first()
         }
     }
 
@@ -53,15 +61,15 @@ class SessionManager(private val project: Project) : Disposable {
      */
     fun createNewSession() {
         // 先从当前会话中移除 project
-        currentSession.projects.remove(project)
+        currentSession.relevantProjects.remove(project)
 
         val sessionId = UUID.randomUUID().toString()
         val newSession = ChatSession(
             id = sessionId,
             type = "chat",
-            project = project.name,
+            project = project,
             startTime = System.currentTimeMillis(),
-            projects = mutableListOf(project)
+            relevantProjects = mutableListOf(project)
         )
 
         currentSession = newSession
@@ -91,8 +99,8 @@ class SessionManager(private val project: Project) : Disposable {
     fun setCurrentSession(session: ChatSession, project: Project) {
         // 设置当前会话
         currentSession = session
-        if (!currentSession.projects.contains(project)) {
-            currentSession.projects.add(project)
+        if (!currentSession.relevantProjects.contains(project)) {
+            currentSession.relevantProjects.add(project)
         }
 
         // 获取并刷新所有项目的 fileTreePanel 的 file list
@@ -129,8 +137,24 @@ class SessionManager(private val project: Project) : Disposable {
         val projectFileTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name }
             ?: ProjectFileTree(project.name).also { currentSession.appFileTree.projectFileTrees.add(it) }
 
-        // 创建新的 ProjectFile，使用相对路径作为 fileName，并设置 whole 为 true
-        val projectFile = ProjectFile(relativePath, whole = true)
+        // 检查文件是否已存在
+        if (projectFileTree.files.any { it.filePath == relativePath }) {
+            logger.info("File already exists in session: $relativePath")
+            return
+        }
+
+        // 获取 PsiFile
+        val psiFile = PsiManager.getInstance(project).findFile(file)
+
+        // 创建新的 ProjectFile
+        val projectFile = ProjectFile(
+            filePath = relativePath,
+            virtualFile = file,
+            psiFile = psiFile,
+            classes = mutableListOf(),
+            whole = true
+        )
+
         projectFileTree.files.add(projectFile)
 
         // 保存会话并通知更新
@@ -144,10 +168,10 @@ class SessionManager(private val project: Project) : Disposable {
     fun addMethodToCurrentSession(psiMethod: PsiMethod) {
         // 获取文件名、类名和方法名
         val containingFile = psiMethod.containingFile
-        val fileName = containingFile.virtualFile.path.removePrefix(project.basePath!! + "/")
-        val className = psiMethod.containingClass?.name ?: ""
-        val methodName = psiMethod.name
-        
+        val filePath = containingFile.virtualFile.path.removePrefix(project.basePath!! + "/")
+        val psiClass = psiMethod.containingClass ?: return
+        val className = psiClass.name ?: return
+
         // 获取方法参数类型列表
         val parameterTypes = psiMethod.parameterList.parameters.map { param ->
             param.type.canonicalText
@@ -158,19 +182,34 @@ class SessionManager(private val project: Project) : Disposable {
             ?: ProjectFileTree(project.name).also { currentSession.appFileTree.projectFileTrees.add(it) }
 
         // 获取或创建 ProjectFile
-        val projectFile = projectFileTree.files.find { it.filePath == fileName }
-            ?: ProjectFile(fileName).also { projectFileTree.files.add(it) }
+        val projectFile = projectFileTree.files.find { it.filePath == filePath }
+            ?: ProjectFile(
+                filePath = filePath,
+                virtualFile = containingFile.virtualFile,
+                psiFile = containingFile,  // 添加 psiFile 参数
+                classes = mutableListOf(),
+                whole = false
+            ).also { projectFileTree.files.add(it) }
 
-        // 添加类和方法
+        // 获取或创建 ProjectClass
         val projectClass = projectFile.classes.find { it.className == className }
-            ?: ProjectClass(className).also { projectFile.classes.add(it) }
+            ?: ProjectClass(
+                className = className,
+                psiClass = psiClass,
+                methods = mutableListOf(),
+                whole = false
+            ).also { projectFile.classes.add(it) }
 
         // 检查是否已存在相同的方法（包括参数类型）
-        if (!projectClass.methods.any { 
-            it.methodName == methodName && 
-            it.parameterTypes == parameterTypes 
-        }) {
-            projectClass.methods.add(ProjectMethod(methodName, parameterTypes))
+        if (!projectClass.methods.any {
+                it.methodName == psiMethod.name &&
+                        it.parameterTypes == parameterTypes
+            }) {
+            projectClass.methods.add(ProjectMethod(
+                methodName = psiMethod.name,
+                parameterTypes = parameterTypes,
+                psiMethod = psiMethod
+            ))
         }
 
         saveSessions()
@@ -270,7 +309,7 @@ class SessionManager(private val project: Project) : Disposable {
 
     override fun dispose() {
         // 销毁时移除当前 project
-        currentSession.projects.remove(project)
+        currentSession.relevantProjects.remove(project)
     }
 
     companion object {
