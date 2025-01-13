@@ -46,7 +46,7 @@ class ChatFileTreeListPanel(private val project: Project) : JPanel() {
         // 创建一个映射来存储每个项目的类节点
         val projectClassNodes = mutableMapOf<String, MutableMap<String, CheckboxTreeNode>>()
 
-        session.projectTrees.forEach { projectTree ->
+        session.appFileTree.projectFileTrees.forEach { projectTree ->
             // 创建项目节点
             val projectNode = CheckboxTreeNode(projectTree.projectName)
             root.add(projectNode)

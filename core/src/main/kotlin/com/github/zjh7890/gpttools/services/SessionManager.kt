@@ -126,12 +126,12 @@ class SessionManager(private val project: Project) : Disposable {
         val relativePath = file.path.removePrefix(project.basePath!! + "/")
 
         // 获取当前 session 对应的 ProjectFileTree
-        val projectTree = currentSession.projectTrees.find { it.projectName == project.name }
-            ?: ProjectTree(project.name).also { currentSession.projectTrees.add(it) }
+        val projectFileTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name }
+            ?: ProjectFileTree(project.name).also { currentSession.appFileTree.projectFileTrees.add(it) }
 
         // 创建新的 ProjectFile，使用相对路径作为 fileName，并设置 whole 为 true
         val projectFile = ProjectFile(relativePath, whole = true)
-        projectTree.files.add(projectFile)
+        projectFileTree.files.add(projectFile)
 
         // 保存会话并通知更新
         saveSessions()
@@ -154,12 +154,12 @@ class SessionManager(private val project: Project) : Disposable {
         }
 
         // 获取当前 session 对应的 ProjectFileTree
-        val projectTree = currentSession.projectTrees.find { it.projectName == project.name }
-            ?: ProjectTree(project.name).also { currentSession.projectTrees.add(it) }
+        val projectFileTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name }
+            ?: ProjectFileTree(project.name).also { currentSession.appFileTree.projectFileTrees.add(it) }
 
         // 获取或创建 ProjectFile
-        val projectFile = projectTree.files.find { it.filePath == fileName }
-            ?: ProjectFile(fileName).also { projectTree.files.add(it) }
+        val projectFile = projectFileTree.files.find { it.filePath == fileName }
+            ?: ProjectFile(fileName).also { projectFileTree.files.add(it) }
 
         // 添加类和方法
         val projectClass = projectFile.classes.find { it.className == className }
@@ -188,11 +188,11 @@ class SessionManager(private val project: Project) : Disposable {
      */
     fun removeSelectedNodes(fileName: String?, className: String?, methodNames: List<String>?) {
         val currentSession = getCurrentSession()
-        val projectTree = currentSession.projectTrees.find { it.projectName == project.name } ?: return
+        val projectTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name } ?: return
 
         if (fileName == null) {
             // 移除整个项目的所有文件、类和方法
-            currentSession.projectTrees.remove(projectTree)
+            currentSession.appFileTree.projectFileTrees.remove(projectTree)
         } else {
             val projectFile = projectTree.files.find { it.filePath == fileName }
             if (projectFile != null) {

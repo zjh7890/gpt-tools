@@ -41,8 +41,8 @@ object GenerateDiffAgent {
         )
 
         var fileContent = "No files."
-        if (currentSession.projectTrees.isNotEmpty()) {
-            fileContent = currentSession.projectTrees.joinToString("\n\n") { projectFileTree ->
+        if (currentSession.appFileTree.projectFileTrees.isNotEmpty()) {
+            fileContent = currentSession.appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
                 """
 === Project: ${projectFileTree.projectName} ===
 ${collectFileContents(projectFileTree.files, project).joinToString("\n")}

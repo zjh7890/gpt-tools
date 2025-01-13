@@ -116,9 +116,9 @@ class ChatCodingService(val project: Project) : Disposable {
     private fun addContextToMessages(message: ChatContextMessage, project: Project) {
         val contextBuilder = StringBuilder()
 
-        if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().projectTrees.isNotEmpty()) {
+        if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().appFileTree.projectFileTrees.isNotEmpty()) {
             contextBuilder.append("相关项目文件内容：\n")
-            val fileContents = sessionManager.getCurrentSession().projectTrees.joinToString("\n\n") { projectFileTree ->
+            val fileContents = sessionManager.getCurrentSession().appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
 """
 === Project: ${projectFileTree.projectName} ===
 ${collectFileContents(projectFileTree.files, project).joinToString("\n")}
