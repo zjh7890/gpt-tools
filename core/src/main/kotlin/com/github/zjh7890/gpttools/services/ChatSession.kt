@@ -347,7 +347,7 @@ data class SerializableProjectClass(
 
 @Serializable
 data class ProjectFile(
-    val filePath: String = "",
+    val filePath: String = "",      // 相对项目根目录路径
     val classes: MutableList<ProjectClass> = mutableListOf(),
     val whole: Boolean = false
 ) {
