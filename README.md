@@ -5,8 +5,8 @@
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/24670.svg)](https://plugins.jetbrains.com/plugin/24670)
 
 ## 前言
-一个 Java 后端自用的 IntelliJ IDEA 插件，希望做到类似 cursor 的体验，非 Java 语言的同学建议直接用 cursor，不用关注此项目了，本人无力维护那么多模块。 <br>
-
+一个 Java 后端自用的 IntelliJ IDEA 插件，希望做到类似 cursor 的体验 <br />
+非 Java 语言的同学建议直接用 cursor，不用关注此项目了，本人无力维护那么多模块。 <br />
 <!-- Plugin description -->
 ## An AI plugin that turns your thoughts into code instantly.
 This plugin offers two main features:
