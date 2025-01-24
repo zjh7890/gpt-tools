@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools.agent
 import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
+import com.github.zjh7890.gpttools.services.AppFileTree
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatCodingService.Companion.collectFileContents
 import com.github.zjh7890.gpttools.services.ChatContextMessage
@@ -41,13 +42,9 @@ object GenerateDiffAgent {
         )
 
         var fileContent = "No files."
-        if (currentSession.appFileTree.projectFileTrees.isNotEmpty()) {
-            fileContent = currentSession.appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
-                """
-=== Project: ${projectFileTree.projectName} ===
-${collectFileContents(projectFileTree.files, project).joinToString("\n")}
-""".trimIndent()
-            }
+        val appFileTree = currentSession.appFileTree
+        if (appFileTree.projectFileTrees.isNotEmpty()) {
+            fileContent = generateDependenciesText(fileContent, appFileTree, project)
 
             chatSession.add(
                 ChatContextMessage(

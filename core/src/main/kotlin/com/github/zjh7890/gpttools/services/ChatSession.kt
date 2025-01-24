@@ -4,10 +4,10 @@ import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.utils.FileUtil
-import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
@@ -229,13 +229,15 @@ data class SerializableAppFileTree(
 // “项目文件树”
 // ----------------------------
 data class ProjectFileTree(
-    val projectName: String = "",    // 原来的 project: Project 改为 projectName
-    val files: MutableList<ProjectFile> = mutableListOf()
+    val projectName: String = "",
+    val modules: MutableList<ModuleDependency> = mutableListOf(),
+    val mavenDependencies: MutableList<MavenDependency> = mutableListOf()
 ) {
     fun toSerializable(): SerializableProjectFileTree {
         return SerializableProjectFileTree(
             projectName = projectName,
-            files = files.map { it.toSerializable() }
+            modules = modules.map { it.toSerializable() },
+            mavenDependencies = mavenDependencies.map { it.toSerializable() }
         )
     }
 }
@@ -243,20 +245,121 @@ data class ProjectFileTree(
 @Serializable
 data class SerializableProjectFileTree(
     val projectName: String = "",
-    val files: List<SerializableProjectFile> = emptyList()
+    val modules: List<SerializableModuleDependency> = emptyList(),
+    val mavenDependencies: List<SerializableMavenDependency> = emptyList()
 ) {
     fun toProjectFileTree(): ProjectFileTree {
         // 获取对应的 Project 实例
         val project = ProjectManager.getInstance().openProjects
             .find { it.name == projectName }
             ?: throw IllegalStateException("Cannot find project with name: $projectName")
-        val fileList = files.map { it.toProjectFile(project) }.toMutableList()
+
         return ProjectFileTree(
             projectName = projectName,
-            files = fileList
+            modules = modules.map {
+                SerializableModuleDependency(
+                    moduleName = it.moduleName,
+                    packages = it.packages
+                ).toModuleDependency(project)
+            }.toMutableList(),
+            mavenDependencies = mavenDependencies.map {
+                SerializableMavenDependency(
+                    groupId = it.groupId,
+                    artifactId = it.artifactId,
+                    version = it.version,
+                    packages = it.packages
+                ).toMavenDependency(project)
+            }.toMutableList()
         )
     }
 }
+
+// [Module Name]
+data class ModuleDependency(
+    val moduleName: String,
+    val packages: MutableList<PackageDependency> = mutableListOf()
+) {
+    fun toSerializable(): SerializableModuleDependency {
+        return SerializableModuleDependency(
+            moduleName = moduleName,
+            packages = packages.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializableModuleDependency(
+    val moduleName: String,
+    val packages: List<SerializablePackageDependency> = emptyList()
+) {
+    fun toModuleDependency(project: Project): ModuleDependency {
+        return ModuleDependency(
+            moduleName = moduleName,
+            packages = packages.map { it.toPackageDependency(project) }.toMutableList()
+        )
+    }
+}
+
+// Maven Dependencies
+data class MavenDependency(
+    val groupId: String,
+    val artifactId: String,
+    val version: String,
+    val packages: MutableList<PackageDependency> = mutableListOf()
+) {
+    fun toSerializable(): SerializableMavenDependency {
+        return SerializableMavenDependency(
+            groupId = groupId,
+            artifactId = artifactId,
+            version = version,
+            packages = packages.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializableMavenDependency(
+    val groupId: String,
+    val artifactId: String,
+    val version: String,
+    val packages: List<SerializablePackageDependency> = emptyList()
+){
+    fun toMavenDependency(project: Project): MavenDependency {
+        return MavenDependency(
+            groupId = groupId,
+            artifactId = artifactId,
+            version = version,
+            packages = packages.map { it.toPackageDependency(project) }.toMutableList()
+        )
+    }
+}
+
+// [Package Name]
+data class PackageDependency(
+    val packageName: String,
+    val files: MutableList<ProjectFile> = mutableListOf()
+) {
+    fun toSerializable(): SerializablePackageDependency {
+        return SerializablePackageDependency(
+            packageName = packageName,
+            files = files.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializablePackageDependency(
+    val packageName: String,
+    val files: List<SerializableProjectFile> = emptyList()
+) {
+    fun toPackageDependency(project: Project): PackageDependency {
+        return PackageDependency(
+            packageName = packageName,
+            files = files.map { it.toProjectFile(project) }.toMutableList()
+        )
+    }
+}
+
 
 // ----------------------------
 // “项目文件”
@@ -329,12 +432,19 @@ data class ProjectFile(
 @Serializable
 data class SerializableProjectFile(
     val filePath: String = "",
+    val ifMavenFile: Boolean = false,
     val classes: List<SerializableProjectClass>? = null,
     val whole: Boolean = false
 ) {
     fun toProjectFile(project: Project): ProjectFile {
-        val vFile = project.baseDir.findFileByRelativePath(filePath)
-            ?: throw IllegalStateException("Cannot find filePath=$filePath in project=${project.name}")
+        val vFile: VirtualFile
+        if (!ifMavenFile) {
+            vFile = project.baseDir.findFileByRelativePath(filePath)
+                ?: throw IllegalStateException("Cannot find filePath=$filePath in project=${project.name}")
+        } else {
+            vFile = LocalFileSystem.getInstance().findFileByPath(filePath)!!
+        }
+
         val psiFile = PsiManager.getInstance(project).findFile(vFile)
 
         // 如果是 whole，就不需要转换具体的类
