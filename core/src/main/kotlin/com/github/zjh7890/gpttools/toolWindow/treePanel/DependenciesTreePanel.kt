@@ -126,7 +126,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         // 原先代码中使用的临时缓存或辅助结构
         val moduleMap = mutableMapOf<String, DefaultMutableTreeNode>()
         val mavenDependencies = mutableMapOf<String, MutableList<PsiClass>>()
-        val externalsNode = DefaultMutableTreeNode("Externals")
 
         // 获取当前 DependenciesTreePanel 对应的 Project 名
         val projectName = project.name
@@ -198,17 +197,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                             // Maven 依赖
                             val key = mavenInfo.toString()
                             mavenDependencies.getOrPut(key) { mutableListOf() }.add(psiClass)
-                        } else {
-                            // 普通外部依赖
-                            val packageName = psiClass.qualifiedName
-                                ?.substringBeforeLast(".")
-                                ?.replace('.', '/')
-                                ?.substringAfter("src/main/java/")
-                                ?.replace('/', '.')
-                                ?: "(default package)"
-                            val packageNode = findOrCreatePackageNode(externalsNode, packageName)
-                            packageNode.add(DefaultMutableTreeNode(psiClass.name))
-                            addedDependencies.add(psiClass)
                         }
                     }
                 }
@@ -256,11 +244,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
             root.add(mavenNode)
         }
 
-        // 6. 添加外部依赖节点
-        if (externalsNode.childCount > 0) {
-            root.add(externalsNode)
-        }
-
         // 7. 刷新并展开
         (tree.model as DefaultTreeModel).reload(root)
         expandDefaultNodes()
@@ -291,7 +274,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         val virtualFile = cls.containingFile?.virtualFile ?: return null
         val path = virtualFile.path
         // 匹配形如 /.m2/repository/com/yupaopao/platform/config-client/0.10.21/config-client-0.10.21.jar 的路径
-        val regex = ".*/repository/([^/]+)/([^/]+)/([^/]+)/([^/]+!)/.*".toRegex()
+        val regex = ".*/repository/(.+)/([^/]+)/([^/]+)/([^/]+)\\.jar!/.*".toRegex()
         val matchResult = regex.find(path) ?: return null
 
         return try {
