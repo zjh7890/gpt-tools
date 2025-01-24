@@ -1,7 +1,6 @@
 package com.github.zjh7890.gpttools.utils
 
 import com.github.zjh7890.gpttools.services.*
-import com.github.zjh7890.gpttools.services.ChatCodingService.Companion.collectFileContents
 import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.toolWindow.treePanel.MavenDependencyId
 import com.intellij.openapi.project.Project
@@ -233,81 +232,96 @@ object DependencyUtils {
         projectFile.classes.add(projectClass)
     }
 
-    private fun generateDependenciesText(
-        fileContent: String,
-        appFileTree: AppFileTree,
-        project: Project
+    /**
+     * 将原先 generateDependenciesText 和 collectFileContents 的逻辑合并到一个函数中
+     */
+    fun generateDependenciesTextCombined(
+        appFileTree: AppFileTree
     ): String {
-        var fileContent1 = fileContent
-        fileContent1 = appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
+        // 针对每个 ProjectFileTree 生成文本，再用 joinToString 拼装
+        return appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
+            // 1) 整理 “本地 module” 的文件
+            val moduleFilesContents = projectFileTree.modules
+                .flatMap { it.packages }
+                .flatMap { it.files }
+                .mapNotNull { projectFile ->
+                    handleSingleProjectFile(projectFile)
+                }
+
+            // 2) 整理 “mavenDependencies” 中的文件
+            val mavenFilesContents = projectFileTree.mavenDependencies
+                .flatMap { it.packages }
+                .flatMap { it.files }
+                .mapNotNull { projectFile ->
+                    handleSingleProjectFile(projectFile, )
+                }
+
+            // 合并两个来源的内容
+            val joinedFileContents = (moduleFilesContents + mavenFilesContents).joinToString("\n")
+
             """
 === Project: ${projectFileTree.projectName} ===
-${collectFileContents(projectFileTree.files, project).joinToString("\n")}
+$joinedFileContents
 """.trimIndent()
         }
-        return fileContent1
     }
 
     /**
-     * 收集指定文件的内容，供 LLM 使用
+     * 单独提取一个函数，处理单个 ProjectFile 的逻辑
+     * 返回要拼接的字符串，若不需要则返回 null
      */
-    fun collectFileContents(files: List<ProjectFile>, project: Project): List<String> {
-        return files.mapNotNull { projectFile ->
-            val virtualFile = projectFile.virtualFile
+    private fun handleSingleProjectFile(
+        projectFile: ProjectFile
+    ): String? {
+        val virtualFile = projectFile.virtualFile
+        // 如果用户配置了 whole=true 则读取整文件内容
+        return if (projectFile.whole) {
+            FileUtil.readFileInfoForLLM(virtualFile, project)
+        } else {
+            // 收集需要处理的 PsiElement
+            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
+            val elementsToProcess = mutableListOf<PsiElement>()
 
-            // 如果用户配置了 whole = true，说明整文件都要
-            if (projectFile.whole) {
-                // 直接读取文件内容
-                FileUtil.readFileInfoForLLM(virtualFile, project)
-            } else {
-                // 同一个文件内，先把要处理的所有 PsiElement (类、方法等) 都收集到 elementsToProcess
-                val elementsToProcess = mutableListOf<PsiElement>()
-                val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return@mapNotNull null
-
-                // 遍历用户指定的 Class/Method 信息
-                projectFile.classes.forEach { projectClass ->
-                    // 查找对应的 PsiClass
-                    val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
-                        if (projectClass.whole) {
-                            // 如果指定了 whole = true，则用 qualifiedName 精确匹配
-                            it.qualifiedName == projectClass.className
-                        } else {
-                            // 如果不需要整类，className 可能只写了简单类名，这里做简单匹配
-                            it.name == projectClass.className
-                        }
-                    } ?: return@forEach
-
-                    // 如果用户配置了对整个类都需要
+            // 遍历用户指定的 Class/Method 信息
+            projectFile.classes.forEach { projectClass ->
+                val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
                     if (projectClass.whole) {
-                        // 只需要把这个类加进去一次
-                        elementsToProcess.add(psiClass)
+                        // 如果需要整类，则用 qualifiedName 精确匹配
+                        it.qualifiedName == projectClass.className
                     } else {
-                        // 如果只需要其中部分方法，则逐个方法查找
-                        projectClass.methods.forEach { projectMethod ->
-                            val methods = psiClass.findMethodsByName(projectMethod.methodName, false)
-                            // 找到参数类型匹配的方法
-                            val matchedMethod = methods.find { method ->
+                        // 否则只匹配类名
+                        it.name == projectClass.className
+                    }
+                } ?: return@forEach
+
+                if (projectClass.whole) {
+                    // 整类内容
+                    elementsToProcess.add(psiClass)
+                } else {
+                    // 若只需要其中某些方法
+                    projectClass.methods.forEach { projectMethod ->
+                        val matchedMethod = psiClass
+                            .findMethodsByName(projectMethod.methodName, false)
+                            .find { method ->
                                 val paramTypes = method.parameterList.parameters.map { it.type.canonicalText }
                                 paramTypes == projectMethod.parameterTypes
                             } ?: return@forEach
 
-                            elementsToProcess.add(matchedMethod)
-                        }
+                        elementsToProcess.add(matchedMethod)
                     }
                 }
+            }
 
-                // 如果本文件收集到了想要处理的 PsiElement
-                if (elementsToProcess.isNotEmpty()) {
-                    // 此处只调用一次 depsInSingleFile，把当前文件内的所有类和方法一并传入
-                    val fileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
-                    if (!fileContent.isNullOrBlank()) {
-                        FileUtil.wrapBorder(fileContent.trim())
-                    } else {
-                        null
-                    }
+            // 将收集到的 PsiElement 调用 depsInSingleFile 生成内容
+            if (elementsToProcess.isNotEmpty()) {
+                val singleFileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
+                if (!singleFileContent.isNullOrBlank()) {
+                    FileUtil.wrapBorder(singleFileContent.trim())
                 } else {
                     null
                 }
+            } else {
+                null
             }
         }
     }

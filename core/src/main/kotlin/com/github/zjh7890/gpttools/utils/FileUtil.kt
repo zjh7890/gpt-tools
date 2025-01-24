@@ -47,7 +47,6 @@ object FileUtil {
         }
         
         return """
-${relativePath}:
 ${border}
 ${text}
 ${border}

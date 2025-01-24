@@ -15,10 +15,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiManager
-import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
@@ -118,12 +114,7 @@ class ChatCodingService(val project: Project) : Disposable {
 
         if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().appFileTree.projectFileTrees.isNotEmpty()) {
             contextBuilder.append("相关项目文件内容：\n")
-            val fileContents = sessionManager.getCurrentSession().appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
-"""
-=== Project: ${projectFileTree.projectName} ===
-${collectFileContents(projectFileTree.files, project).joinToString("\n\n")}
-""".trimIndent()
-            }
+            val fileContents = DependencyUtils.generateDependenciesTextCombined(sessionManager.getCurrentSession().appFileTree)
             contextBuilder.append(FileUtil.wrapBorder(fileContents))
             contextBuilder.append("\n\n")
         }
@@ -132,9 +123,9 @@ ${collectFileContents(projectFileTree.files, project).joinToString("\n\n")}
         if (CommonSettings.getInstance().withDir) {
             val projectStructure = DirectoryUtil.getProjectStructure(project)
             contextBuilder.append("""
-        项目目录结构：
-        ${FileUtil.wrapBorder(projectStructure)}
-            """.trimIndent())
+项目目录结构：
+${FileUtil.wrapBorder(projectStructure)}
+""".trimIndent())
         }
 
         val context = contextBuilder.toString().trim()

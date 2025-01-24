@@ -49,7 +49,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         add(splitPane, BorderLayout.CENTER)
 
         tree.expandPath(TreePath(arrayOf(root, rootClassNode)))
-
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 val path = tree.getPathForLocation(e.x, e.y)
