@@ -12,6 +12,8 @@ import com.intellij.psi.impl.compiled.ClsTypeParameterImpl
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import com.github.zjh7890.gpttools.settings.other.OtherSettingsState
+import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel.Companion.ifGetterOrSetter
+import com.github.zjh7890.gpttools.toolWindow.treePanel.FileTreeListPanel.Companion.isStandardClassMethod
 import java.util.jar.JarFile
 
 
@@ -183,12 +185,8 @@ object PsiUtils {
                     val virtualFile = resolvedFile.virtualFile
                     // virtualFile.path
                     // example /Users/zjh/.m2/repository/com/platform/config-client/0.10.21/config-client-0.10.21.jar!/com/ctrip/framework/apollo/Config.class
-                    val patterns = OtherSettingsState.getInstance().dependencyPatterns
-                        .split("\n")
-                        .filter { it.isNotEmpty() }
-                        .map { it.toRegex() }
-                    if (isFileInProject(virtualFile, project) ||
-                        patterns.any { pattern -> virtualFile.path.matches(pattern) }) {
+                    val ifProjectFile = ifProjectFile(project, virtualFile)
+                    if (ifProjectFile) {
                         // 在这里继续处理 virtualFile
                         findSourceCode(resolvedFile)?.let { referencedFiles.add(it) }
                     }
@@ -199,8 +197,17 @@ object PsiUtils {
         return referencedFiles.distinct()
     }
 
-    fun isFileInProject(file: VirtualFile, project: Project): Boolean {
-        return ProjectRootManager.getInstance(project).fileIndex.isInContent(file)
+    fun ifProjectFile(
+        project: Project,
+        virtualFile: VirtualFile
+    ): Boolean {
+        val patterns = OtherSettingsState.getInstance().dependencyPatterns
+            .split("\n")
+            .filter { it.isNotEmpty() }
+            .map { it.toRegex() }
+        val ifProjectFile = ProjectRootManager.getInstance(project).fileIndex.isInContent(virtualFile) ||
+                patterns.any { pattern -> virtualFile.path.matches(pattern) }
+        return ifProjectFile
     }
 
     fun getMethodStartAndEndLines(method: PsiMethod): Pair<Int, Int> {
@@ -271,6 +278,22 @@ object PsiUtils {
             }
         }
         return relevantImports
+    }
+
+    fun isDataClass(psiClass: PsiClass): Boolean {
+        val methods = psiClass.methods
+        val fields = psiClass.fields
+
+        if (fields.isEmpty()) return false
+
+        val allMethodsAreGettersSettersOrStandard = methods.all {
+            if (!it.isPhysical) {
+                return true
+            }
+            ifGetterOrSetter(it) || it.isStandardClassMethod() || it.isConstructor
+        }
+
+        return allMethodsAreGettersSettersOrStandard
     }
 }
 

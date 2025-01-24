@@ -3,11 +3,15 @@
 package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.services.AppFileTree
+import com.github.zjh7890.gpttools.services.ProjectClass
+import com.github.zjh7890.gpttools.services.ProjectMethod
+import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.ui.treeStructure.Tree
 import java.awt.BorderLayout
 import java.awt.Color
@@ -24,8 +28,8 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
     val root = DefaultMutableTreeNode("Dependencies")
     val tree = Tree(root)
     private val addedDependencies = mutableSetOf<PsiClass>()
-    private lateinit var scrollPane: JScrollPane
-    private lateinit var emptyPanel: JPanel
+    private var scrollPane: JScrollPane
+    private var emptyPanel: JPanel
 
     init {
         layout = BorderLayout()
@@ -45,10 +49,10 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         tree.cellRenderer = CheckboxTreeCellRenderer()
 
         val scrollPane = JScrollPane(tree)
-        
+
         // 默认显示树面板
         add(scrollPane, BorderLayout.CENTER)
-        
+
         // 保存引用以便后续切换
         this.scrollPane = scrollPane
         this.emptyPanel = emptyPanel
@@ -74,12 +78,28 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 
                 if (e.clickCount == 2) {
                     val node = tree.selectionPath?.lastPathComponent as? DefaultMutableTreeNode
-                    val className = node?.userObject.toString()
-                    val psiClass = addedDependencies.find { it.name == className }
-                    if (psiClass != null) {
-                        val virtualFile = psiClass.containingFile?.virtualFile
-                        if (virtualFile != null) {
-                            FileEditorManager.getInstance(project).openFile(virtualFile, true)
+                    val userObject = node?.userObject
+
+                    when (userObject) {
+                        // 处理 ProjectClass 类型
+                        is ProjectClass -> {
+                            val psiClass = userObject.psiClass
+                            val virtualFile = psiClass.containingFile?.virtualFile
+                            if (virtualFile != null) {
+                                FileEditorManager.getInstance(project).openFile(virtualFile, true)
+                            }
+                        }
+                        // 处理 ProjectMethod 类型
+                        is ProjectMethod -> {
+                            val psiMethod = userObject.psiMethod
+                            val virtualFile = psiMethod.containingFile?.virtualFile
+                            if (virtualFile != null) {
+                                val editor = FileEditorManager.getInstance(project).openFile(virtualFile, true)[0]
+                                // 转换为 Editor 类型
+                                if (editor is com.intellij.openapi.editor.Editor) {
+                                    editor.caretModel.moveToOffset(psiMethod.textOffset)
+                                }
+                            }
                         }
                     }
                     e.consume()
@@ -118,27 +138,22 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 
         // 2. 遍历 appFileTree 中的每个 ProjectFileTree
         appFileTree.projectFileTrees.forEach { projectFileTree ->
-            // 2.1 找到对应的 Project（如有跨项目场景，这里可根据名称判断是否是当前 project）
+            // 2.1 找到对应的 Project（可跨项目）
             val targetProject = com.intellij.openapi.project.ProjectManager.getInstance()
                 .openProjects
                 .find { it.name == projectFileTree.projectName }
-            // 如果找不到就忽略该块，或自行决定如何处理
                 ?: return@forEach
 
             // 2.2 遍历文件
             projectFileTree.files.forEach { projectFile ->
-                // 如果整文件已标记为 whole，则取该文件中所有 PSI Class
-                // 否则只处理 projectFile.classes 列表
-                val psiFile = projectFile.psiFile ?: return@forEach
-                val fileClasses: List<PsiClass> = if (projectFile.whole) {
-                    com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).toList()
-                } else {
-                    projectFile.classes.map { it.psiClass }
-                }
+                // 使用 getCurrentClasses() 取回当前有效的 ProjectClass 列表
+                val projectClasses = projectFile.getCurrentClasses()
 
-                // 遍历当前文件中的所有类
-                fileClasses.forEach { psiClass ->
-                    // 判定是否外部依赖
+                // 遍历当前文件中的所有“ProjectClass”
+                projectClasses.forEach { pClass ->
+                    val psiClass = pClass.psiClass
+
+                    // 先判定是否是外部依赖
                     if (!isExternalDependency(psiClass)) {
                         // 处理项目内的依赖
                         val moduleName = getModuleName(psiClass)
@@ -146,42 +161,33 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                             DefaultMutableTreeNode(moduleName)
                         }
 
+                        // 解析包名
                         val packageName = psiClass.qualifiedName
                             ?.substringBeforeLast(".")
                             ?.replace('.', '/')
-                            ?.let { it.substringAfter("src/main/java/") }
+                            ?.substringAfter("src/main/java/")
                             ?.replace('/', '.')
                             ?: "(default package)"
 
                         val packageNode = findOrCreatePackageNode(moduleNode, packageName)
 
                         // 创建类节点
-                        val classNode = CheckboxTreeNode(psiClass.name ?: "UnknownClass")
+                        val classNode = CheckboxTreeNode("").apply {
+                            userObject = pClass
+                        }
                         packageNode.add(classNode)
 
-                        // 维护 addedDependencies，表示在 DependenciesTreePanel 中出现的 PsiClass
+                        // 将 psiClass 加入记录
                         addedDependencies.add(psiClass)
 
-                        // 处理方法节点
-                        // 如果该 class 是 “整类” (projectClass.whole) 或 projectFile.whole，则把该类全部方法加进去
-                        // 否则只加被选中的 methods
-                        val isWholeClass = projectFile.whole || projectFile.classes.find {
-                            // 找到和 psiClass 对应的那一项
-                            it.psiClass == psiClass
-                        }?.whole == true
-
-                        val selectedMethods = if (isWholeClass) {
-                            psiClass.methods.asList()
-                        } else {
-                            // 找到该类对应的 ProjectClass
-                            val pClass = projectFile.classes.find { it.psiClass == psiClass }
-                            // 若不存在就空列表
-                            pClass?.methods?.map { it.psiMethod } ?: emptyList()
-                        }
+                        // 使用 pClass.getCurrentMethods() 来获取本类需要展示的方法
+                        val selectedMethods = pClass.getCurrentMethods()
 
                         // 添加方法级别的子节点
-                        selectedMethods.forEach { m ->
-                            val methodNode = CheckboxTreeNode(m.name)
+                        selectedMethods.forEach { method ->
+                            val methodNode = CheckboxTreeNode("").apply {
+                                userObject = method
+                            }
                             classNode.add(methodNode)
                         }
 
@@ -189,7 +195,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                         // 处理外部依赖
                         val mavenInfo = extractMavenInfo(psiClass)
                         if (mavenInfo != null) {
-                            // 加到 mavenDependencies
+                            // Maven 依赖
                             val key = mavenInfo.toString()
                             mavenDependencies.getOrPut(key) { mutableListOf() }.add(psiClass)
                         } else {
@@ -197,7 +203,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                             val packageName = psiClass.qualifiedName
                                 ?.substringBeforeLast(".")
                                 ?.replace('.', '/')
-                                ?.let { it.substringAfter("src/main/java/") }
+                                ?.substringAfter("src/main/java/")
                                 ?.replace('/', '.')
                                 ?: "(default package)"
                             val packageNode = findOrCreatePackageNode(externalsNode, packageName)
@@ -234,7 +240,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                 }
 
                 packageMap.entries.sortedBy { it.key }.forEach { (packageName, pkgClsList) ->
-                    // 如果是 (default package)，直接挂在 mavenInfoNode 下
                     val packageNode = if (packageName == "(default package)") {
                         mavenInfoNode
                     } else {
@@ -242,8 +247,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                         mavenInfoNode.add(pn)
                         pn
                     }
-
-                    // 加类节点
                     pkgClsList.sortedBy { it.name }.forEach { cls ->
                         packageNode.add(DefaultMutableTreeNode(cls.name))
                     }
@@ -458,7 +461,7 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
         row: Int,
         hasFocus: Boolean
     ): Component {
-        val component = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
+        val defaultComponent = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
 
         if (value is CheckboxTreeNode) {
             // 检查是否是 Root Classes 下的节点或其子节点
@@ -472,9 +475,27 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
                 }
                 parent = parent.parent as? DefaultMutableTreeNode
             }
+
+            // 如果不是 Root Classes 节点，检查是否是类节点
+            val userObj = value.userObject
+            if (userObj is ProjectClass) {
+                val psiClass = userObj.psiClass
+                // 判断是否是数据类
+                if (PsiUtils.isDataClass(psiClass)) {
+                    // 如果是数据类，使用特殊图标
+                    this.icon = com.intellij.icons.AllIcons.Nodes.Record
+                } else {
+                    this.icon = com.intellij.icons.AllIcons.Nodes.Class
+                }
+                this.text = userObj.psiClass.name
+            }
+            else if (userObj is ProjectMethod) {
+                this.icon = com.intellij.icons.AllIcons.Nodes.Method
+                this.text = userObj.psiMethod.name
+            }
         }
 
-        return component
+        return defaultComponent
     }
 }
 

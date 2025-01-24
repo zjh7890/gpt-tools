@@ -5,6 +5,7 @@ package com.github.zjh7890.gpttools.toolWindow.treePanel
 import com.github.zjh7890.gpttools.services.*
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
+import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
@@ -13,16 +14,12 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
 import com.intellij.ui.treeStructure.Tree
 import java.awt.BorderLayout
-import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.util.*
-import javax.swing.JCheckBox
 import javax.swing.JPanel
 import javax.swing.JScrollPane
-import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
@@ -41,7 +38,6 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
         tree.isRootVisible = false
         tree.showsRootHandles = true
-        tree.cellRenderer = CheckboxTreeCellRenderer()
 
         // 使用 JSplitPane 分割 FileTreeListPanel 和 DependenciesTreePanel
         val splitPane =
@@ -213,7 +209,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         psiClass: PsiClass,
         classGraph: MutableMap<PsiClass, ClassDependencyInfo>
     ) {
-        val dataClassFlag = isDataClass(psiClass)
+        val dataClassFlag = PsiUtils.isDataClass(psiClass)
 
         if (dataClassFlag) {
             analyzeDataClass(psiClass, classGraph)
@@ -252,156 +248,13 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         }
     }
 
-    private fun analyzeDataClass(
-        psiClass: PsiClass,
-        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
-    ) {
-        var classInfo = classGraph[psiClass]
-        if (classInfo == null) {
-            val dataClassDeps = extractDataClassDependencies(psiClass)
-            for (depClass in dataClassDeps) {
-                classGraph[depClass] = ClassDependencyInfo(isDataClass = true)
-            }
-        }
-    }
-
-    private fun analyzeMethodDependencies(
-        method: PsiMethod,
-        currentClass: PsiClass,
-        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
-    ) {
-        var classInfo = classGraph[currentClass] ?: ClassDependencyInfo()
-
-        if (classInfo.usedMethods.contains(method)) {
-            return
-        }
-        classInfo.markMethodUsed(method)
-        val usedElements = findFieldOrMethodUsedElements(method)
-        for (element in usedElements) {
-            when (element) {
-                is PsiMethod -> {
-                    val depClass = element.containingClass ?: continue
-                    analyzeMethodDependencies(element, depClass, classGraph)
-                }
-
-                is PsiField -> {
-                    val depClass = element.containingClass
-                    analyzeFieldDependencies(element, depClass, classGraph)
-                }
-            }
-        }
-
-        classGraph[currentClass] = classInfo
-    }
-
-    private fun analyzeFieldDependencies(
-        field: PsiField,
-        containingClass: PsiClass?,
-        classGraph: MutableMap<PsiClass, ClassDependencyInfo>
-    ) {
-        if (containingClass == null) return
-
-        var classInfo = classGraph.getOrPut(containingClass) { ClassDependencyInfo() }
-
-        if (classInfo.usedFields.contains(field)) {
-            return
-        }
-
-        classInfo.markFieldUsed(field)
-
-        val fieldTypeClass = resolveClassFromType(field.type)
-        if (fieldTypeClass != null && isDataClass(fieldTypeClass)) {
-            analyzeDataClass(fieldTypeClass, classGraph)
-        }
-
-        field.initializer?.let { initializer ->
-            val usedElements = findFieldOrMethodUsedElements(initializer)
-            for (element in usedElements) {
-                when (element) {
-                    is PsiMethod -> {
-                        val depClass = element.containingClass ?: return@let
-                        analyzeMethodDependencies(element, depClass, classGraph)
-                    }
-
-                    is PsiField -> {
-                        val depClass = element.containingClass
-                        analyzeFieldDependencies(element, depClass, classGraph)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun extractDataClassDependencies(psiClass: PsiClass): List<PsiClass> {
-        val deps = mutableListOf<PsiClass>()
-        for (field in psiClass.fields) {
-            val fieldTypeClass = resolveClassFromType(field.type)
-            if (fieldTypeClass != null && isDataClass(fieldTypeClass)) {
-                deps.add(fieldTypeClass)
-            }
-        }
-        return deps
-    }
-
-    private fun findFieldOrMethodUsedElements(element: PsiElement): List<PsiElement> {
-        val used = mutableListOf<PsiElement>()
-        PsiTreeUtil.processElements(element) { e ->
-            when (e) {
-                is PsiMethodCallExpression -> {
-                    e.resolveMethod()?.let { used.add(it) }
-                }
-
-                is PsiReferenceExpression -> {
-                    val resolved = e.resolve()
-                    if (resolved is PsiField) {
-                        used.add(resolved)
-                    }
-                }
-            }
-            true
-        }
-        return used
-    }
-
-    private fun resolveClassFromType(type: PsiType): PsiClass? {
-        return PsiUtil.resolveClassInType(type)
-    }
-
-    private fun isDataClass(element: PsiElement?): Boolean {
-        if (element !is PsiClass) return false
-
-        val methods = element.methods
-        val fields = element.fields
-
-        if (fields.isEmpty()) return false
-
-        val allMethodsAreGettersSettersOrStandard = methods.all {
-            ifGetterOrSetter(it) || it.isStandardClassMethod() || it.isConstructor
-        }
-
-        return allMethodsAreGettersSettersOrStandard
-    }
-
-    private fun ifGetterOrSetter(method: PsiMethod): Boolean {
-        val name = method.name
-        return (name.startsWith("get") && method.parameterList.parametersCount == 0 && method.returnType != PsiTypes.voidType()) ||
-                (name.startsWith("set") && method.parameterList.parametersCount == 1 && method.returnType == PsiTypes.voidType())
-    }
-
-    private fun PsiMethod.isStandardClassMethod(): Boolean {
-        return when (this.name) {
-            "equals", "hashCode", "toString", "canEqual" -> true
-            else -> false
-        }
-    }
-
     fun addClass(psiClass: PsiClass, selected: Boolean) {
         if (!isClassInAddedClasses(psiClass)) {
             val expandedPaths = getExpandedPaths()
             val node = CheckboxTreeNode(psiClass.name ?: "Unnamed Class")
             node.isChecked = selected // 根据需要设置初始选中状态
 
-            if (!isDataClass(psiClass)) {
+            if (!PsiUtils.isDataClass(psiClass)) {
                 psiClass.methods.forEach { method ->
                     if (!ifGetterOrSetter(method) && !method.isStandardClassMethod()) {
                         val methodNode = CheckboxTreeNode(method.name ?: "Unnamed Method")
@@ -618,5 +471,132 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         }
 
         return selectedClasses.toList()
+    }
+
+    companion object {
+        fun analyzeMethodDependencies(
+            method: PsiMethod,
+            currentClass: PsiClass,
+            classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+        ) {
+            val classInfo = classGraph.getOrPut(currentClass) { ClassDependencyInfo() }
+            if (classInfo.usedMethods.contains(method)) {
+                return
+            }
+            classInfo.markMethodUsed(method)
+            findFieldOrMethodUsedElements(method, classGraph)
+        }
+
+        fun findFieldOrMethodUsedElements(element: PsiElement, classGraph: MutableMap<PsiClass, ClassDependencyInfo>) {
+            PsiTreeUtil.processElements(element) { e ->
+                when (e) {
+                    is PsiMethodCallExpression -> {
+                        val psiMethod = e.resolveMethod()
+                        val depClass = psiMethod?.containingClass ?: return@processElements true
+                        // 检查类文件是否是项目文件
+                        val virtualFile = depClass.containingFile?.virtualFile
+                        if (virtualFile != null &&
+                            PsiUtils.ifProjectFile(depClass.project, virtualFile) &&
+                            !PsiUtils.isDataClass(depClass)) {  // 添加检查
+                            analyzeMethodDependencies(psiMethod, depClass, classGraph)
+                        }
+                    }
+                    is PsiReferenceExpression -> {
+                        val resolved = e.resolve()
+                        if (resolved is PsiField) {
+                            val depClass = resolved.containingClass
+                            // 检查类文件是否是项目文件
+                            val virtualFile = depClass?.containingFile?.virtualFile
+                            if (virtualFile != null &&
+                                PsiUtils.ifProjectFile(depClass.project, virtualFile) &&
+                                !PsiUtils.isDataClass(depClass)) {  // 添加检查
+                                analyzeFieldDependencies(resolved, depClass, classGraph)
+                            }
+                        }
+                    }
+                    is PsiTypeElement -> {
+                        // 处理显式类型声明
+                        val typeClass = resolveClassFromType(e.type)
+                        if (typeClass != null) {
+                            // 检查类文件是否是项目文件
+                            val virtualFile = typeClass.containingFile?.virtualFile
+                            if (virtualFile != null &&
+                                PsiUtils.ifProjectFile(typeClass.project, virtualFile) &&
+                                PsiUtils.isDataClass(typeClass)) {
+                                analyzeDataClass(typeClass, classGraph)
+                            }
+                        }
+                    }
+                }
+                true
+            }
+        }
+
+        fun analyzeFieldDependencies(
+            field: PsiField,
+            containingClass: PsiClass,
+            classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+        ) {
+            val classInfo = classGraph.getOrPut(containingClass) { ClassDependencyInfo() }
+            if (classInfo.usedFields.contains(field)) {
+                return
+            }
+            classInfo.markFieldUsed(field)
+            findFieldOrMethodUsedElements(field, classGraph);
+        }
+
+        fun resolveClassFromType(type: PsiType): PsiClass? {
+            return PsiUtil.resolveClassInType(type)
+        }
+
+        fun ifGetterOrSetter(method: PsiMethod): Boolean {
+            val name = method.name
+            return (
+                    // getter 判断：以 get 开头或 is 开头（boolean 类型）
+                    ((name.startsWith("get") || name.startsWith("is")) &&
+                            method.parameterList.parametersCount == 0 &&
+                            method.returnType != PsiTypes.voidType()) ||
+                            // setter 判断
+                            (name.startsWith("set") &&
+                                    method.parameterList.parametersCount == 1 &&
+                                    method.returnType == PsiTypes.voidType())
+                    )
+        }
+
+        fun PsiMethod.isStandardClassMethod(): Boolean {
+            return when (this.name) {
+                "equals", "hashCode", "toString", "canEqual" -> true
+                else -> false
+            }
+        }
+
+        fun analyzeDataClass(
+            psiClass: PsiClass,
+            classGraph: MutableMap<PsiClass, ClassDependencyInfo>
+        ) {
+            // 如果已经分析过这个类，直接返回
+            if (classGraph[psiClass] != null) {
+                return
+            }
+
+            classGraph.getOrPut(psiClass) { ClassDependencyInfo(isDataClass = true) }
+            // 处理整个类中的所有元素
+            PsiTreeUtil.processElements(psiClass) { element ->
+                when (element) {
+                    is PsiTypeElement -> {
+                        val typeClass = resolveClassFromType(element.type)
+                        if (typeClass != null) {
+                            val virtualFile = typeClass.containingFile?.virtualFile
+                            if (virtualFile != null && PsiUtils.ifProjectFile(typeClass.project, virtualFile)) {
+                                if (PsiUtils.isDataClass(typeClass)) {
+                                    analyzeDataClass(typeClass, classGraph)
+                                }
+                            }
+                        }
+                    }
+                }
+                true
+            }
+        }
     }
 }

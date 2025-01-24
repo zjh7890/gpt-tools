@@ -117,6 +117,14 @@
             <add-to-group group-id="ProjectViewPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
         </action>
 
+        <action id="GptTools.AnalyzeMethodDependencies"
+                class="com.github.zjh7890.gpttools.actions.AnalyzeMethodDependenciesAction"
+                text="Analyze And Add Method Dependencies"
+                description="Analyze method dependencies and add to current session"
+                icon="/icons/icon_16px.svg">
+            <add-to-group group-id="EditorPopupMenu" relative-to-action="PromptGeneratorGroup" anchor="after"/>
+        </action>
+
         <action id="ConvertToMermaid"
                 class="com.github.zjh7890.gpttools.actions.ConvertToMermaidAction"
                 text="ConvertToMermaid"

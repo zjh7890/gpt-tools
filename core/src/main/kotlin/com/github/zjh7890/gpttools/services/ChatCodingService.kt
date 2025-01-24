@@ -121,7 +121,7 @@ class ChatCodingService(val project: Project) : Disposable {
             val fileContents = sessionManager.getCurrentSession().appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
 """
 === Project: ${projectFileTree.projectName} ===
-${collectFileContents(projectFileTree.files, project).joinToString("\n")}
+${collectFileContents(projectFileTree.files, project).joinToString("\n\n")}
 """.trimIndent()
             }
             contextBuilder.append(FileUtil.wrapBorder(fileContents))
@@ -154,7 +154,7 @@ ${collectFileContents(projectFileTree.files, project).joinToString("\n")}
          */
         fun collectFileContents(files: List<ProjectFile>, project: Project): List<String> {
             return files.mapNotNull { projectFile ->
-                val virtualFile = project.baseDir.findFileByRelativePath(projectFile.filePath) ?: return@mapNotNull null
+                val virtualFile = projectFile.virtualFile
 
                 // 如果用户配置了 whole = true，说明整文件都要
                 if (projectFile.whole) {
@@ -202,7 +202,7 @@ ${collectFileContents(projectFileTree.files, project).joinToString("\n")}
                         // 此处只调用一次 depsInSingleFile，把当前文件内的所有类和方法一并传入
                         val fileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
                         if (!fileContent.isNullOrBlank()) {
-                            fileContent.trim()
+                            FileUtil.wrapBorder(fileContent.trim())
                         } else {
                             null
                         }

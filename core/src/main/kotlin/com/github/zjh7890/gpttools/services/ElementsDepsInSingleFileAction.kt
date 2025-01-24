@@ -402,7 +402,7 @@ class ElementsDepsInSingleFileAction : AnAction() {
                         }
                         else -> {
                             // 删除其他不相关的元素
-                            child.delete()
+//                            child.delete()
                         }
                     }
                 }

@@ -4,6 +4,7 @@ import com.github.zjh7890.gpttools.llm.ChatMessage
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.utils.FileUtil
+import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -261,7 +262,7 @@ data class SerializableProjectFileTree(
 // “项目文件”
 // ----------------------------
 data class ProjectFile(
-    val filePath: String = "",            // 相对项目根目录路径
+    val filePath: String = "",            // 1. 相对项目根目录路径
     val virtualFile: VirtualFile,
     val psiFile: PsiFile?,
     val classes: MutableList<ProjectClass> = mutableListOf(),
@@ -473,7 +474,7 @@ data class ProjectMethod(
 
 @Serializable
 data class SerializableProjectMethod(
-    val methodName: String,
+    val methodName: String = "",
     val parameterTypes: List<String> = emptyList()
 ) {
     /**
