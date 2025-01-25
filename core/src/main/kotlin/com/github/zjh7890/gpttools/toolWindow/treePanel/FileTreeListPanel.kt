@@ -4,7 +4,6 @@ package com.github.zjh7890.gpttools.toolWindow.treePanel
 
 import com.github.zjh7890.gpttools.services.*
 import com.github.zjh7890.gpttools.utils.ClipboardUtils
-import com.github.zjh7890.gpttools.utils.DependencyUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.application.ApplicationManager
@@ -102,7 +101,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
 
             // 更新 DependenciesTreePanel
             ApplicationManager.getApplication().invokeLater {
-                dependenciesTreePanel.updateDependencies(DependencyUtils.buildAppFileTreeFromClassGraph(classDependencyGraph))
+                dependenciesTreePanel.updateDependencies(AppFileTree.buildAppFileTreeFromClassGraph(classDependencyGraph))
                 (tree.model as DefaultTreeModel).reload(root)
                 expandDefaultNodes()
                 onComplete()

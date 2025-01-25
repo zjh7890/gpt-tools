@@ -3,13 +3,13 @@ package com.github.zjh7890.gpttools.agent
 import com.github.zjh7890.gpttools.LLMCoroutineScope
 import com.github.zjh7890.gpttools.llm.LlmConfig
 import com.github.zjh7890.gpttools.llm.LlmProvider
+import com.github.zjh7890.gpttools.services.AppFileTree
 import com.github.zjh7890.gpttools.services.ChatCodingService
 import com.github.zjh7890.gpttools.services.ChatContextMessage
 import com.github.zjh7890.gpttools.services.ChatSession
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.chat.MessageView
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatPanel
-import com.github.zjh7890.gpttools.utils.DependencyUtils
 import com.github.zjh7890.gpttools.utils.FileUtil
 import com.github.zjh7890.gpttools.utils.JsonUtils
 import com.intellij.openapi.application.ApplicationManager
@@ -43,7 +43,7 @@ object GenerateDiffAgent {
         var fileContent = "No files."
         val appFileTree = currentSession.appFileTree
         if (appFileTree.projectFileTrees.isNotEmpty()) {
-            fileContent = DependencyUtils.generateDependenciesTextCombined(appFileTree)
+            fileContent = AppFileTree.generateDependenciesTextCombined(appFileTree)
 
             chatSession.add(
                 ChatContextMessage(

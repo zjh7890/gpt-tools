@@ -150,6 +150,34 @@ class SessionManager(private val project: Project) : Disposable {
         notifyAllFileTreePanels(currentSession)
     }
 
+    fun removeSelectedNodesFromCurrentSession(selectedNodes: List<Any>) {
+        val appFileTree = currentSession.appFileTree
+
+        // 先分类
+        val methodList = mutableListOf<ProjectMethod>()
+        val classList = mutableListOf<ProjectClass>()
+        val fileList = mutableListOf<VirtualFile>()
+
+        selectedNodes.forEach { node ->
+            when (node) {
+                is ProjectMethod -> methodList.add(node)
+                is ProjectClass -> classList.add(node)
+                is VirtualFile -> fileList.add(node)
+                // 如果还要支持移除“包”/“模块”/“MavenDependency”，可在此增加分支
+            }
+        }
+
+        // 依次移除
+        fileList.forEach { file -> appFileTree.removeFile(file, project) }
+        classList.forEach { cls -> appFileTree.removeClass(cls, project) }
+        methodList.forEach { m -> appFileTree.removeMethod(m, project) }
+
+        // 移除完毕后，保存 & 刷新
+        saveSessions()
+        notifyAllFileTreePanels(currentSession)
+    }
+
+
     /**
      * 通知所有项目的 fileTreePanel 更新文件树
      */

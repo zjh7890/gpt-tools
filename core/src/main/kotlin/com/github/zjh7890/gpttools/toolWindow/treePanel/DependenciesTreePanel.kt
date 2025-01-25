@@ -5,6 +5,7 @@ package com.github.zjh7890.gpttools.toolWindow.treePanel
 import com.github.zjh7890.gpttools.services.AppFileTree
 import com.github.zjh7890.gpttools.services.ProjectClass
 import com.github.zjh7890.gpttools.services.ProjectMethod
+import com.github.zjh7890.gpttools.services.SessionManager
 import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
@@ -27,7 +28,7 @@ import javax.swing.tree.DefaultTreeCellRenderer
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
-class DependenciesTreePanel(private val project: Project) : JPanel() {
+class DependenciesTreePanel(val project: Project) : JPanel() {
     val root = DefaultMutableTreeNode("Dependencies")
     val tree = Tree(root)
     private val addedDependencies = mutableSetOf<PsiClass>()
@@ -51,15 +52,9 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         tree.showsRootHandles = true
         tree.cellRenderer = CheckboxTreeCellRenderer()
 
-        // 创建 Action
-        val refreshAction = object : AnAction("Refresh", "Refresh file tree", null) {
-            override fun actionPerformed(e: AnActionEvent) {
-            }
-        }
-
-        // 创建 ActionGroup
         val actionGroup = DefaultActionGroup().apply {
-            add(refreshAction)
+            add(RemoveSelectedNodesAction(this@DependenciesTreePanel))
+            // 其他 Action ...
         }
 
         // 创建 toolbar
@@ -72,9 +67,6 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 
         // 添加 toolbar 到面板顶部
         add(toolbar.component, BorderLayout.NORTH)
-
-
-
         val scrollPane = JScrollPane(tree)
 
         // 默认显示树面板
@@ -398,3 +390,42 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
     }
 }
 
+
+class RemoveSelectedNodesAction(
+    private val dependenciesPanel: DependenciesTreePanel
+) : AnAction(
+    "Remove Selected", 
+    "Remove the selected nodes from session", 
+    com.intellij.icons.AllIcons.General.Remove  // 添加删除图标
+) {
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = dependenciesPanel.project
+        val tree = dependenciesPanel.tree
+
+        // 获取所有选中的 TreePath
+        val selectionPaths = tree.selectionPaths ?: return
+
+        // 准备一个列表装“待移除对象”
+        val selectedObjects = mutableListOf<Any>()
+
+        // 遍历选中的每一个节点
+        for (path in selectionPaths) {
+            val node = path.lastPathComponent as? DefaultMutableTreeNode ?: continue
+            val userObject = node.userObject
+            // 根据前面设计，如果 userObject 是 ProjectMethod、ProjectClass、ProjectFile、VirtualFile 等，收集起来
+            when (userObject) {
+                is ProjectMethod -> selectedObjects.add(userObject)
+                is ProjectClass -> selectedObjects.add(userObject)
+                // 如果你在构造树节点时是用 ProjectFile 作为 userObject，也可以这样做:
+                // is ProjectFile -> selectedObjects.add(userObject.virtualFile)
+                // 或者如果直接存了 VirtualFile：
+                // is VirtualFile -> selectedObjects.add(userObject)
+            }
+        }
+
+        // 调用 SessionManager 移除
+        val sessionManager = SessionManager.getInstance(project)
+        sessionManager.removeSelectedNodesFromCurrentSession(selectedObjects)
+    }
+}

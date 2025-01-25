@@ -1,0 +1,1051 @@
+package com.github.zjh7890.gpttools.services
+
+import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
+import com.github.zjh7890.gpttools.toolWindow.treePanel.MavenDependencyId
+import com.github.zjh7890.gpttools.utils.FileUtil
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.*
+import com.intellij.psi.util.PsiTreeUtil
+import kotlinx.serialization.Serializable
+
+/**
+ * @Date: 2025/1/25 15:26
+ */
+// ----------------------------
+// 文件理解：
+// 当某个 ProjectFile 标记为 whole=true 时，表示“整文件都包含”。这时，file.classes 为空，因为不再需要按类或方法的粒度来记录任何信息。如果要只移除其中的某个类或方法，则必须先把该 ProjectFile 从 whole=true 降级为 whole=false，再去填充它的 classes 列表（把该文件中的所有类都扫描进来），接着针对要移除的目标进行删除。
+//
+//同理，当某个 ProjectClass 标记为 whole=true 时，表示“这个类全部使用”。此时 class.methods 为空，因为不需要记录具体方法。如果要移除其中的某些方法，需要先把这个 ProjectClass 从 whole=true 降级为 whole=false，然后把该类中的所有方法都加到 methods 列表里，再删除要移除的方法。
+//
+//只有在对象是 “部分使用” 状态 (whole=false) 时，才会在它的 classes、methods 等列表中存放更细粒度的记录，以方便针对其中的某些元素做添加或移除。
+//
+//如果要完全移除一个“whole”的文件/类，那就无需降级为 partial，直接在上层数据结构把它从列表中删除即可，因为它表示“整个文件/类”的引用都不需要了。
+//
+//也就是说，「移除逻辑」里需要区别对待：
+//
+//整对象（整文件/整类）被移除：如果它是 whole=true，可以直接删掉这个文件或类节点；如果是 whole=false，同样可以删掉对应对象在列表里的记录。
+//部分子级（文件里的一部分类，类里的一部分方法）被移除：如果父级是 whole=true，得先降级(whole=false)并初始化具体子元素，再删去想要删除的那部分；如果父级本来就是 whole=false，直接在其子列表中删除相应的节点就行。
+//因此，需要在各个层级（ProjectFile、ProjectClass 等）里适当地实现（或修改现有的）removeXxx 方法，以涵盖上述处理“whole” 与 “partial” 两种状态的逻辑。这样才能在使用“remove...”时保证数据结构与实际含义同步。
+// ----------------------------
+data class AppFileTree(
+    val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf()
+) {
+    fun toSerializable(): SerializableAppFileTree {
+        return SerializableAppFileTree(
+            projectTrees = projectFileTrees.map { it.toSerializable() }
+        )
+    }
+
+
+    /**
+     * 将指定文件加入到 AppFileTree
+     * - 若是本地文件，则按照 module -> package -> file 进行挂载
+     * - 若是外部依赖 (.m2/repository/... )，则解析 groupId:artifactId:version 并挂载到 mavenDependencies
+     * - 仅完成结构挂载，不做额外解析（如类、方法）
+     */
+    fun addFile(file: VirtualFile, project: Project) {
+        // 1. 找到或创建当前 Project 对应的 projectFileTree
+        val pft = findOrCreateProjectFileTree(this, project)
+
+        // 2. 判断本地 or 外部依赖
+        val projectPath = project.basePath ?: ""
+        val isExternal = !file.path.startsWith(projectPath)
+
+        if (!isExternal) {
+            // ------- 本地文件 -------
+            // (1) 获取 moduleDependency
+            val moduleName = getModuleName(file, project)
+            val moduleDep = findOrCreateModule(pft.modules, moduleName)
+
+            // (2) 获取 packageDependency
+            val psiFile = PsiManager.getInstance(project).findFile(file)
+            val packageName = getPackageName(psiFile)
+            val packageDep = findOrCreatePackage(moduleDep.packages, packageName)
+
+            // (3) 找 / 创建 ProjectFile
+            findOrCreateProjectFile(packageDep.files, file, project, isMaven = false, whole = true)
+
+        } else {
+            // ------- 外部依赖文件 -------
+            // (1) 解析 maven groupId/artifactId/version
+            val mavenInfo = extractMavenInfo(file.path) ?: return
+            val mavenDep = findOrCreateMavenDependency(
+                pft.mavenDependencies,
+                mavenInfo.groupId,
+                mavenInfo.artifactId,
+                mavenInfo.version
+            )
+
+            // (2) 获取 packageDependency
+            val psiFile = PsiManager.getInstance(project).findFile(file)
+            val packageName = getPackageName(psiFile)
+            val packageDep = findOrCreatePackage(mavenDep.packages, packageName)
+
+            // (3) 找 / 创建 ProjectFile
+            findOrCreateProjectFile(packageDep.files, file, project, isMaven = true, whole = true)
+        }
+    }
+
+    /**
+     * 将指定 PsiMethod 加入到 AppFileTree。
+     * - 首先调用 addFile 把所在文件挂载到结构里
+     * - 然后在对应的 ProjectFile 下找 / 建对应的 ProjectClass
+     * - 将该 psiMethod 转为 ProjectMethod 并加入
+     */
+    fun addMethod(psiMethod: PsiMethod, project: Project) {
+        // 1. 先保证所在文件已加入
+        val containingFile = psiMethod.containingFile?.virtualFile ?: return
+        addFile(containingFile, project)
+
+        // 2. 找到或创建 projectFileTree
+        val pft = findOrCreateProjectFileTree(this, project)
+
+        // 3. 判断本地 or 外部
+        val projectPath = project.basePath ?: ""
+        val isExternal = !containingFile.path.startsWith(projectPath)
+
+        // 4. 找到对应的 [PackageDependency] -> [ProjectFile]
+        val (packageDep, projectFile) = if (!isExternal) {
+            val moduleName = getModuleName(containingFile, project)
+            val moduleDep = findOrCreateModule(pft.modules, moduleName)
+
+            val psiFile = PsiManager.getInstance(project).findFile(containingFile)
+            val packageName = getPackageName(psiFile)
+            val pkgDep = findOrCreatePackage(moduleDep.packages, packageName)
+            val projFile = findOrCreateProjectFile(pkgDep.files, containingFile, project, false)
+            pkgDep to projFile
+        } else {
+            val mavenInfo = extractMavenInfo(containingFile.path) ?: return
+            val mavenDep = findOrCreateMavenDependency(
+                pft.mavenDependencies,
+                mavenInfo.groupId,
+                mavenInfo.artifactId,
+                mavenInfo.version
+            )
+            val psiFile = PsiManager.getInstance(project).findFile(containingFile)
+            val packageName = getPackageName(psiFile)
+            val pkgDep = findOrCreatePackage(mavenDep.packages, packageName)
+            val projFile = findOrCreateProjectFile(pkgDep.files, containingFile, project, true)
+            pkgDep to projFile
+        }
+
+        // 5. 找 / 建 ProjectClass
+        val psiClass = psiMethod.containingClass ?: return
+        val className = psiClass.name ?: return
+
+        // 看当前 file 里是否已有这个类
+        val existingClass = projectFile.classes.find { it.className == className }
+        val projectClass = if (existingClass != null) {
+            existingClass
+        } else {
+            // 新建
+            val newCls = ProjectClass(
+                className = className,
+                psiClass = psiClass,
+                methods = mutableListOf(),
+                whole = false
+            )
+            projectFile.classes.add(newCls)
+            newCls
+        }
+
+        // 6. 将该 psiMethod 加到 projectClass.methods
+        val paramTypes = psiMethod.parameterList.parameters.map { it.type.canonicalText }
+        val existMethod = projectClass.methods.find {
+            it.methodName == psiMethod.name && it.parameterTypes == paramTypes
+        }
+        if (existMethod == null) {
+            projectClass.methods.add(
+                ProjectMethod(
+                    methodName = psiMethod.name,
+                    parameterTypes = paramTypes,
+                    psiMethod = psiMethod
+                )
+            )
+        }
+    }
+
+    fun removeFile(file: VirtualFile, project: Project) {
+        // 找到所在的 ProjectFileTree
+        val pft = findOrCreateProjectFileTree(this, project)
+
+        // 1. 判断本地 or 外部依赖
+        val projectPath = project.basePath ?: ""
+        val isExternal = !file.path.startsWith(projectPath)
+
+        if (!isExternal) {
+            // 去本地 modules 里寻找
+            val moduleName = getModuleName(file, project)
+            val moduleDep = pft.modules.find { it.moduleName == moduleName } ?: return
+
+            // 尝试在所有 packageDependency 里移除对应的 ProjectFile
+            moduleDep.packages.forEach { pkg ->
+                pkg.files.removeAll { it.virtualFile == file }
+            }
+            // 也可以根据需要，如果 pkg.files 为空时，pkg 也一并移除
+            moduleDep.packages.removeAll { it.files.isEmpty() }
+            // 如果 moduleDep.packages 为空，则也可以选择把整个 moduleDep 移除
+            pft.modules.removeAll { it.packages.isEmpty() }
+        } else {
+            // 去 mavenDependencies 里找
+            val mavenInfo = extractMavenInfo(file.path) ?: return
+            val mavenDep = pft.mavenDependencies.find {
+                it.groupId == mavenInfo.groupId &&
+                        it.artifactId == mavenInfo.artifactId &&
+                        it.version == mavenInfo.version
+            } ?: return
+
+            mavenDep.packages.forEach { pkg ->
+                pkg.files.removeAll { it.virtualFile == file }
+            }
+            mavenDep.packages.removeAll { it.files.isEmpty() }
+            pft.mavenDependencies.removeAll { it.packages.isEmpty() }
+        }
+    }
+
+    fun removeClass(projectClass: ProjectClass, project: Project) {
+        // 通过 projectClass.psiClass 找到所在文件
+        val containingFile = projectClass.psiClass.containingFile?.virtualFile ?: return
+        val pft = findOrCreateProjectFileTree(this, project)
+
+        // 判断本地 or 外部依赖
+        val projectPath = project.basePath ?: ""
+        val isExternal = !containingFile.path.startsWith(projectPath)
+
+        // 找到对应的 ProjectFile，然后调用其 removeClasses(...)
+        if (!isExternal) {
+            val moduleName = getModuleName(containingFile, project)
+            val moduleDep = pft.modules.find { it.moduleName == moduleName } ?: return
+            moduleDep.packages.forEach { pkg ->
+                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
+                targetFile.removeClasses(listOf(projectClass))
+            }
+        } else {
+            val mavenInfo = extractMavenInfo(containingFile.path) ?: return
+            val mavenDep = pft.mavenDependencies.find {
+                it.groupId == mavenInfo.groupId &&
+                        it.artifactId == mavenInfo.artifactId &&
+                        it.version == mavenInfo.version
+            } ?: return
+            mavenDep.packages.forEach { pkg ->
+                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
+                targetFile.removeClasses(listOf(projectClass))
+            }
+        }
+    }
+
+    fun removeMethod(projectMethod: ProjectMethod, project: Project) {
+        val containingFile = projectMethod.psiMethod.containingFile?.virtualFile ?: return
+        val pft = findOrCreateProjectFileTree(this, project)
+
+        // 判断本地 or 外部依赖
+        val projectPath = project.basePath ?: ""
+        val isExternal = !containingFile.path.startsWith(projectPath)
+
+        if (!isExternal) {
+            val moduleName = getModuleName(containingFile, project)
+            val moduleDep = pft.modules.find { it.moduleName == moduleName } ?: return
+            moduleDep.packages.forEach { pkg ->
+                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
+                // 找到所在的 projectClass
+                val realClass = targetFile.classes.find { it.className == projectMethod.psiMethod.containingClass?.name }
+                realClass?.removeMethods(listOf(projectMethod))
+            }
+        } else {
+            val mavenInfo = extractMavenInfo(containingFile.path) ?: return
+            val mavenDep = pft.mavenDependencies.find {
+                it.groupId == mavenInfo.groupId &&
+                        it.artifactId == mavenInfo.artifactId &&
+                        it.version == mavenInfo.version
+            } ?: return
+            mavenDep.packages.forEach { pkg ->
+                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
+                val realClass = targetFile.classes.find { it.className == projectMethod.psiMethod.containingClass?.name }
+                realClass?.removeMethods(listOf(projectMethod))
+            }
+        }
+    }
+
+
+    /**
+     * 轻量获取 moduleName：从 file 路径里截取项目路径后第一级目录名。
+     * 如果需要更精细的逻辑，可自定义或复用 DependencyUtils 的类似实现。
+     */
+    private fun getModuleName(file: VirtualFile, project: Project): String {
+        val basePath = project.basePath ?: return "UnknownModule"
+        val relPath = file.path.removePrefix(basePath).removePrefix("/")
+        return relPath.split("/").firstOrNull() ?: "UnknownModule"
+    }
+
+    /**
+     * 猜测包名。若是 Java 文件则可直接用其 packageName，否则返回 (default package)。
+     * 可视需要抽用 DependencyUtils 的其他逻辑。
+     */
+    private fun getPackageName(psiFile: PsiFile?): String {
+        return if (psiFile is PsiJavaFile) {
+            psiFile.packageName.ifBlank { "(default package)" }
+        } else {
+            "(default package)"
+        }
+    }
+
+    companion object {
+
+        /**
+         * 将 classDependencyGraph 转换为 AppFileTree
+         */
+        fun buildAppFileTreeFromClassGraph(
+            classDependencyGraph: Map<PsiClass, ClassDependencyInfo>
+        ): AppFileTree {
+            // 以 Project 为粒度分组
+            val projectFileTreeMap = mutableMapOf<Project, ProjectFileTree>()
+
+            for ((psiClass, dependencyInfo) in classDependencyGraph) {
+                val vFile = psiClass.containingFile?.virtualFile ?: continue
+                val project = psiClass.project
+
+                // 先拿到或创建对应的 ProjectFileTree
+                val projectFileTree = projectFileTreeMap.getOrPut(project) {
+                    ProjectFileTree(
+                        project = project,
+                        // 注意，这里不再直接把所有文件都塞进 fileTree，
+                        // 而是使用 modules 和 mavenDependencies 两个列表
+                        modules = mutableListOf(),
+                        mavenDependencies = mutableListOf()
+                    )
+                }
+
+                // 判断是否是外部依赖
+                val projectPath = project.basePath ?: ""
+                val isExternal = !vFile.path.startsWith(projectPath)
+
+                if (!isExternal) {
+                    // 本地依赖 → 找到或创建对应的 module
+                    val moduleName = getModuleName(project, psiClass)
+                    val moduleDependency = findOrCreateModule(projectFileTree.modules, moduleName)
+
+                    // 找到或创建对应的 packageDependency
+                    val packageName = psiClass.qualifiedName
+                        ?.substringBeforeLast('.')
+                        ?: "(default package)"
+                    val packageDependency = findOrCreatePackage(moduleDependency.packages, packageName)
+
+                    // 找到或创建 ProjectFile
+                    val projectFile = findOrCreateProjectFile(packageDependency.files, vFile, project)
+
+                    // 最后将当前 psiClass + usedMethods 放进 projectFile.classes
+                    fillProjectClassAndMethods(projectFile, psiClass, dependencyInfo)
+                } else {
+                    // 外部依赖 → 解析 maven info
+                    val mavenInfo = extractMavenInfo(vFile.path)
+                    if (mavenInfo != null) {
+                        val mavenDependency = findOrCreateMavenDependency(
+                            projectFileTree.mavenDependencies,
+                            mavenInfo.groupId,
+                            mavenInfo.artifactId,
+                            mavenInfo.version
+                        )
+                        // 包名
+                        val packageName = psiClass.qualifiedName
+                            ?.substringBeforeLast('.')
+                            ?: "(default package)"
+                        val packageDependency = findOrCreatePackage(mavenDependency.packages, packageName)
+                        val projectFile = findOrCreateProjectFile(packageDependency.files, vFile, project, isMaven = true)
+
+                        fillProjectClassAndMethods(projectFile, psiClass, dependencyInfo)
+                    }
+                }
+            }
+
+            // 若某个文件里所有类均被整类使用，则设置该文件为 whole
+            projectFileTreeMap.values.forEach { projectFileTree ->
+                projectFileTree.modules.forEach { module ->
+                    module.packages.forEach { pkg ->
+                        pkg.files.forEach { file ->
+                            if (file.classes.isNotEmpty() && file.classes.all { it.whole }) {
+                                file.whole = true
+                                file.classes.clear()
+                            }
+                        }
+                    }
+                }
+                projectFileTree.mavenDependencies.forEach { mdep ->
+                    mdep.packages.forEach { pkg ->
+                        pkg.files.forEach { file ->
+                            if (file.classes.isNotEmpty() && file.classes.all { it.whole }) {
+                                file.whole = true
+                                file.classes.clear()
+                            }
+                        }
+                    }
+                }
+            }
+
+            return AppFileTree(
+                projectFileTrees = projectFileTreeMap.values.toMutableList()
+            )
+        }
+
+        /**
+         * 根据 DependenciesTreePanel 原先的逻辑，把外部依赖 jar 路径解析出 groupId, artifactId, version
+         */
+        fun extractMavenInfo(path: String): MavenDependencyId? {
+            val regex = ".*/repository/(.+)/([^/]+)/([^/]+)/([^/]+)\\.jar!/.*".toRegex()
+            val matchResult = regex.find(path) ?: return null
+            return try {
+                val (groupIdPath, artifactId, version, _) = matchResult.destructured
+                MavenDependencyId(
+                    groupId = groupIdPath.replace('/', '.'),
+                    artifactId = artifactId,
+                    version = version
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        /**
+         * 根据文件相对路径(形如 /moduleA/src/...) 前缀来判断 module
+         */
+        fun getModuleName(project: Project, cls: PsiClass): String {
+            val vFile = cls.containingFile?.virtualFile ?: return "UnknownModule"
+            val basePath = project.basePath ?: return "UnknownModule"
+            val relativePath = vFile.path.removePrefix(basePath).removePrefix("/")
+            return relativePath.split("/").firstOrNull() ?: "UnknownModule"
+        }
+
+        /**
+         * 在 projectFileTrees 中找出对应的 ProjectFileTree；若无则新建。
+         */
+        fun findOrCreateProjectFileTree(appFileTree: AppFileTree, project: Project): ProjectFileTree {
+            val existing = appFileTree.projectFileTrees.find { it.project == project }
+            if (existing != null) return existing
+
+            val newPft = ProjectFileTree(
+                project = project,
+                modules = mutableListOf(),
+                mavenDependencies = mutableListOf()
+            )
+            appFileTree.projectFileTrees.add(newPft)
+            return newPft
+        }
+
+        fun findOrCreateModule(modules: MutableList<ModuleDependency>, moduleName: String): ModuleDependency {
+            return modules.find { it.moduleName == moduleName } ?: ModuleDependency(moduleName).also {
+                modules.add(it)
+            }
+        }
+
+        fun findOrCreateMavenDependency(
+            mavenDeps: MutableList<MavenDependency>,
+            groupId: String,
+            artifactId: String,
+            version: String
+        ): MavenDependency {
+            return mavenDeps.find {
+                it.groupId == groupId && it.artifactId == artifactId && it.version == version
+            } ?: MavenDependency(
+                groupId = groupId,
+                artifactId = artifactId,
+                version = version
+            ).also {
+                mavenDeps.add(it)
+            }
+        }
+
+        fun findOrCreatePackage(
+            packages: MutableList<PackageDependency>,
+            packageName: String
+        ): PackageDependency {
+            return packages.find { it.packageName == packageName } ?: PackageDependency(packageName).also {
+                packages.add(it)
+            }
+        }
+
+        fun findOrCreateProjectFile(
+            files: MutableList<ProjectFile>,
+            vFile: VirtualFile,
+            project: Project,
+            isMaven: Boolean = false,
+            whole: Boolean = false
+        ): ProjectFile {
+            // 计算 filePath
+            val basePath = project.basePath?.removeSuffix("/") ?: ""
+            val absolutePath = vFile.path
+            val relativePath = if (!isMaven) {
+                // 本地项目文件
+                absolutePath.removePrefix(basePath).removePrefix("/")
+            } else {
+                // 如果是 Maven 文件，可能要直接存绝对路径
+                // 或者你也可以存 jarPath + className
+                absolutePath
+            }
+
+            return files.find { it.filePath == relativePath } ?: run {
+                val psiFile = PsiManager.getInstance(project).findFile(vFile)
+                val newFile = ProjectFile(
+                    filePath = relativePath,
+                    virtualFile = vFile,
+                    psiFile = psiFile,
+                    classes = mutableListOf(),
+                    whole = whole
+                )
+                files.add(newFile)
+                newFile
+            }
+        }
+
+        /**
+         * 根据 dependencyInfo 里的 usedMethods，往一个 ProjectFile 里添加对应的 ProjectClass/ProjectMethod
+         * 并判断是否为 whole
+         */
+        fun fillProjectClassAndMethods(
+            projectFile: ProjectFile,
+            psiClass: PsiClass,
+            dependencyInfo: ClassDependencyInfo
+        ) {
+            val allMethods = psiClass.methods.filterNot { it.isConstructor }
+            val usedMethods = dependencyInfo.usedMethods.filterNot { it.isConstructor }
+
+            val projectMethods = usedMethods.map { usedMethod ->
+                ProjectMethod(
+                    methodName = usedMethod.name,
+                    parameterTypes = usedMethod.parameterList.parameters.map { p -> p.type.canonicalText },
+                    psiMethod = usedMethod
+                )
+            }.toMutableList()
+
+            val isWholeClass = allMethods.isNotEmpty() && allMethods.size == usedMethods.size
+
+            val projectClass = ProjectClass(
+                className = psiClass.name ?: "Unnamed",
+                psiClass = psiClass,
+                methods = projectMethods,
+                whole = isWholeClass
+            )
+            projectFile.classes.add(projectClass)
+        }
+
+        /**
+         * 将原先 generateDependenciesText 和 collectFileContents 的逻辑合并到一个函数中
+         */
+        fun generateDependenciesTextCombined(
+            appFileTree: AppFileTree
+        ): String {
+            // 针对每个 ProjectFileTree 生成文本，再用 joinToString 拼装
+            return appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
+                // 1) 整理 “本地 module” 的文件
+                val moduleFilesContents = projectFileTree.modules
+                    .flatMap { it.packages }
+                    .flatMap { it.files }
+                    .mapNotNull { projectFile ->
+                        handleSingleProjectFile(projectFile, projectFileTree.project)
+                    }
+
+                // 2) 整理 “mavenDependencies” 中的文件
+                val mavenFilesContents = projectFileTree.mavenDependencies
+                    .flatMap { it.packages }
+                    .flatMap { it.files }
+                    .mapNotNull { projectFile ->
+                        handleSingleProjectFile(projectFile, projectFileTree.project)
+                    }
+
+                // 合并两个来源的内容
+                val joinedFileContents = (moduleFilesContents + mavenFilesContents).joinToString("\n\n")
+                joinedFileContents
+            }
+        }
+
+        /**
+         * 单独提取一个函数，处理单个 ProjectFile 的逻辑
+         * 返回要拼接的字符串，若不需要则返回 null
+         */
+        private fun handleSingleProjectFile(
+            projectFile: ProjectFile,
+            project: Project
+        ): String? {
+            val virtualFile = projectFile.virtualFile
+            val absolutePath = virtualFile.path
+
+            val relativePath = calculateRelativePath(absolutePath, project, projectFile.ifMavenFile)
+            // 如果用户配置了 whole=true 则读取整文件内容
+            return if (projectFile.whole) {
+                return "${relativePath}\n" + FileUtil.readFileInfoForLLM(virtualFile)
+            } else {
+                // 收集需要处理的 PsiElement
+                val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
+                val elementsToProcess = mutableListOf<PsiElement>()
+
+                // 遍历用户指定的 Class/Method 信息
+                projectFile.classes.forEach { projectClass ->
+                    val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
+                        if (projectClass.whole) {
+                            // 如果需要整类，则用 qualifiedName 精确匹配
+                            it.qualifiedName == projectClass.className
+                        } else {
+                            // 否则只匹配类名
+                            it.name == projectClass.className
+                        }
+                    } ?: return@forEach
+
+                    if (projectClass.whole) {
+                        // 整类内容
+                        elementsToProcess.add(psiClass)
+                    } else {
+                        // 若只需要其中某些方法
+                        projectClass.methods.forEach { projectMethod ->
+                            val matchedMethod = psiClass
+                                .findMethodsByName(projectMethod.methodName, false)
+                                .find { method ->
+                                    val paramTypes = method.parameterList.parameters.map { it.type.canonicalText }
+                                    paramTypes == projectMethod.parameterTypes
+                                } ?: return@forEach
+
+                            elementsToProcess.add(matchedMethod)
+                        }
+                    }
+                }
+
+                // 将收集到的 PsiElement 调用 depsInSingleFile 生成内容
+                if (elementsToProcess.isNotEmpty()) {
+                    val singleFileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
+                    if (!singleFileContent.isNullOrBlank()) {
+                        "${relativePath}\n" + FileUtil.wrapBorder(singleFileContent.trim())
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            }
+        }
+
+        /**
+         * 计算文件的相对路径
+         * @param absolutePath 文件的绝对路径
+         * @param project 项目对象
+         * @param isMaven 是否是 Maven 依赖文件
+         * @return 相对路径（本地文件包含项目名称，jar包不包含）
+         */
+        private fun calculateRelativePath(
+            absolutePath: String,
+            project: Project,
+            isMaven: Boolean
+        ): String {
+            val basePath = project.basePath?.removeSuffix("/")
+            return if (isMaven) {
+                // Maven 依赖文件: 提取 jar 包名称及其后续路径
+                val regex = ".*/([^/]+\\.jar!/.*)".toRegex()
+                val matchResult = regex.find(absolutePath)
+                if (matchResult != null) {
+                    "/${matchResult.groupValues[1]}"
+                } else {
+                    absolutePath
+                }
+            } else {
+                // 本地项目文件: 添加项目名称前缀
+                val path = absolutePath.removePrefix(basePath ?: "").removePrefix("/")
+                "${project.name}/$path"
+            }
+        }
+    }
+}
+
+@Serializable
+data class SerializableAppFileTree(
+    val projectTrees: List<SerializableProjectFileTree> = emptyList()
+) {
+    /**
+     * 反序列化 -> 立即遍历所有文件/类/方法，找出对应 PSI 实例
+     * 使得后续使用时保证 psiClass / psiMethod 都不为空
+     */
+    fun toAppFileTree(): AppFileTree {
+        val realProjectFileTrees = projectTrees.map { it.toProjectFileTree() }.toMutableList()
+        return AppFileTree(projectFileTrees = realProjectFileTrees)
+    }
+}
+
+// ----------------------------
+// “项目文件树”
+// ----------------------------
+data class ProjectFileTree(
+    val project: Project,
+    val modules: MutableList<ModuleDependency> = mutableListOf(),
+    val mavenDependencies: MutableList<MavenDependency> = mutableListOf()
+) {
+    fun toSerializable(): SerializableProjectFileTree {
+        return SerializableProjectFileTree(
+            projectName = project.name,
+            modules = modules.map { it.toSerializable() },
+            mavenDependencies = mavenDependencies.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectFileTree(
+    val projectName: String = "",
+    val modules: List<SerializableModuleDependency> = emptyList(),
+    val mavenDependencies: List<SerializableMavenDependency> = emptyList()
+) {
+    fun toProjectFileTree(): ProjectFileTree {
+        // 获取对应的 Project 实例
+        val project = ProjectManager.getInstance().openProjects
+            .find { it.name == projectName }
+            ?: throw IllegalStateException("Cannot find project with name: $projectName")
+
+        return ProjectFileTree(
+            project = project,
+            modules = modules.map {
+                SerializableModuleDependency(
+                    moduleName = it.moduleName,
+                    packages = it.packages
+                ).toModuleDependency(project)
+            }.toMutableList(),
+            mavenDependencies = mavenDependencies.map {
+                SerializableMavenDependency(
+                    groupId = it.groupId,
+                    artifactId = it.artifactId,
+                    version = it.version,
+                    packages = it.packages
+                ).toMavenDependency(project)
+            }.toMutableList()
+        )
+    }
+}
+
+// [Module Name]
+data class ModuleDependency(
+    val moduleName: String,
+    val packages: MutableList<PackageDependency> = mutableListOf()
+) {
+    fun toSerializable(): SerializableModuleDependency {
+        return SerializableModuleDependency(
+            moduleName = moduleName,
+            packages = packages.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializableModuleDependency(
+    val moduleName: String,
+    val packages: List<SerializablePackageDependency> = emptyList()
+) {
+    fun toModuleDependency(project: Project): ModuleDependency {
+        return ModuleDependency(
+            moduleName = moduleName,
+            packages = packages.map { it.toPackageDependency(project) }.toMutableList()
+        )
+    }
+}
+
+// Maven Dependencies
+data class MavenDependency(
+    val groupId: String,
+    val artifactId: String,
+    val version: String,
+    val packages: MutableList<PackageDependency> = mutableListOf()
+) {
+    fun toSerializable(): SerializableMavenDependency {
+        return SerializableMavenDependency(
+            groupId = groupId,
+            artifactId = artifactId,
+            version = version,
+            packages = packages.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializableMavenDependency(
+    val groupId: String,
+    val artifactId: String,
+    val version: String,
+    val packages: List<SerializablePackageDependency> = emptyList()
+){
+    fun toMavenDependency(project: Project): MavenDependency {
+        return MavenDependency(
+            groupId = groupId,
+            artifactId = artifactId,
+            version = version,
+            packages = packages.map { it.toPackageDependency(project) }.toMutableList()
+        )
+    }
+}
+
+// [Package Name]
+data class PackageDependency(
+    val packageName: String,
+    val files: MutableList<ProjectFile> = mutableListOf()
+) {
+    fun toSerializable(): SerializablePackageDependency {
+        return SerializablePackageDependency(
+            packageName = packageName,
+            files = files.map { it.toSerializable() }
+        )
+    }
+}
+
+@Serializable
+data class SerializablePackageDependency(
+    val packageName: String,
+    val files: List<SerializableProjectFile> = emptyList()
+) {
+    fun toPackageDependency(project: Project): PackageDependency {
+        return PackageDependency(
+            packageName = packageName,
+            files = files.map { it.toProjectFile(project) }.toMutableList()
+        )
+    }
+}
+
+// ----------------------------
+// “项目文件”
+// ----------------------------
+data class ProjectFile(
+    val filePath: String = "",            // 1. 相对项目根目录路径
+    val virtualFile: VirtualFile,
+    val ifMavenFile: Boolean = false,
+    val psiFile: PsiFile?,
+    val classes: MutableList<ProjectClass> = mutableListOf(),
+    var whole: Boolean = false
+) {
+    fun toSerializable(): SerializableProjectFile {
+        return SerializableProjectFile(
+            filePath = filePath,
+            classes = classes.map { it.toSerializable() },
+            whole = whole
+        )
+    }
+
+    // 获取当前有效的 Classes
+    fun getCurrentClasses(): List<ProjectClass> {
+        return if (whole) {
+            // 如果是 whole，返回文件中所有类
+            psiFile.let {
+                PsiTreeUtil.findChildrenOfType(it, PsiClass::class.java).map { psiClass ->
+                    ProjectClass(
+                        className = psiClass.name ?: "",
+                        psiClass = psiClass,
+                        methods = mutableListOf(),
+                        whole = true
+                    )
+                }
+            }
+        } else {
+            // 否则返回指定的类列表
+            classes
+        }
+    }
+
+    fun removeClasses(classesToRemove: List<ProjectClass>) {
+        if (whole) {
+            // 如果是 whole，需要把 whole 改为 false，并添加除了要移除的类之外的所有类
+            whole = false
+            classes.clear()
+
+            psiFile.let {
+                PsiTreeUtil.findChildrenOfType(it, PsiClass::class.java).forEach { psiClass ->
+                    // 检查当前类是否在要移除的列表中
+                    val shouldKeep = !classesToRemove.any { it.className == psiClass.name }
+
+                    if (shouldKeep) {
+                        classes.add(ProjectClass(
+                            className = psiClass.name ?: "",
+                            psiClass = psiClass,
+                            methods = mutableListOf(),
+                            whole = true
+                        ))
+                    }
+                }
+            }
+        } else {
+            // 如果不是 whole，直接从 classes 列表中移除指定的类
+            classes.removeAll { projectClass ->
+                classesToRemove.any { it.className == projectClass.className }
+            }
+        }
+    }
+}
+
+@Serializable
+data class SerializableProjectFile(
+    val filePath: String = "",
+    val ifMavenFile: Boolean = false,
+    val classes: List<SerializableProjectClass>? = null,
+    val whole: Boolean = false
+) {
+    fun toProjectFile(project: Project): ProjectFile {
+        val vFile: VirtualFile
+        if (!ifMavenFile) {
+            vFile = project.baseDir.findFileByRelativePath(filePath)
+                ?: throw IllegalStateException("Cannot find filePath=$filePath in project=${project.name}")
+        } else {
+            vFile = LocalFileSystem.getInstance().findFileByPath(filePath)!!
+        }
+
+        val psiFile = PsiManager.getInstance(project).findFile(vFile)
+
+        // 如果是 whole，就不需要转换具体的类
+        val realClasses = if (whole) {
+            mutableListOf()
+        } else {
+            // 只有当文件是 Java/Kotlin/Scala 等支持类的文件时才处理类
+            when {
+                psiFile is PsiJavaFile ||
+                        psiFile?.fileType?.name?.contains("KOTLIN") == true ||
+                        psiFile?.fileType?.name?.contains("SCALA") == true -> {
+                    classes?.map { it.toProjectClass(psiFile) }?.toMutableList() ?: mutableListOf()
+                }
+                else -> mutableListOf()
+            }
+        }
+
+        return ProjectFile(
+            filePath = filePath,
+            virtualFile = vFile,
+            psiFile = psiFile,  // 这里可以为 null
+            classes = realClasses,
+            whole = whole
+        )
+    }
+}
+
+// ----------------------------
+// “项目类”
+// ----------------------------
+data class ProjectClass(
+    val className: String,
+    val psiClass: PsiClass,               // 现在保证不能为空
+    val methods: MutableList<ProjectMethod>,
+    var whole: Boolean
+) {
+    fun toSerializable(): SerializableProjectClass {
+        return SerializableProjectClass(
+            className = className,
+            methods = methods.map { it.toSerializable() },
+            whole = whole
+        )
+    }
+
+    fun getCurrentMethods(): List<ProjectMethod> {
+        return if (whole) {
+            // 如果是 whole，返回类中所有方法
+            psiClass.methods.map { method ->
+                ProjectMethod(
+                    methodName = method.name,
+                    parameterTypes = method.parameterList.parameters.map { it.type.canonicalText },
+                    psiMethod = method
+                )
+            }
+        } else {
+            // 否则返回指定的方法列表
+            methods
+        }
+    }
+
+    fun removeMethods(methodsToRemove: List<ProjectMethod>) {
+        if (whole) {
+            // 如果是 whole，需要把 whole 改为 false，并添加除了要移除的方法之外的所有方法
+            whole = false
+            methods.clear()
+            psiClass.methods.forEach { method ->
+                // 检查当前方法是否在要移除的列表中
+                val shouldKeep = !methodsToRemove.any {
+                    it.methodName == method.name &&
+                            it.parameterTypes == method.parameterList.parameters.map { p -> p.type.canonicalText }
+                }
+
+                if (shouldKeep) {
+                    methods.add(ProjectMethod(
+                        methodName = method.name,
+                        parameterTypes = method.parameterList.parameters.map { it.type.canonicalText },
+                        psiMethod = method
+                    ))
+                }
+            }
+        } else {
+            // 如果不是 whole，直接从 methods 列表中移除指定的方法
+            methods.removeAll { method ->
+                methodsToRemove.any {
+                    it.methodName == method.methodName &&
+                            it.parameterTypes == method.parameterTypes
+                }
+            }
+        }
+    }
+}
+
+@Serializable
+data class SerializableProjectClass(
+    val className: String = "",
+    val methods: List<SerializableProjectMethod> = emptyList(),
+    val whole: Boolean = false
+) {
+    fun toProjectClass(psiFile: PsiFile): ProjectClass {
+        // 在 psiFile 里查找同名的 PsiClass
+        val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+            .find { it.name == className }
+            ?: throw IllegalStateException("Cannot find class=$className in file=${psiFile.name}")
+
+        // 如果标记了 whole，就返回空的方法列表
+        val realMethods = if (whole) {
+            mutableListOf()
+        } else {
+            // 否则只转换指定的方法
+            methods.map { it.toProjectMethod(foundPsiClass) }.toMutableList()
+        }
+
+        return ProjectClass(
+            className = className,
+            psiClass = foundPsiClass,
+            methods = realMethods,
+            whole = whole
+        )
+    }
+}
+
+// ----------------------------
+// “项目方法”
+// ----------------------------
+data class ProjectMethod(
+    val methodName: String,
+    val parameterTypes: List<String> = emptyList(),
+    val psiMethod: PsiMethod             // 现在保证不能为空
+) {
+    fun toSerializable(): SerializableProjectMethod {
+        return SerializableProjectMethod(
+            methodName = methodName,
+            parameterTypes = parameterTypes
+        )
+    }
+}
+
+@Serializable
+data class SerializableProjectMethod(
+    val methodName: String = "",
+    val parameterTypes: List<String> = emptyList()
+) {
+    /**
+     * 反序列化：在给定的 PsiClass 中找对应的方法
+     * 如果找不到就抛异常，保证 psiMethod 不为空
+     */
+    fun toProjectMethod(psiClass: PsiClass): ProjectMethod {
+        val foundPsiMethod = psiClass.methods.find { method ->
+            method.name == methodName &&
+                    method.parameterList.parameters.map { p -> p.type.canonicalText } == parameterTypes
+        } ?: throw IllegalStateException(
+            "Cannot find method=$methodName(param=$parameterTypes) in class=${psiClass.name}"
+        )
+
+        return ProjectMethod(
+            methodName = methodName,
+            parameterTypes = parameterTypes,
+            psiMethod = foundPsiMethod
+        )
+    }
+}
