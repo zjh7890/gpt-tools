@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools.utils
 import com.github.zjh7890.gpttools.services.*
 import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.toolWindow.treePanel.MavenDependencyId
+import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiClass
@@ -30,7 +31,7 @@ object DependencyUtils {
             // 先拿到或创建对应的 ProjectFileTree
             val projectFileTree = projectFileTreeMap.getOrPut(project) {
                 ProjectFileTree(
-                    projectName = project.name,
+                    project = project,
                     // 注意，这里不再直接把所有文件都塞进 fileTree，
                     // 而是使用 modules 和 mavenDependencies 两个列表
                     modules = mutableListOf(),
@@ -112,7 +113,7 @@ object DependencyUtils {
     /**
      * 根据 DependenciesTreePanel 原先的逻辑，把外部依赖 jar 路径解析出 groupId, artifactId, version
      */
-    private fun extractMavenInfo(path: String): MavenDependencyId? {
+    fun extractMavenInfo(path: String): MavenDependencyId? {
         val regex = ".*/repository/(.+)/([^/]+)/([^/]+)/([^/]+)\\.jar!/.*".toRegex()
         val matchResult = regex.find(path) ?: return null
         return try {
@@ -130,20 +131,36 @@ object DependencyUtils {
     /**
      * 根据文件相对路径(形如 /moduleA/src/...) 前缀来判断 module
      */
-    private fun getModuleName(project: Project, cls: PsiClass): String {
+    fun getModuleName(project: Project, cls: PsiClass): String {
         val vFile = cls.containingFile?.virtualFile ?: return "UnknownModule"
         val basePath = project.basePath ?: return "UnknownModule"
         val relativePath = vFile.path.removePrefix(basePath).removePrefix("/")
         return relativePath.split("/").firstOrNull() ?: "UnknownModule"
     }
 
-    private fun findOrCreateModule(modules: MutableList<ModuleDependency>, moduleName: String): ModuleDependency {
+    /**
+     * 在 projectFileTrees 中找出对应的 ProjectFileTree；若无则新建。
+     */
+    fun findOrCreateProjectFileTree(appFileTree: AppFileTree, project: Project): ProjectFileTree {
+        val existing = appFileTree.projectFileTrees.find { it.project == project }
+        if (existing != null) return existing
+
+        val newPft = ProjectFileTree(
+            project = project,
+            modules = mutableListOf(),
+            mavenDependencies = mutableListOf()
+        )
+        appFileTree.projectFileTrees.add(newPft)
+        return newPft
+    }
+
+    fun findOrCreateModule(modules: MutableList<ModuleDependency>, moduleName: String): ModuleDependency {
         return modules.find { it.moduleName == moduleName } ?: ModuleDependency(moduleName).also {
             modules.add(it)
         }
     }
 
-    private fun findOrCreateMavenDependency(
+    fun findOrCreateMavenDependency(
         mavenDeps: MutableList<MavenDependency>,
         groupId: String,
         artifactId: String,
@@ -160,7 +177,7 @@ object DependencyUtils {
         }
     }
 
-    private fun findOrCreatePackage(
+    fun findOrCreatePackage(
         packages: MutableList<PackageDependency>,
         packageName: String
     ): PackageDependency {
@@ -169,11 +186,12 @@ object DependencyUtils {
         }
     }
 
-    private fun findOrCreateProjectFile(
+    fun findOrCreateProjectFile(
         files: MutableList<ProjectFile>,
         vFile: VirtualFile,
         project: Project,
-        isMaven: Boolean = false
+        isMaven: Boolean = false,
+        whole: Boolean = false
     ): ProjectFile {
         // 计算 filePath
         val basePath = project.basePath?.removeSuffix("/") ?: ""
@@ -194,7 +212,7 @@ object DependencyUtils {
                 virtualFile = vFile,
                 psiFile = psiFile,
                 classes = mutableListOf(),
-                whole = false
+                whole = whole
             )
             files.add(newFile)
             newFile
@@ -205,7 +223,7 @@ object DependencyUtils {
      * 根据 dependencyInfo 里的 usedMethods，往一个 ProjectFile 里添加对应的 ProjectClass/ProjectMethod
      * 并判断是否为 whole
      */
-    private fun fillProjectClassAndMethods(
+    fun fillProjectClassAndMethods(
         projectFile: ProjectFile,
         psiClass: PsiClass,
         dependencyInfo: ClassDependencyInfo
@@ -245,7 +263,7 @@ object DependencyUtils {
                 .flatMap { it.packages }
                 .flatMap { it.files }
                 .mapNotNull { projectFile ->
-                    handleSingleProjectFile(projectFile)
+                    handleSingleProjectFile(projectFile, projectFileTree.project)
                 }
 
             // 2) 整理 “mavenDependencies” 中的文件
@@ -253,16 +271,12 @@ object DependencyUtils {
                 .flatMap { it.packages }
                 .flatMap { it.files }
                 .mapNotNull { projectFile ->
-                    handleSingleProjectFile(projectFile, )
+                    handleSingleProjectFile(projectFile, projectFileTree.project)
                 }
 
             // 合并两个来源的内容
-            val joinedFileContents = (moduleFilesContents + mavenFilesContents).joinToString("\n")
-
-            """
-=== Project: ${projectFileTree.projectName} ===
-$joinedFileContents
-""".trimIndent()
+            val joinedFileContents = (moduleFilesContents + mavenFilesContents).joinToString("\n\n")
+            joinedFileContents
         }
     }
 
@@ -271,12 +285,16 @@ $joinedFileContents
      * 返回要拼接的字符串，若不需要则返回 null
      */
     private fun handleSingleProjectFile(
-        projectFile: ProjectFile
+        projectFile: ProjectFile,
+        project: Project
     ): String? {
         val virtualFile = projectFile.virtualFile
+        val absolutePath = virtualFile.path
+
+        val relativePath = calculateRelativePath(absolutePath, project, projectFile.ifMavenFile)
         // 如果用户配置了 whole=true 则读取整文件内容
         return if (projectFile.whole) {
-            FileUtil.readFileInfoForLLM(virtualFile, project)
+            return "${relativePath}\n" + FileUtil.readFileInfoForLLM(virtualFile)
         } else {
             // 收集需要处理的 PsiElement
             val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
@@ -316,13 +334,42 @@ $joinedFileContents
             if (elementsToProcess.isNotEmpty()) {
                 val singleFileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
                 if (!singleFileContent.isNullOrBlank()) {
-                    FileUtil.wrapBorder(singleFileContent.trim())
+                    "${relativePath}\n" + FileUtil.wrapBorder(singleFileContent.trim())
                 } else {
                     null
                 }
             } else {
                 null
             }
+        }
+    }
+
+    /**
+     * 计算文件的相对路径
+     * @param absolutePath 文件的绝对路径
+     * @param project 项目对象
+     * @param isMaven 是否是 Maven 依赖文件
+     * @return 相对路径（本地文件包含项目名称，jar包不包含）
+     */
+    private fun calculateRelativePath(
+        absolutePath: String,
+        project: Project,
+        isMaven: Boolean
+    ): String {
+        val basePath = project.basePath?.removeSuffix("/")
+        return if (isMaven) {
+            // Maven 依赖文件: 提取 jar 包名称及其后续路径
+            val regex = ".*/([^/]+\\.jar!/.*)".toRegex()
+            val matchResult = regex.find(absolutePath)
+            if (matchResult != null) {
+                "/${matchResult.groupValues[1]}"
+            } else {
+                absolutePath
+            }
+        } else {
+            // 本地项目文件: 添加项目名称前缀
+            val path = absolutePath.removePrefix(basePath ?: "").removePrefix("/")
+            "${project.name}/$path"
         }
     }
 }

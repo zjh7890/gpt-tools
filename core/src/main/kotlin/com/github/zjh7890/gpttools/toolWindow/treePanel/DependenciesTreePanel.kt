@@ -6,6 +6,10 @@ import com.github.zjh7890.gpttools.services.AppFileTree
 import com.github.zjh7890.gpttools.services.ProjectClass
 import com.github.zjh7890.gpttools.services.ProjectMethod
 import com.github.zjh7890.gpttools.utils.PsiUtils
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
@@ -46,6 +50,30 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
         tree.isRootVisible = true
         tree.showsRootHandles = true
         tree.cellRenderer = CheckboxTreeCellRenderer()
+
+        // 创建 Action
+        val refreshAction = object : AnAction("Refresh", "Refresh file tree", null) {
+            override fun actionPerformed(e: AnActionEvent) {
+            }
+        }
+
+        // 创建 ActionGroup
+        val actionGroup = DefaultActionGroup().apply {
+            add(refreshAction)
+        }
+
+        // 创建 toolbar
+        val actionManager = ActionManager.getInstance()
+        val toolbar = actionManager.createActionToolbar(
+            "ChatFileTreeToolbar",
+            actionGroup,
+            true
+        )
+
+        // 添加 toolbar 到面板顶部
+        add(toolbar.component, BorderLayout.NORTH)
+
+
 
         val scrollPane = JScrollPane(tree)
 
@@ -127,7 +155,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
 
         // 遍历每个 ProjectFileTree，创建一个 projectNode
         appFileTree.projectFileTrees.forEach { projectFileTree ->
-            val projectNode = DefaultMutableTreeNode(projectFileTree.projectName)
+            val projectNode = DefaultMutableTreeNode(projectFileTree.project.name)
 
             // ---------- 1) 处理 modules ----------
             projectFileTree.modules.forEach { moduleDependency ->
@@ -142,7 +170,7 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                         val usedClasses = if (file.whole) {
                             // 整文件
                             // 你可以在 UI 上给个特殊标识
-                            emptyList<ProjectClass>()
+                            file.getCurrentClasses()
                         } else {
                             file.classes
                         }
@@ -155,13 +183,11 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                             addedDependencies.add(pClass.psiClass)
 
                             // 方法
-                            if (!pClass.whole) {
-                                pClass.methods.forEach { pm ->
-                                    val methodNode = CheckboxTreeNode("").apply {
-                                        userObject = pm
-                                    }
-                                    classNode.add(methodNode)
+                            pClass.getCurrentMethods().forEach { pm ->
+                                val methodNode = CheckboxTreeNode("").apply {
+                                    userObject = pm
                                 }
+                                classNode.add(methodNode)
                             }
                             packageNode.add(classNode)
                         }
@@ -195,13 +221,11 @@ class DependenciesTreePanel(private val project: Project) : JPanel() {
                             }
                             addedDependencies.add(pClass.psiClass)
 
-                            if (!pClass.whole) {
-                                pClass.methods.forEach { pm ->
-                                    val methodNode = CheckboxTreeNode("").apply {
-                                        userObject = pm
-                                    }
-                                    classNode.add(methodNode)
+                            pClass.getCurrentMethods().forEach { pm ->
+                                val methodNode = CheckboxTreeNode("").apply {
+                                    userObject = pm
                                 }
+                                classNode.add(methodNode)
                             }
                             packageNode.add(classNode)
                         }

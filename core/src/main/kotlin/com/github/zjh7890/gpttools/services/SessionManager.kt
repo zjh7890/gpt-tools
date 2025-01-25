@@ -130,32 +130,7 @@ class SessionManager(private val project: Project) : Disposable {
             return
         }
 
-        // 获取相对于项目根目录的路径
-        val relativePath = file.path.removePrefix(project.basePath!! + "/")
-
-        // 获取当前 session 对应的 ProjectFileTree
-        val projectFileTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name }
-            ?: ProjectFileTree(project.name).also { currentSession.appFileTree.projectFileTrees.add(it) }
-
-        // 检查文件是否已存在
-        if (projectFileTree.files.any { it.filePath == relativePath }) {
-            logger.info("File already exists in session: $relativePath")
-            return
-        }
-
-        // 获取 PsiFile
-        val psiFile = PsiManager.getInstance(project).findFile(file)
-
-        // 创建新的 ProjectFile
-        val projectFile = ProjectFile(
-            filePath = relativePath,
-            virtualFile = file,
-            psiFile = psiFile,
-            classes = mutableListOf(),
-            whole = true
-        )
-
-        projectFileTree.files.add(projectFile)
+        currentSession.appFileTree.addFile(file, project)
 
         // 保存会话并通知更新
         saveSessions()
@@ -166,96 +141,7 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     fun addMethodToCurrentSession(psiMethod: PsiMethod) {
-        // 获取文件名、类名和方法名
-        val containingFile = psiMethod.containingFile
-        val filePath = containingFile.virtualFile.path.removePrefix(project.basePath!! + "/")
-        val psiClass = psiMethod.containingClass ?: return
-        val className = psiClass.name ?: return
-
-        // 获取方法参数类型列表
-        val parameterTypes = psiMethod.parameterList.parameters.map { param ->
-            param.type.canonicalText
-        }
-
-        // 获取当前 session 对应的 ProjectFileTree
-        val projectFileTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name }
-            ?: ProjectFileTree(project.name).also { currentSession.appFileTree.projectFileTrees.add(it) }
-
-        // 获取或创建 ProjectFile
-        val projectFile = projectFileTree.files.find { it.filePath == filePath }
-            ?: ProjectFile(
-                filePath = filePath,
-                virtualFile = containingFile.virtualFile,
-                psiFile = containingFile,  // 添加 psiFile 参数
-                classes = mutableListOf(),
-                whole = false
-            ).also { projectFileTree.files.add(it) }
-
-        // 获取或创建 ProjectClass
-        val projectClass = projectFile.classes.find { it.className == className }
-            ?: ProjectClass(
-                className = className,
-                psiClass = psiClass,
-                methods = mutableListOf(),
-                whole = false
-            ).also { projectFile.classes.add(it) }
-
-        // 检查是否已存在相同的方法（包括参数类型）
-        if (!projectClass.methods.any {
-                it.methodName == psiMethod.name &&
-                        it.parameterTypes == parameterTypes
-            }) {
-            projectClass.methods.add(ProjectMethod(
-                methodName = psiMethod.name,
-                parameterTypes = parameterTypes,
-                psiMethod = psiMethod
-            ))
-        }
-
-        saveSessions()
-        notifySessionListChanged()
-
-        // 通知所有项目的 fileTreePanel 更新
-        notifyAllFileTreePanels(currentSession)
-    }
-
-    /**
-     * 移除选中的类或方法
-     * @param fileName 指定文件名，如果为 null，则移除整个项目的所有内容
-     * @param className 指定类名，如果为 null，则移除指定文件的所有内容
-     * @param methodNames 如果提供了 className，则移除对应类下的这些方法；如果为 null，则移除整个类
-     */
-    fun removeSelectedNodes(fileName: String?, className: String?, methodNames: List<String>?) {
-        val currentSession = getCurrentSession()
-        val projectTree = currentSession.appFileTree.projectFileTrees.find { it.projectName == project.name } ?: return
-
-        if (fileName == null) {
-            // 移除整个项目的所有文件、类和方法
-            currentSession.appFileTree.projectFileTrees.remove(projectTree)
-        } else {
-            val projectFile = projectTree.files.find { it.filePath == fileName }
-            if (projectFile != null) {
-                if (className == null) {
-                    // 移除指定文件的所有类和方法
-                    projectTree.files.remove(projectFile)
-                } else {
-                    val projectClass = projectFile.classes.find { it.className == className }
-                    if (projectClass != null) {
-                        if (methodNames == null || methodNames.isEmpty()) {
-                            // 移除整个类
-                            projectFile.classes.remove(projectClass)
-                        } else {
-                            // 移除指定的方法
-                            projectClass.methods.removeAll { it.methodName in methodNames }
-                            // 如果类中没有方法，则移除整个类
-                            if (projectClass.methods.isEmpty()) {
-                                projectFile.classes.remove(projectClass)
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        currentSession.appFileTree.addMethod(psiMethod, project)
 
         saveSessions()
         notifySessionListChanged()

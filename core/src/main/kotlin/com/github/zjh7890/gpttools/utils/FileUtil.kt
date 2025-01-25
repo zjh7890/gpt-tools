@@ -47,6 +47,22 @@ object FileUtil {
         }
         
         return """
+${relativePath}:
+${border}
+${text}
+${border}
+        """.trimIndent()
+    }
+
+    fun readFileInfoForLLM(virtualFile: VirtualFile?): String {
+        virtualFile ?: return ""
+        var document: Document? = null
+        ApplicationManager.getApplication().runReadAction {
+            document = FileDocumentManager.getInstance().getDocument(virtualFile)
+        }
+        val text = document?.text ?: "未找到文件默认内容"
+        val border = determineBorder(text)
+        return """
 ${border}
 ${text}
 ${border}
