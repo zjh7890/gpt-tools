@@ -207,53 +207,80 @@ data class AppFileTree(
     }
 
     fun removeClass(projectClass: ProjectClass, project: Project) {
-        // 通过 projectClass.psiClass 找到所在文件
         val containingFile = projectClass.psiClass.containingFile?.virtualFile ?: return
         val pft = findOrCreateProjectFileTree(this, project)
 
-        // 判断本地 or 外部依赖
         val projectPath = project.basePath ?: ""
         val isExternal = !containingFile.path.startsWith(projectPath)
 
-        // 找到对应的 ProjectFile，然后调用其 removeClasses(...)
-        if (!isExternal) {
+        // 找到对应的 ProjectFile
+        val targetFile = if (!isExternal) {
+            // 本地文件
             val moduleName = getModuleName(containingFile, project)
             val moduleDep = pft.modules.find { it.moduleName == moduleName } ?: return
-            moduleDep.packages.forEach { pkg ->
-                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
-                targetFile.removeClasses(listOf(projectClass))
-            }
+            moduleDep.packages
+                .flatMap { it.files }
+                .find { it.virtualFile == containingFile }
         } else {
+            // Maven 外部依赖
             val mavenInfo = extractMavenInfo(containingFile.path) ?: return
             val mavenDep = pft.mavenDependencies.find {
                 it.groupId == mavenInfo.groupId &&
                         it.artifactId == mavenInfo.artifactId &&
                         it.version == mavenInfo.version
             } ?: return
-            mavenDep.packages.forEach { pkg ->
-                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
-                targetFile.removeClasses(listOf(projectClass))
+            mavenDep.packages
+                .flatMap { it.files }
+                .find { it.virtualFile == containingFile }
+        } ?: return
+
+        // 如果文件是 whole，需要先降级为 partial，这样才能在其 classes 列表里找到并移除目标类
+        if (targetFile.whole) {
+            targetFile.whole = false
+            targetFile.classes.clear()
+
+            // 把当前文件里的所有类都加载进来，但排除要移除的这个类
+            val psiFile = targetFile.psiFile ?: return
+            val allPsiClasses = com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(psiFile, com.intellij.psi.PsiClass::class.java)
+
+            // 用 qualifiedName 来排除目标类，避免重名冲突
+            val removeQName = projectClass.psiClass.qualifiedName
+            allPsiClasses.forEach { c ->
+                val cQName = c.qualifiedName
+                if (cQName == null || cQName != removeQName) {
+                    // 保留的类默认标记为 whole=true（整个类使用）
+                    targetFile.classes.add(
+                        ProjectClass(
+                            className = c.name ?: "",
+                            psiClass = c,
+                            methods = mutableListOf(),
+                            whole = true
+                        )
+                    )
+                }
             }
+        } else {
+            // 如果文件本来就是 partial，则直接调用 removeClasses 即可
+            targetFile.removeClasses(listOf(projectClass))
         }
     }
 
+
     fun removeMethod(projectMethod: ProjectMethod, project: Project) {
         val containingFile = projectMethod.psiMethod.containingFile?.virtualFile ?: return
-        val pft = findOrCreateProjectFileTree(this, project)
+        val pft = AppFileTree.findOrCreateProjectFileTree(this, project)
 
-        // 判断本地 or 外部依赖
+        // 判断本地 / 外部
         val projectPath = project.basePath ?: ""
         val isExternal = !containingFile.path.startsWith(projectPath)
 
-        if (!isExternal) {
+        // 找到对应的 ProjectFile
+        val targetFile: ProjectFile? = if (!isExternal) {
             val moduleName = getModuleName(containingFile, project)
             val moduleDep = pft.modules.find { it.moduleName == moduleName } ?: return
-            moduleDep.packages.forEach { pkg ->
-                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
-                // 找到所在的 projectClass
-                val realClass = targetFile.classes.find { it.className == projectMethod.psiMethod.containingClass?.name }
-                realClass?.removeMethods(listOf(projectMethod))
-            }
+            moduleDep.packages
+                .flatMap { it.files }
+                .find { it.virtualFile == containingFile }
         } else {
             val mavenInfo = extractMavenInfo(containingFile.path) ?: return
             val mavenDep = pft.mavenDependencies.find {
@@ -261,11 +288,75 @@ data class AppFileTree(
                         it.artifactId == mavenInfo.artifactId &&
                         it.version == mavenInfo.version
             } ?: return
-            mavenDep.packages.forEach { pkg ->
-                val targetFile = pkg.files.find { it.virtualFile == containingFile } ?: return@forEach
-                val realClass = targetFile.classes.find { it.className == projectMethod.psiMethod.containingClass?.name }
-                realClass?.removeMethods(listOf(projectMethod))
+            mavenDep.packages
+                .flatMap { it.files }
+                .find { it.virtualFile == containingFile }
+        }
+
+        if (targetFile == null) return
+
+        // **如果 targetFile 是 whole，需要先降级为 partial**，
+        // 这样才能在 targetFile.classes 中找到对应的类。
+        if (targetFile.whole) {
+            targetFile.whole = false
+            targetFile.classes.clear()
+
+            // 把这个文件里的所有 PsiClass 加载进来
+            val psiFile = targetFile.psiFile
+            if (psiFile != null) {
+                val allPsiClasses = com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(psiFile, com.intellij.psi.PsiClass::class.java)
+                allPsiClasses.forEach { psiClass ->
+                    // 这里可以选择让每个类默认 whole=true（表示整类引用）
+                    // 或直接收集全部方法 whole=false（看你的需求）
+                    targetFile.classes.add(
+                        ProjectClass(
+                            className = psiClass.name ?: "",
+                            psiClass = psiClass,
+                            methods = mutableListOf(),
+                            whole = true
+                        )
+                    )
+                }
             }
+        }
+
+        // 现在 targetFile.classes 里有东西了，可以找到目标 class
+        val realClass = targetFile.classes.find {
+            it.psiClass == projectMethod.psiMethod.containingClass
+        }
+        // 如果找不到，就可能是因为 class 也是 whole=true，需要再去做降级
+        // 或者我们也可以直接找 qualifiedName 去匹配
+        if (realClass == null) {
+            // 可以考虑查 qualifiedName 再找一下
+            // 或者就直接 return
+            return
+        }
+
+        // **如果 realClass 也是 whole=true，需要再降级**，
+        // 然后移除目标方法
+        if (realClass.whole) {
+            realClass.whole = false
+            realClass.methods.clear()
+
+            val allPsiMethods = realClass.psiClass.methods
+            val methodSignToRemove = projectMethod.methodName to projectMethod.parameterTypes
+
+            allPsiMethods.forEach { m ->
+                val signature = m.name to m.parameterList.parameters.map { it.type.canonicalText }
+                // 如果不是要移除的方法，就保留
+                if (signature != methodSignToRemove) {
+                    realClass.methods.add(
+                        ProjectMethod(
+                            methodName = m.name,
+                            parameterTypes = m.parameterList.parameters.map { it.type.canonicalText },
+                            psiMethod = m
+                        )
+                    )
+                }
+            }
+        } else {
+            // 如果 realClass 不是 whole，直接 remove 就行
+            realClass.removeMethods(listOf(projectMethod))
         }
     }
 
@@ -844,29 +935,46 @@ data class ProjectFile(
 
     fun removeClasses(classesToRemove: List<ProjectClass>) {
         if (whole) {
-            // 如果是 whole，需要把 whole 改为 false，并添加除了要移除的类之外的所有类
+            // 如果当前 file 被标记为 whole，需要先降级为 partial
             whole = false
             classes.clear()
 
-            psiFile.let {
-                PsiTreeUtil.findChildrenOfType(it, PsiClass::class.java).forEach { psiClass ->
-                    // 检查当前类是否在要移除的列表中
-                    val shouldKeep = !classesToRemove.any { it.className == psiClass.name }
+            // 1. 获取当前文件里的所有 PsiClass
+            psiFile?.let { psiF ->
+                val allPsiClasses = PsiTreeUtil.findChildrenOfType(psiF, PsiClass::class.java)
 
+                // 2. 为了避免单纯用 name() 引发重复名冲突，使用 qualifiedName 做对比
+                val qualifiedNamesToRemove = classesToRemove
+                    .mapNotNull { it.psiClass.qualifiedName }
+                    .toSet()
+
+                allPsiClasses.forEach { psiClass ->
+                    val psiQName = psiClass.qualifiedName
+                    val shouldKeep = psiQName == null || !qualifiedNamesToRemove.contains(psiQName)
                     if (shouldKeep) {
-                        classes.add(ProjectClass(
-                            className = psiClass.name ?: "",
-                            psiClass = psiClass,
-                            methods = mutableListOf(),
-                            whole = true
-                        ))
+                        // 对于保留的类，这里依然默认它是 whole=true
+                        // 表示"整个类"都用，不关心方法粒度
+                        classes.add(
+                            ProjectClass(
+                                className = psiClass.name ?: "",
+                                psiClass = psiClass,
+                                methods = mutableListOf(),
+                                whole = true
+                            )
+                        )
                     }
                 }
             }
         } else {
-            // 如果不是 whole，直接从 classes 列表中移除指定的类
+            // 如果不是 whole，意味着我们已经在 classes 里记录了需要的类
+            // 这里直接根据 qualifiedName 来匹配移除
+            val qualifiedNamesToRemove = classesToRemove
+                .mapNotNull { it.psiClass.qualifiedName }
+                .toSet()
+
             classes.removeAll { projectClass ->
-                classesToRemove.any { it.className == projectClass.className }
+                val qName = projectClass.psiClass.qualifiedName
+                qName != null && qualifiedNamesToRemove.contains(qName)
             }
         }
     }
@@ -950,31 +1058,38 @@ data class ProjectClass(
 
     fun removeMethods(methodsToRemove: List<ProjectMethod>) {
         if (whole) {
-            // 如果是 whole，需要把 whole 改为 false，并添加除了要移除的方法之外的所有方法
+            // 若当前 class 标记为 whole，需要先降级为 partial
             whole = false
             methods.clear()
-            psiClass.methods.forEach { method ->
-                // 检查当前方法是否在要移除的列表中
-                val shouldKeep = !methodsToRemove.any {
-                    it.methodName == method.name &&
-                            it.parameterTypes == method.parameterList.parameters.map { p -> p.type.canonicalText }
-                }
 
+            // 把类中的所有方法枚举出来
+            val allPsiMethods = psiClass.methods
+            // 映射出要移除的方法签名
+            val toRemoveSignatures = methodsToRemove.map { removed ->
+                removed.methodName to removed.parameterTypes
+            }.toSet()
+
+            allPsiMethods.forEach { m ->
+                val mParamTypes = m.parameterList.parameters.map { it.type.canonicalText }
+                val signature = m.name to mParamTypes
+                val shouldKeep = !toRemoveSignatures.contains(signature)
                 if (shouldKeep) {
-                    methods.add(ProjectMethod(
-                        methodName = method.name,
-                        parameterTypes = method.parameterList.parameters.map { it.type.canonicalText },
-                        psiMethod = method
-                    ))
+                    methods.add(
+                        ProjectMethod(
+                            methodName = m.name,
+                            parameterTypes = mParamTypes,
+                            psiMethod = m
+                        )
+                    )
                 }
             }
         } else {
-            // 如果不是 whole，直接从 methods 列表中移除指定的方法
-            methods.removeAll { method ->
-                methodsToRemove.any {
-                    it.methodName == method.methodName &&
-                            it.parameterTypes == method.parameterTypes
-                }
+            // 如果不是 whole，直接从 methods 中移除匹配的
+            val toRemoveSignatures = methodsToRemove.map { it.methodName to it.parameterTypes }.toSet()
+
+            methods.removeAll { pm ->
+                val signature = pm.methodName to pm.parameterTypes
+                toRemoveSignatures.contains(signature)
             }
         }
     }
