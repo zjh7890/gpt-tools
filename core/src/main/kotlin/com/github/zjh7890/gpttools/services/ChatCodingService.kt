@@ -9,6 +9,7 @@ import com.github.zjh7890.gpttools.settings.common.CommonSettings
 import com.github.zjh7890.gpttools.toolWindow.chat.AutoDevInputTrigger
 import com.github.zjh7890.gpttools.toolWindow.chat.ChatRole
 import com.github.zjh7890.gpttools.toolWindow.llmChat.ChatPanel
+import com.github.zjh7890.gpttools.toolWindow.treePanel.DependenciesTreePanel
 import com.github.zjh7890.gpttools.utils.*
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -113,6 +114,12 @@ class ChatCodingService(val project: Project) : Disposable {
         val contextBuilder = StringBuilder()
 
         if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().appFileTree.projectFileTrees.isNotEmpty()) {
+            contextBuilder.append("相关的项目文件树：\n")
+            val structureStr =
+                DependenciesTreePanel.toMarkdownString(sessionManager.getCurrentSession().appFileTree)
+            contextBuilder.append(FileUtil.wrapBorder(structureStr))
+            contextBuilder.append("\n\n")
+
             contextBuilder.append("最新的文件内容：\n")
             val fileContents = AppFileTree.generateDependenciesTextCombined(sessionManager.getCurrentSession().appFileTree)
             contextBuilder.append(FileUtil.wrapBorder(fileContents))

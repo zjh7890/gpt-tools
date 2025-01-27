@@ -13,24 +13,28 @@ import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.serialization.Serializable
 
 /**
- * @Date: 2025/1/25 15:26
+ *  ----------------------------
+ *  文件理解（结合 whole/partial 与 selected 的关系）:
+ *  ----------------------------
+ *
+ *  1. whole/partial 决定对象是否在数据结构中“显式”存在:
+ *     - 当某个 ProjectFile 标记为 whole=true 时，表示“整文件都包含”。这时，file.classes 为空，因为不再需要按类或方法的粒度来记录任何信息。如果要只移除其中的某个类或方法，则必须先把该 ProjectFile 从 whole=true 降级为 whole=false，再去填充它的 classes 列表（把该文件中的所有类都扫描进来），接着针对要移除的目标进行删除。
+ *     - 同理，当某个 ProjectClass 标记为 whole=true 时，表示“这个类全部使用”。此时 class.methods 为空，因为不需要记录具体方法。如果要移除其中的某些方法，需要先把该 ProjectClass 从 whole=true 降级为 whole=false，然后把该类中的所有方法都加到 methods 列表里，再删除要移除的方法。
+ *     - 只有在对象是 “部分使用” 状态 (whole=false) 时，才会在它的 classes、methods 等列表中存放更细粒度的记录，以方便针对其中的某些元素做添加或移除。
+ *     - 如果要完全移除一个“whole”的文件/类，那就无需降级为 partial，直接在上层数据结构把它从列表中删除即可，因为它表示“整个文件/类”的引用都不需要了。
+ *
+ *  2. 移除逻辑区分：
+ *     - 整对象（整文件/整类）被移除：如果它是 whole=true，可以直接删掉这个文件或类节点；如果是 whole=false，同样可以删掉对应对象在列表里的记录。
+ *     - 部分子级（文件里的一部分类，类里的一部分方法）被移除：如果父级是 whole=true，得先降级(whole=false)并初始化具体子元素，再删去想要删除的那部分；如果父级本来就是 whole=false，直接在其子列表中删除相应的节点就行。
+ *     - 因此，需要在各个层级（ProjectFile、ProjectClass 等）里适当地实现（或修改现有的）removeXxx 方法，以涵盖上述处理“whole” 与 “partial” 两种状态的逻辑。这样才能在使用“remove...”时保证数据结构与实际含义同步。
+ *
+ *  3. selected 与 whole/partial 的关系:
+ *     - selected 字段仅代表在后续操作或 UI 上“是否被勾选/选中”，并不决定对象是否出现在数据结构中。
+ *     - 节点如果没有在 AppFileTree 中显式存在，就无法单独设置 selected；若父级是 whole=true，则其进行选中或移除操作只能对整个文件操作，即全选或者全不选。
+ *     - 因此，“是否纳入(whole/partial)”是前置条件，“是否被选中(selected)”是后续的标记。二者互不影响，但在使用时需要配合：
+ *          - whole=true 的父级意味着所有子节点“隐式存在”，若想单独勾选子节点，需要先将父级降级为 partial，并把子节点显式加入到数据结构中才能设置 selected。
+ *
  */
-// ----------------------------
-// 文件理解：
-// 当某个 ProjectFile 标记为 whole=true 时，表示“整文件都包含”。这时，file.classes 为空，因为不再需要按类或方法的粒度来记录任何信息。如果要只移除其中的某个类或方法，则必须先把该 ProjectFile 从 whole=true 降级为 whole=false，再去填充它的 classes 列表（把该文件中的所有类都扫描进来），接着针对要移除的目标进行删除。
-//
-//同理，当某个 ProjectClass 标记为 whole=true 时，表示“这个类全部使用”。此时 class.methods 为空，因为不需要记录具体方法。如果要移除其中的某些方法，需要先把这个 ProjectClass 从 whole=true 降级为 whole=false，然后把该类中的所有方法都加到 methods 列表里，再删除要移除的方法。
-//
-//只有在对象是 “部分使用” 状态 (whole=false) 时，才会在它的 classes、methods 等列表中存放更细粒度的记录，以方便针对其中的某些元素做添加或移除。
-//
-//如果要完全移除一个“whole”的文件/类，那就无需降级为 partial，直接在上层数据结构把它从列表中删除即可，因为它表示“整个文件/类”的引用都不需要了。
-//
-//也就是说，「移除逻辑」里需要区别对待：
-//
-//整对象（整文件/整类）被移除：如果它是 whole=true，可以直接删掉这个文件或类节点；如果是 whole=false，同样可以删掉对应对象在列表里的记录。
-//部分子级（文件里的一部分类，类里的一部分方法）被移除：如果父级是 whole=true，得先降级(whole=false)并初始化具体子元素，再删去想要删除的那部分；如果父级本来就是 whole=false，直接在其子列表中删除相应的节点就行。
-//因此，需要在各个层级（ProjectFile、ProjectClass 等）里适当地实现（或修改现有的）removeXxx 方法，以涵盖上述处理“whole” 与 “partial” 两种状态的逻辑。这样才能在使用“remove...”时保证数据结构与实际含义同步。
-// ----------------------------
 data class AppFileTree(
     val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf()
 ) {

@@ -158,14 +158,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                     val packageNode = DefaultMutableTreeNode(packageDependency.packageName)
                     packageDependency.files.forEach { file ->
                         // 对应一个文件里的一些类
-                        // 只要 whole = false 时才有 classes，否则表示整文件
-                        val usedClasses = if (file.whole) {
-                            // 整文件
-                            // 你可以在 UI 上给个特殊标识
-                            file.getCurrentClasses()
-                        } else {
-                            file.classes
-                        }
+                        val usedClasses = file.classes
 
                         usedClasses.forEach { pClass ->
                             val classNode = CheckboxTreeNode("").apply {
@@ -205,7 +198,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                 mavenDep.packages.forEach { packageDependency ->
                     val packageNode = DefaultMutableTreeNode(packageDependency.packageName)
                     packageDependency.files.forEach { file ->
-                        val usedClasses = if (file.whole) file.getCurrentClasses() else file.classes
+                        val usedClasses = file.classes
 
                         usedClasses.forEach { pClass ->
                             val classNode = CheckboxTreeNode("").apply {
@@ -282,6 +275,73 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
         }
 
         return path
+    }
+
+    companion object {
+        fun toMarkdownString(appFileTree: AppFileTree): String {
+            // 若无依赖可做特殊处理，这里直接返回空。
+            if (appFileTree.projectFileTrees.isEmpty()) {
+                return "- Dependencies\n  (no dependencies)\n"
+            }
+
+            val sb = StringBuilder()
+            sb.append("- Dependencies\n")
+
+            appFileTree.projectFileTrees.forEach { projectFileTree ->
+                sb.append("  - Project: ${projectFileTree.project.name}\n")
+
+                // ------------------- 1) Modules -------------------
+                projectFileTree.modules.forEach { moduleDependency ->
+                    sb.append("    - Module: ${moduleDependency.moduleName}\n")
+                    moduleDependency.packages.forEach { packageDependency ->
+                        sb.append("      - Package: ${packageDependency.packageName}\n")
+
+                        packageDependency.files.forEach { file ->
+                            val usedClasses = file.classes
+                            usedClasses.forEach { projectClass ->
+                                val className = projectClass.psiClass.name
+                                sb.append("        - Class: $className\n")
+
+                                // 方法
+                                projectClass.getCurrentMethods().forEach { projectMethod ->
+                                    val methodName = projectMethod.psiMethod.name
+                                    sb.append("          - Method: $methodName\n")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ------------------- 2) Maven Dependencies -------------------
+                // 如果有 mavenDependencies，就统一放在 "Maven Dependencies" 下
+                if (projectFileTree.mavenDependencies.isNotEmpty()) {
+                    sb.append("    - Maven Dependencies\n")
+                    projectFileTree.mavenDependencies.forEach { mavenDep ->
+                        val gav = "${mavenDep.groupId}:${mavenDep.artifactId}:${mavenDep.version}"
+                        sb.append("      - $gav\n")
+
+                        mavenDep.packages.forEach { packageDependency ->
+                            sb.append("        - Package: ${packageDependency.packageName}\n")
+
+                            packageDependency.files.forEach { file ->
+                                val usedClasses = file.classes
+                                usedClasses.forEach { projectClass ->
+                                    val className = projectClass.psiClass.name
+                                    sb.append("          - Class: $className\n")
+
+                                    projectClass.getCurrentMethods().forEach { projectMethod ->
+                                        val methodName = projectMethod.psiMethod.name
+                                        sb.append("            - Method: $methodName\n")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return sb.toString()
+        }
     }
 }
 
