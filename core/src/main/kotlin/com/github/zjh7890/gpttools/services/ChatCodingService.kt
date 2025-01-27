@@ -113,7 +113,7 @@ class ChatCodingService(val project: Project) : Disposable {
         val contextBuilder = StringBuilder()
 
         if (CommonSettings.getInstance().withFiles && sessionManager.getCurrentSession().appFileTree.projectFileTrees.isNotEmpty()) {
-            contextBuilder.append("相关项目文件内容：\n")
+            contextBuilder.append("最新的文件内容：\n")
             val fileContents = AppFileTree.generateDependenciesTextCombined(sessionManager.getCurrentSession().appFileTree)
             contextBuilder.append(FileUtil.wrapBorder(fileContents))
             contextBuilder.append("\n\n")

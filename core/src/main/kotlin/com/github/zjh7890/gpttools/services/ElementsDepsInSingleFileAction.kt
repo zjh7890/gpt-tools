@@ -110,7 +110,7 @@ class ElementsDepsInSingleFileAction : AnAction() {
             // 查找方法中的引用
             PsiTreeUtil.findChildrenOfType(method, PsiJavaCodeReferenceElement::class.java).forEach {
                 val resolvedElement = it.resolve()
-                if (resolvedElement is PsiMethod || resolvedElement is PsiField || isDataClass(resolvedElement)) {
+                if (resolvedElement is PsiMethod || resolvedElement is PsiField || isAtomicClass(resolvedElement)) {
                     // 添加依赖信息
                     val dependencies = psiDependency.elementDependsList.getOrDefault(method, mutableListOf())
                     dependencies.add(ElementDependInfo(resolvedElement!!, it))
@@ -673,7 +673,7 @@ class ElementsDepsInSingleFileAction : AnAction() {
         /**
          * 判断元素是否为数据类
          */
-        private fun isDataClass(element: PsiElement?): Boolean {
+        private fun isAtomicClass(element: PsiElement?): Boolean {
             if (element !is PsiClass) return false
 
             val methods = element.methods

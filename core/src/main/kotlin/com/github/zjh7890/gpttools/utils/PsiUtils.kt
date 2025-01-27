@@ -280,9 +280,14 @@ object PsiUtils {
         return relevantImports
     }
 
-    fun isDataClass(psiClass: PsiClass): Boolean {
+    fun isAtomicClass(psiClass: PsiClass): Boolean {
         val methods = psiClass.methods
         val fields = psiClass.fields
+
+        // 检查当前类是否是异常类
+        if (isExceptionClass(psiClass)) {
+            return true
+        }
 
         if (fields.isEmpty()) return false
 
@@ -294,6 +299,15 @@ object PsiUtils {
         }
 
         return allMethodsAreGettersSettersOrStandard
+    }
+
+    // 递归检查是否是异常类
+    fun isExceptionClass(cls: PsiClass?): Boolean {
+        if (cls == null) return false
+        if (cls.qualifiedName == "java.lang.Exception" || cls.qualifiedName == "java.lang.Throwable") {
+            return true
+        }
+        return cls.supers.any { isExceptionClass(it) }
     }
 }
 

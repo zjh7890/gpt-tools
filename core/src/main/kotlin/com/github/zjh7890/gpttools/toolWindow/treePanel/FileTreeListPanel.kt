@@ -9,7 +9,6 @@ import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.PsiUtil
@@ -114,7 +113,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         psiClass: PsiClass,
         classGraph: MutableMap<PsiClass, ClassDependencyInfo>
     ) {
-        val dataClassFlag = PsiUtils.isDataClass(psiClass)
+        val dataClassFlag = PsiUtils.isAtomicClass(psiClass)
 
         if (dataClassFlag) {
             analyzeDataClass(psiClass, classGraph)
@@ -159,7 +158,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             val node = CheckboxTreeNode(psiClass.name ?: "Unnamed Class")
             node.isChecked = selected // 根据需要设置初始选中状态
 
-            if (!PsiUtils.isDataClass(psiClass)) {
+            if (!PsiUtils.isAtomicClass(psiClass)) {
                 psiClass.methods.forEach { method ->
                     if (!ifGetterOrSetter(method) && !method.isStandardClassMethod()) {
                         val methodNode = CheckboxTreeNode(method.name ?: "Unnamed Method")
@@ -402,7 +401,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                         val virtualFile = depClass.containingFile?.virtualFile
                         if (virtualFile != null &&
                             PsiUtils.ifProjectFile(depClass.project, virtualFile) &&
-                            !PsiUtils.isDataClass(depClass)) {  // 添加检查
+                            !PsiUtils.isAtomicClass(depClass)) {  // 添加检查
                             analyzeMethodDependencies(psiMethod, depClass, classGraph)
                         }
                     }
@@ -414,7 +413,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                             val virtualFile = depClass?.containingFile?.virtualFile
                             if (virtualFile != null &&
                                 PsiUtils.ifProjectFile(depClass.project, virtualFile) &&
-                                !PsiUtils.isDataClass(depClass)) {  // 添加检查
+                                !PsiUtils.isAtomicClass(depClass)) {  // 添加检查
                                 analyzeFieldDependencies(resolved, depClass, classGraph)
                             }
                         }
@@ -427,7 +426,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                             val virtualFile = typeClass.containingFile?.virtualFile
                             if (virtualFile != null &&
                                 PsiUtils.ifProjectFile(typeClass.project, virtualFile) &&
-                                PsiUtils.isDataClass(typeClass)) {
+                                PsiUtils.isAtomicClass(typeClass)) {
                                 analyzeDataClass(typeClass, classGraph)
                             }
                         }
@@ -484,7 +483,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                 return
             }
 
-            classGraph.getOrPut(psiClass) { ClassDependencyInfo(isDataClass = true) }
+            classGraph.getOrPut(psiClass) { ClassDependencyInfo(isAtomicClass = true) }
             // 处理整个类中的所有元素
             PsiTreeUtil.processElements(psiClass) { element ->
                 when (element) {
@@ -493,7 +492,7 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
                         if (typeClass != null) {
                             val virtualFile = typeClass.containingFile?.virtualFile
                             if (virtualFile != null && PsiUtils.ifProjectFile(typeClass.project, virtualFile)) {
-                                if (PsiUtils.isDataClass(typeClass)) {
+                                if (PsiUtils.isAtomicClass(typeClass)) {
                                     analyzeDataClass(typeClass, classGraph)
                                 }
                             }

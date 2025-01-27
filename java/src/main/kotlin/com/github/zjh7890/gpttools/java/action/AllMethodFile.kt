@@ -243,7 +243,7 @@ class AllMethodFile : AnAction() {
             when (it) {
                 is PsiJavaCodeReferenceElement -> {
                     val resolvedElement = it.resolve()
-                    if (resolvedElement is PsiMethod || resolvedElement is PsiField || isDataClass(resolvedElement)) {
+                    if (resolvedElement is PsiMethod || resolvedElement is PsiField || isAtomicClass(resolvedElement)) {
                         // 使用 getOrDefault 确保得到的是一个可变的列表
                         val dependencies = psiDependency.elementDependsList.getOrDefault(element, mutableListOf())
                         dependencies.add(ElementDependInfo(resolvedElement!!, it))
@@ -326,7 +326,7 @@ class AllMethodFile : AnAction() {
         }
     }
 
-    private fun isDataClass(element: PsiElement?): Boolean {
+    private fun isAtomicClass(element: PsiElement?): Boolean {
         if (element !is PsiClass) return false
 
         val methods = element.methods

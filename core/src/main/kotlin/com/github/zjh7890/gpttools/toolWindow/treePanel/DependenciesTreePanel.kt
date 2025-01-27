@@ -205,7 +205,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                 mavenDep.packages.forEach { packageDependency ->
                     val packageNode = DefaultMutableTreeNode(packageDependency.packageName)
                     packageDependency.files.forEach { file ->
-                        val usedClasses = if (file.whole) emptyList<ProjectClass>() else file.classes
+                        val usedClasses = if (file.whole) file.getCurrentClasses() else file.classes
 
                         usedClasses.forEach { pClass ->
                             val classNode = CheckboxTreeNode("").apply {
@@ -293,7 +293,7 @@ data class MavenDependencyId(
     override fun toString(): String = "$groupId:$artifactId:$version"
 }
 
-class ClassDependencyInfo(var isDataClass: Boolean = false) {
+class ClassDependencyInfo(var isAtomicClass: Boolean = false) {
     val usedMethods = mutableSetOf<PsiMethod>()
     val usedFields = mutableSetOf<PsiField>()
 
@@ -372,7 +372,7 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
             if (userObj is ProjectClass) {
                 val psiClass = userObj.psiClass
                 // 判断是否是数据类
-                if (PsiUtils.isDataClass(psiClass)) {
+                if (userObj.isAtomicClass) {
                     // 如果是数据类，使用特殊图标
                     this.icon = com.intellij.icons.AllIcons.Nodes.Record
                 } else {

@@ -7,7 +7,6 @@ import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
@@ -33,7 +32,7 @@ class AnalyzeMethodDependenciesAction : AnAction("Analyze Method Dependencies") 
         val psiClass = method.containingClass ?: return
 
         // 4. 判断是否是 data class
-        if (PsiUtils.isDataClass(psiClass)) {
+        if (PsiUtils.isAtomicClass(psiClass)) {
             // 如果是 data class，直接添加整个文件
             val virtualFile = psiFile.virtualFile
             if (virtualFile != null) {
@@ -49,9 +48,13 @@ class AnalyzeMethodDependenciesAction : AnAction("Analyze Method Dependencies") 
 
         // 6. 分析完成后，将依赖图中的所有方法加入到当前会话
         val sessionManager = SessionManager.getInstance(project)
-        for ((_, dependencyInfo) in classDependencyGraph) {
-            dependencyInfo.usedMethods.forEach { usedMethod ->
-                sessionManager.addMethodToCurrentSession(usedMethod)
+        for ((key, dependencyInfo) in classDependencyGraph) {
+            if (dependencyInfo.isAtomicClass) {
+                sessionManager.addClassToCurrentSession(key)
+            } else {
+                dependencyInfo.usedMethods.forEach { usedMethod ->
+                    sessionManager.addMethodToCurrentSession(usedMethod)
+                }
             }
         }
     }

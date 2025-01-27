@@ -3,6 +3,7 @@ package com.github.zjh7890.gpttools.services
 import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.toolWindow.treePanel.MavenDependencyId
 import com.github.zjh7890.gpttools.utils.FileUtil
+import com.github.zjh7890.gpttools.utils.PsiUtils
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -46,7 +47,7 @@ data class AppFileTree(
      * - 若是外部依赖 (.m2/repository/... )，则解析 groupId:artifactId:version 并挂载到 mavenDependencies
      * - 仅完成结构挂载，不做额外解析（如类、方法）
      */
-    fun addFile(file: VirtualFile, project: Project) {
+    fun addFile(file: VirtualFile, project: Project, whole: Boolean = false) {
         // 1. 找到或创建当前 Project 对应的 projectFileTree
         val pft = findOrCreateProjectFileTree(this, project)
 
@@ -66,7 +67,7 @@ data class AppFileTree(
             val packageDep = findOrCreatePackage(moduleDep.packages, packageName)
 
             // (3) 找 / 创建 ProjectFile
-            findOrCreateProjectFile(packageDep.files, file, project, isMaven = false, whole = true)
+            findOrCreateProjectFile(packageDep.files, file, project, isMaven = false, whole = whole)
 
         } else {
             // ------- 外部依赖文件 -------
@@ -85,7 +86,61 @@ data class AppFileTree(
             val packageDep = findOrCreatePackage(mavenDep.packages, packageName)
 
             // (3) 找 / 创建 ProjectFile
-            findOrCreateProjectFile(packageDep.files, file, project, isMaven = true, whole = true)
+            findOrCreateProjectFile(packageDep.files, file, project, isMaven = true, whole = whole)
+        }
+    }
+
+    fun addClass(psiClass: PsiClass, project: Project) {
+        // 1. 先保证所在文件已加入
+        val containingFile = psiClass.containingFile?.virtualFile ?: return
+        addFile(containingFile, project, false)
+
+        // 2. 找到或创建 projectFileTree
+        val pft = findOrCreateProjectFileTree(this, project)
+
+        // 3. 判断本地 or 外部
+        val projectPath = project.basePath ?: ""
+        val isExternal = !containingFile.path.startsWith(projectPath)
+
+        // 4. 找到对应的 PackageDependency -> ProjectFile
+        val (packageDep, projectFile) = if (!isExternal) {
+            // 本地文件
+            val moduleName = getModuleName(containingFile, project)
+            val moduleDep = findOrCreateModule(pft.modules, moduleName)
+            val psiFile = PsiManager.getInstance(project).findFile(containingFile)
+            val packageName = getPackageName(psiFile)
+            val pkgDep = findOrCreatePackage(moduleDep.packages, packageName)
+            val projFile = findOrCreateProjectFile(pkgDep.files, containingFile, project, isMaven = false)
+            pkgDep to projFile
+        } else {
+            // 外部依赖
+            val mavenInfo = extractMavenInfo(containingFile.path) ?: return
+            val mavenDep = findOrCreateMavenDependency(
+                pft.mavenDependencies,
+                mavenInfo.groupId,
+                mavenInfo.artifactId,
+                mavenInfo.version
+            )
+            val psiFile = PsiManager.getInstance(project).findFile(containingFile)
+            val packageName = getPackageName(psiFile)
+            val pkgDep = findOrCreatePackage(mavenDep.packages, packageName)
+            val projFile = findOrCreateProjectFile(pkgDep.files, containingFile, project, isMaven = true)
+            pkgDep to projFile
+        }
+
+        // 5. 找 / 建 ProjectClass（默认 whole=true 表示“整类引用”）
+        val className = psiClass.name ?: return
+        val existingClass = projectFile.classes.find { it.className == className }
+        if (existingClass == null) {
+            // 新建并默认 whole=true
+            projectFile.classes.add(
+                ProjectClass(
+                    className = className,
+                    psiClass = psiClass,
+                    methods = mutableListOf(),
+                    whole = true
+                )
+            )
         }
     }
 
@@ -98,7 +153,7 @@ data class AppFileTree(
     fun addMethod(psiMethod: PsiMethod, project: Project) {
         // 1. 先保证所在文件已加入
         val containingFile = psiMethod.containingFile?.virtualFile ?: return
-        addFile(containingFile, project)
+        addFile(containingFile, project, false)
 
         // 2. 找到或创建 projectFileTree
         val pft = findOrCreateProjectFileTree(this, project)
@@ -1029,6 +1084,7 @@ data class SerializableProjectFile(
 data class ProjectClass(
     val className: String,
     val psiClass: PsiClass,               // 现在保证不能为空
+    val isAtomicClass: Boolean = PsiUtils.isAtomicClass(psiClass),
     val methods: MutableList<ProjectMethod>,
     var whole: Boolean
 ) {
@@ -1041,6 +1097,9 @@ data class ProjectClass(
     }
 
     fun getCurrentMethods(): List<ProjectMethod> {
+        if (isAtomicClass) {
+            return emptyList()
+        }
         return if (whole) {
             // 如果是 whole，返回类中所有方法
             psiClass.methods.map { method ->

@@ -9,6 +9,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
 import java.util.UUID
@@ -125,18 +126,21 @@ class SessionManager(private val project: Project) : Disposable {
     }
 
     fun addFileToCurrentSession(file: VirtualFile) {
-        if (!file.isValid || !file.isWritable) {
-            logger.warn("Invalid or unwritable file: ${file.path}")
-            return
-        }
-
-        currentSession.appFileTree.addFile(file, project)
+        currentSession.appFileTree.addFile(file, project, true)
 
         // 保存会话并通知更新
         saveSessions()
         notifySessionListChanged()
 
         // 通知所有项目的 fileTreePanel 更新
+        notifyAllFileTreePanels(currentSession)
+    }
+
+    fun addClassToCurrentSession(psiClass: PsiClass) {
+        currentSession.appFileTree.addClass(psiClass, project)
+
+        saveSessions()
+        notifySessionListChanged()
         notifyAllFileTreePanels(currentSession)
     }
 
