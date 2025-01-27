@@ -14,26 +14,34 @@ import kotlinx.serialization.Serializable
 
 /**
  *  ----------------------------
- *  文件理解：
+ *  文件理解（结合 whole/partial 与 selected 的关系）:
  *  ----------------------------
  *
- *  1. whole/partial 决定对象是否在数据结构中“显式”存在:
- *     - 当某个 ProjectFile 标记为 whole=true 时，表示“整文件都包含”。这时，file.classes 为空，因为不再需要按类或方法的粒度来记录任何信息。如果要只移除其中的某个类或方法，则必须先把该 ProjectFile 从 whole=true 降级为 whole=false，再去填充它的 classes 列表（把该文件中的所有类都扫描进来），接着针对要移除的目标进行删除。
- *     - 同理，当某个 ProjectClass 标记为 whole=true 时，表示“这个类全部使用”。此时 class.methods 为空，因为不需要记录具体方法。如果要移除其中的某些方法，需要先把该 ProjectClass 从 whole=true 降级为 whole=false，然后把该类中的所有方法都加到 methods 列表里，再删除要移除的方法。
- *     - 只有在对象是 “部分使用” 状态 (whole=false) 时，才会在它的 classes、methods 等列表中存放更细粒度的记录，以方便针对其中的某些元素做添加或移除。
- *     - 如果要完全移除一个“whole”的文件/类，那就无需降级为 partial，直接在上层数据结构把它从列表中删除即可，因为它表示“整个文件/类”的引用都不需要了。
+ *  1. whole/partial 的含义（新版，无隐式节点）：
+ *     - 当某个文件（ProjectFile）或类（ProjectClass）设置为 whole=true，表示“我们需要使用该文件/类的全部内容”。
+ *       但**与原设计不同**的是：我们依旧会在数据结构中“显式”地列出它的全部子节点（例如文件下的所有类、类中的所有方法），
+ *       不再将其视为“隐式存在”而不存储。这样可以避免后续操作时出现“先降级为 partial 再重新扫描子节点”的繁琐流程。
+ *     - 当标记为 whole=false，则意味着“只需要其中的一部分”，这时我们会在 children 列表里（比如 ProjectFile.classes、
+ *       ProjectClass.methods）列举出所需的具体子节点。若需要更多子节点，可以随时调用相关方法添加；若要移除部分子节点，也可以直接删除。
  *
- *  2. 移除逻辑区分：
- *     - 整对象（整文件/整类）被移除：如果它是 whole=true，可以直接删掉这个文件或类节点；如果是 whole=false，同样可以删掉对应对象在列表里的记录。
- *     - 部分子级（文件里的一部分类，类里的一部分方法）被移除：如果父级是 whole=true，得先降级(whole=false)并初始化具体子元素，再删去想要删除的那部分；如果父级本来就是 whole=false，直接在其子列表中删除相应的节点就行。
- *     - 因此，需要在各个层级（ProjectFile、ProjectClass 等）里适当地实现（或修改现有的）removeXxx 方法，以涵盖上述处理“whole” 与 “partial” 两种状态的逻辑。这样才能在使用“remove...”时保证数据结构与实际含义同步。
+ *     - 总之，“whole=true” 现在只是一个标签，表示“当前对象及其所有子节点都被完整使用”。**但不再依赖“清空子节点”来表示整对象引用**，
+ *       数据结构中依旧能看到它包含的所有类或方法。
  *
- *  3. selected 与 whole/partial 的关系:
- *     - selected 字段仅代表在后续操作或 UI 上“是否被勾选/选中”，并不决定对象是否出现在数据结构中。
- *     - 节点如果没有在 AppFileTree 中显式存在，就无法单独设置 selected；若父级是 whole=true，则其进行选中或移除操作只能对整个文件操作，即全选或者全不选。
- *     - 因此，“是否纳入(whole/partial)”是前置条件，“是否被选中(selected)”是后续的标记。二者互不影响，但在使用时需要配合：
- *          - whole=true 的父级意味着所有子节点“隐式存在”，若想单独勾选子节点，需要先将父级降级为 partial，并把子节点显式加入到数据结构中才能设置 selected。
+ *  2. 移除逻辑：
+ *     - **删除整个对象（文件 / 类）**：若我们不再需要这个文件或类，可直接从上级列表中移除它。例如在 PackageDependency.files 里 `remove` 掉
+ *       对应的 ProjectFile，或在 ProjectFile.classes 中 `remove` 掉对应的 ProjectClass。
+ *     - **删除部分子节点（类中的部分方法等）**：不论父级是 whole=true 还是 whole=false，都可以直接操作其子节点列表进行删除；无需再做“降级”。
+ *       因为即使是 whole=true，我们也已显式存了所有子节点，对它们的增删改查都可以直接进行。
  *
+ *  3. selected 与 whole/partial 的关系：
+ *     - selected 表示在后续某些操作（例如 UI 勾选、批量处理）时是否被选中，与 “是否纳入(whole/partial)” 无直接影响。
+ *       两者是不同维度：数据结构中是否存在节点，取决于是否 addFile/addClass/addMethod；而节点是否选中，取决于 UI 或逻辑对 selected 的设置。
+ *     - 即使文件或类是 whole=true，因为我们采用“无隐式节点”的方式，子节点也都在数据结构中显式存在，也可独立设置 selected = true / false。
+ *       具体是否这样使用，视你业务需求而定。
+ *
+ *  4. 关于“整对象 / 部分对象”的转换：
+ *     - 在旧设计中，如果某个文件/类是 whole=true 而要部分移除某个方法，需要先“降级为 partial”，再重新扫描子节点。现在则无需如此。
+ *     - 如果业务上还需要“切换 whole ↔ partial”的标记，也可以做，但这只是一种标签状态切换；子节点依旧存储在数据结构中，并不受影响。
  */
 data class AppFileTree(
     val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf()
@@ -258,7 +266,7 @@ data class AppFileTree(
         // 找到所在的 ProjectFileTree
         val pft = findOrCreateProjectFileTree(this, project)
 
-        // 1. 判断本地 or 外部依赖
+        // 1. 本地 or 外部
         val projectPath = project.basePath ?: ""
         val isExternal = !file.path.startsWith(projectPath)
 
@@ -477,19 +485,15 @@ data class AppFileTree(
         fun buildAppFileTreeFromClassGraph(
             classDependencyGraph: Map<PsiClass, ClassDependencyInfo>
         ): AppFileTree {
-            // 以 Project 为粒度分组
             val projectFileTreeMap = mutableMapOf<Project, ProjectFileTree>()
 
             for ((psiClass, dependencyInfo) in classDependencyGraph) {
                 val vFile = psiClass.containingFile?.virtualFile ?: continue
                 val project = psiClass.project
 
-                // 先拿到或创建对应的 ProjectFileTree
                 val projectFileTree = projectFileTreeMap.getOrPut(project) {
                     ProjectFileTree(
                         project = project,
-                        // 注意，这里不再直接把所有文件都塞进 fileTree，
-                        // 而是使用 modules 和 mavenDependencies 两个列表
                         modules = mutableListOf(),
                         mavenDependencies = mutableListOf()
                     )
@@ -500,23 +504,20 @@ data class AppFileTree(
                 val isExternal = !vFile.path.startsWith(projectPath)
 
                 if (!isExternal) {
-                    // 本地依赖 → 找到或创建对应的 module
                     val moduleName = getModuleName(project, psiClass)
                     val moduleDependency = findOrCreateModule(projectFileTree.modules, moduleName)
 
-                    // 找到或创建对应的 packageDependency
                     val packageName = psiClass.qualifiedName
                         ?.substringBeforeLast('.')
                         ?: "(default package)"
                     val packageDependency = findOrCreatePackage(moduleDependency.packages, packageName)
 
-                    // 找到或创建 ProjectFile
                     val projectFile = findOrCreateProjectFile(packageDependency.files, vFile, project)
 
-                    // 最后将当前 psiClass + usedMethods 放进 projectFile.classes
+                    // 将当前 psiClass + usedMethods 放进 projectFile.classes
                     fillProjectClassAndMethods(projectFile, psiClass, dependencyInfo)
+
                 } else {
-                    // 外部依赖 → 解析 maven info
                     val mavenInfo = extractMavenInfo(vFile.path)
                     if (mavenInfo != null) {
                         val mavenDependency = findOrCreateMavenDependency(
@@ -525,7 +526,6 @@ data class AppFileTree(
                             mavenInfo.artifactId,
                             mavenInfo.version
                         )
-                        // 包名
                         val packageName = psiClass.qualifiedName
                             ?.substringBeforeLast('.')
                             ?: "(default package)"
@@ -533,30 +533,6 @@ data class AppFileTree(
                         val projectFile = findOrCreateProjectFile(packageDependency.files, vFile, project, isMaven = true)
 
                         fillProjectClassAndMethods(projectFile, psiClass, dependencyInfo)
-                    }
-                }
-            }
-
-            // 若某个文件里所有类均被整类使用，则设置该文件为 whole
-            projectFileTreeMap.values.forEach { projectFileTree ->
-                projectFileTree.modules.forEach { module ->
-                    module.packages.forEach { pkg ->
-                        pkg.files.forEach { file ->
-                            if (file.classes.isNotEmpty() && file.classes.all { it.whole }) {
-                                file.whole = true
-                                file.classes.clear()
-                            }
-                        }
-                    }
-                }
-                projectFileTree.mavenDependencies.forEach { mdep ->
-                    mdep.packages.forEach { pkg ->
-                        pkg.files.forEach { file ->
-                            if (file.classes.isNotEmpty() && file.classes.all { it.whole }) {
-                                file.whole = true
-                                file.classes.clear()
-                            }
-                        }
                     }
                 }
             }
