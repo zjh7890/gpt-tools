@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
 
 /**
  *  ----------------------------
- *  文件理解（结合 whole/partial 与 selected 的关系）:
+ *  文件理解：
  *  ----------------------------
  *
  *  1. whole/partial 决定对象是否在数据结构中“显式”存在:
@@ -59,7 +59,8 @@ data class AppFileTree(
         val projectPath = project.basePath ?: ""
         val isExternal = !file.path.startsWith(projectPath)
 
-        if (!isExternal) {
+        // 3. 找到对应的 packageDependency 和创建 ProjectFile
+        val (packageDep, projectFile) = if (!isExternal) {
             // ------- 本地文件 -------
             // (1) 获取 moduleDependency
             val moduleName = getModuleName(file, project)
@@ -71,8 +72,8 @@ data class AppFileTree(
             val packageDep = findOrCreatePackage(moduleDep.packages, packageName)
 
             // (3) 找 / 创建 ProjectFile
-            findOrCreateProjectFile(packageDep.files, file, project, isMaven = false, whole = whole)
-
+            val projFile = findOrCreateProjectFile(packageDep.files, file, project, isMaven = false, whole = whole)
+            packageDep to projFile
         } else {
             // ------- 外部依赖文件 -------
             // (1) 解析 maven groupId/artifactId/version
@@ -90,23 +91,37 @@ data class AppFileTree(
             val packageDep = findOrCreatePackage(mavenDep.packages, packageName)
 
             // (3) 找 / 创建 ProjectFile
-            findOrCreateProjectFile(packageDep.files, file, project, isMaven = true, whole = whole)
+            val projFile = findOrCreateProjectFile(packageDep.files, file, project, isMaven = true, whole = whole)
+            packageDep to projFile
+        }
+
+        // 4. 如果是 whole=true，显式添加文件中的所有类
+        if (whole) {
+            val psiFile = PsiManager.getInstance(project).findFile(file)
+            if (psiFile != null) {
+                val allPsiClasses = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                for (cls in allPsiClasses) {
+                    // 递归添加类及其方法，同样标记为 whole=true
+                    addClass(cls, project, whole = true)
+                }
+            }
         }
     }
 
-    fun addClass(psiClass: PsiClass, project: Project) {
+    fun addClass(psiClass: PsiClass, project: Project, whole: Boolean = true) {
         // 1. 先保证所在文件已加入
         val containingFile = psiClass.containingFile?.virtualFile ?: return
-        addFile(containingFile, project, false)
+        // 这里若直接传入 whole=true 可能会形成再次递归，你可根据需要来决定
+        // 如果文件层面也想显式列出所有类，则可将 addFile 第二个参数也设为 true
+        addFile(containingFile, project, whole = false)
 
         // 2. 找到或创建 projectFileTree
         val pft = findOrCreateProjectFileTree(this, project)
 
-        // 3. 判断本地 or 外部
         val projectPath = project.basePath ?: ""
         val isExternal = !containingFile.path.startsWith(projectPath)
 
-        // 4. 找到对应的 PackageDependency -> ProjectFile
+        // 3. 找到对应的 ProjectFile
         val (packageDep, projectFile) = if (!isExternal) {
             // 本地文件
             val moduleName = getModuleName(containingFile, project)
@@ -132,19 +147,31 @@ data class AppFileTree(
             pkgDep to projFile
         }
 
-        // 5. 找 / 建 ProjectClass（默认 whole=true 表示“整类引用”）
+        // 4. 找/建 对应的 ProjectClass，并设置 whole = 传入值
         val className = psiClass.name ?: return
         val existingClass = projectFile.classes.find { it.className == className }
-        if (existingClass == null) {
-            // 新建并默认 whole=true
-            projectFile.classes.add(
-                ProjectClass(
-                    className = className,
-                    psiClass = psiClass,
-                    methods = mutableListOf(),
-                    whole = true
-                )
+        val projectClass = if (existingClass == null) {
+            // 新建
+            val newCls = ProjectClass(
+                className = className,
+                psiClass = psiClass,
+                methods = mutableListOf(),
+                whole = whole
             )
+            projectFile.classes.add(newCls)
+            newCls
+        } else {
+            // 如果已存在，可根据需求更新它的 whole
+            existingClass.whole = whole
+            existingClass
+        }
+
+        // 如果我们希望“整类”也显式地列出它所有方法
+        if (whole) {
+            // 此时就递归把所有方法都加进来
+            for (m in psiClass.methods) {
+                addMethod(m, project)  // addMethod 原本没有 whole 概念，方法本身也无 whole
+            }
         }
     }
 
