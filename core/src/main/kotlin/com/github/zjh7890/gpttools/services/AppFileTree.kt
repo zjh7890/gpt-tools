@@ -18,40 +18,41 @@ import kotlinx.serialization.Serializable
  *  ----------------------------
  *
  *  1. whole/partial 的含义（新版，无隐式节点）：
- *     - 当某个文件（ProjectFile）或类（ProjectClass）设置为 whole=true，表示“我们需要使用该文件/类的全部内容”。
- *       但**与原设计不同**的是：我们依旧会在数据结构中“显式”地列出它的全部子节点（例如文件下的所有类、类中的所有方法），
- *       不再将其视为“隐式存在”而不存储。这样可以避免后续操作时出现“先降级为 partial 再重新扫描子节点”的繁琐流程。
- *     - 当标记为 whole=false，则意味着“只需要其中的一部分”，这时我们会在 children 列表里（比如 ProjectFile.classes、
+ *     - 当某个文件（ProjectFile）或类（ProjectClass）设置为 whole=true，表示"我们需要使用该文件/类的全部内容"。
+ *       但**与原设计不同**的是：我们依旧会在数据结构中"显式"地列出它的全部子节点（例如文件下的所有类、类中的所有方法），
+ *       不再将其视为"隐式存在"而不存储。这样可以避免后续操作时出现"先降级为 partial 再重新扫描子节点"的繁琐流程。
+ *     - 当标记为 whole=false，则意味着"只需要其中的一部分"，这时我们会在 children 列表里（比如 ProjectFile.classes、
  *       ProjectClass.methods）列举出所需的具体子节点。若需要更多子节点，可以随时调用相关方法添加；若要移除部分子节点，也可以直接删除。
  *
- *     - 总之，“whole=true” 现在只是一个标签，表示“当前对象及其所有子节点都被完整使用”。**但不再依赖“清空子节点”来表示整对象引用**，
+ *     - 总之，"whole=true" 现在只是一个标签，表示"当前对象及其所有子节点都被完整使用"。**但不再依赖"清空子节点"来表示整对象引用**，
  *       数据结构中依旧能看到它包含的所有类或方法。
  *
  *  2. 移除逻辑：
  *     - **删除整个对象（文件 / 类）**：若我们不再需要这个文件或类，可直接从上级列表中移除它。例如在 PackageDependency.files 里 `remove` 掉
  *       对应的 ProjectFile，或在 ProjectFile.classes 中 `remove` 掉对应的 ProjectClass。
- *     - **删除部分子节点（类中的部分方法等）**：不论父级是 whole=true 还是 whole=false，都可以直接操作其子节点列表进行删除；无需再做“降级”。
+ *     - **删除部分子节点（类中的部分方法等）**：不论父级是 whole=true 还是 whole=false，都可以直接操作其子节点列表进行删除；无需再做"降级"。
  *       因为即使是 whole=true，我们也已显式存了所有子节点，对它们的增删改查都可以直接进行。
  *
  *  3. selected 与 whole/partial 的关系：
- *     - selected 表示在后续某些操作（例如 UI 勾选、批量处理）时是否被选中，与 “是否纳入(whole/partial)” 无直接影响。
+ *     - selected 表示在后续某些操作（例如 UI 勾选、批量处理）时是否被选中，与 "是否纳入(whole/partial)" 无直接影响。
  *       两者是不同维度：数据结构中是否存在节点，取决于是否 addFile/addClass/addMethod；而节点是否选中，取决于 UI 或逻辑对 selected 的设置。
- *     - 即使文件或类是 whole=true，因为我们采用“无隐式节点”的方式，子节点也都在数据结构中显式存在，也可独立设置 selected = true / false。
+ *     - 即使文件或类是 whole=true，因为我们采用"无隐式节点"的方式，子节点也都在数据结构中显式存在，也可独立设置 selected = true / false。
  *       具体是否这样使用，视你业务需求而定。
  *
- *  4. 关于“整对象 / 部分对象”的转换：
- *     - 在旧设计中，如果某个文件/类是 whole=true 而要部分移除某个方法，需要先“降级为 partial”，再重新扫描子节点。现在则无需如此。
- *     - 如果业务上还需要“切换 whole ↔ partial”的标记，也可以做，但这只是一种标签状态切换；子节点依旧存储在数据结构中，并不受影响。
+ *  4. 关于"整对象 / 部分对象"的转换：
+ *     - 在旧设计中，如果某个文件/类是 whole=true 而要部分移除某个方法，需要先"降级为 partial"，再重新扫描子节点。现在则无需如此。
+ *     - 如果业务上还需要"切换 whole ↔ partial"的标记，也可以做，但这只是一种标签状态切换；子节点依旧存储在数据结构中，并不受影响。
  */
 data class AppFileTree(
-    val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf()
+    val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf(),
+    var selected: Boolean = false
 ) {
     fun toSerializable(): SerializableAppFileTree {
         return SerializableAppFileTree(
-            projectTrees = projectFileTrees.map { it.toSerializable() }
+            projectTrees = projectFileTrees.map { it.toSerializable() },
+            selected = selected
         )
     }
-
 
     /**
      * 将指定文件加入到 AppFileTree
@@ -164,7 +165,8 @@ data class AppFileTree(
                 className = className,
                 psiClass = psiClass,
                 methods = mutableListOf(),
-                whole = whole
+                whole = whole,
+                selected = true // 新建时设置 selected = true
             )
             projectFile.classes.add(newCls)
             newCls
@@ -174,7 +176,7 @@ data class AppFileTree(
             existingClass
         }
 
-        // 如果我们希望“整类”也显式地列出它所有方法
+        // 如果我们希望"整类"也显式地列出它所有方法
         if (whole) {
             // 此时就递归把所有方法都加进来
             for (m in psiClass.methods) {
@@ -240,7 +242,8 @@ data class AppFileTree(
                 className = className,
                 psiClass = psiClass,
                 methods = mutableListOf(),
-                whole = false
+                whole = false,
+                selected = true // 新建时设置 selected = true
             )
             projectFile.classes.add(newCls)
             newCls
@@ -256,7 +259,8 @@ data class AppFileTree(
                 ProjectMethod(
                     methodName = psiMethod.name,
                     parameterTypes = paramTypes,
-                    psiMethod = psiMethod
+                    psiMethod = psiMethod,
+                    selected = true // 新建时设置 selected = true
                 )
             )
         }
@@ -348,7 +352,8 @@ data class AppFileTree(
                             className = c.name ?: "",
                             psiClass = c,
                             methods = mutableListOf(),
-                            whole = true
+                            whole = true,
+                            selected = true // 新建时设置 selected = true
                         )
                     )
                 }
@@ -407,7 +412,8 @@ data class AppFileTree(
                             className = psiClass.name ?: "",
                             psiClass = psiClass,
                             methods = mutableListOf(),
-                            whole = true
+                            whole = true,
+                            selected = true // 新建时设置 selected = true
                         )
                     )
                 }
@@ -443,7 +449,8 @@ data class AppFileTree(
                         ProjectMethod(
                             methodName = m.name,
                             parameterTypes = m.parameterList.parameters.map { it.type.canonicalText },
-                            psiMethod = m
+                            psiMethod = m,
+                            selected = true // 新建时设置 selected = true
                         )
                     )
                 }
@@ -495,7 +502,8 @@ data class AppFileTree(
                     ProjectFileTree(
                         project = project,
                         modules = mutableListOf(),
-                        mavenDependencies = mutableListOf()
+                        mavenDependencies = mutableListOf(),
+                        selected = true // 新建时设置 selected = true
                     )
                 }
 
@@ -538,7 +546,8 @@ data class AppFileTree(
             }
 
             return AppFileTree(
-                projectFileTrees = projectFileTreeMap.values.toMutableList()
+                projectFileTrees = projectFileTreeMap.values.toMutableList(),
+                selected = true // 新建时设置 selected = true
             )
         }
 
@@ -580,7 +589,8 @@ data class AppFileTree(
             val newPft = ProjectFileTree(
                 project = project,
                 modules = mutableListOf(),
-                mavenDependencies = mutableListOf()
+                mavenDependencies = mutableListOf(),
+                selected = true // 新建时设置 selected = true
             )
             appFileTree.projectFileTrees.add(newPft)
             return newPft
@@ -809,7 +819,8 @@ data class AppFileTree(
 
 @Serializable
 data class SerializableAppFileTree(
-    val projectTrees: List<SerializableProjectFileTree> = emptyList()
+    val projectTrees: List<SerializableProjectFileTree> = emptyList(),
+    val selected: Boolean = false
 ) {
     /**
      * 反序列化 -> 立即遍历所有文件/类/方法，找出对应 PSI 实例
@@ -817,7 +828,7 @@ data class SerializableAppFileTree(
      */
     fun toAppFileTree(): AppFileTree {
         val realProjectFileTrees = projectTrees.map { it.toProjectFileTree() }.toMutableList()
-        return AppFileTree(projectFileTrees = realProjectFileTrees)
+        return AppFileTree(projectFileTrees = realProjectFileTrees, selected = selected)
     }
 }
 
@@ -827,13 +838,15 @@ data class SerializableAppFileTree(
 data class ProjectFileTree(
     val project: Project,
     val modules: MutableList<ModuleDependency> = mutableListOf(),
-    val mavenDependencies: MutableList<MavenDependency> = mutableListOf()
+    val mavenDependencies: MutableList<MavenDependency> = mutableListOf(),
+    var selected: Boolean = false  // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectFileTree {
         return SerializableProjectFileTree(
             projectName = project.name,
             modules = modules.map { it.toSerializable() },
-            mavenDependencies = mavenDependencies.map { it.toSerializable() }
+            mavenDependencies = mavenDependencies.map { it.toSerializable() },
+            selected = selected  // 传递 selected 值
         )
     }
 }
@@ -842,7 +855,8 @@ data class ProjectFileTree(
 data class SerializableProjectFileTree(
     val projectName: String = "",
     val modules: List<SerializableModuleDependency> = emptyList(),
-    val mavenDependencies: List<SerializableMavenDependency> = emptyList()
+    val mavenDependencies: List<SerializableMavenDependency> = emptyList(),
+    val selected: Boolean = false
 ) {
     fun toProjectFileTree(): ProjectFileTree {
         // 获取对应的 Project 实例
@@ -865,7 +879,8 @@ data class SerializableProjectFileTree(
                     version = it.version,
                     packages = it.packages
                 ).toMavenDependency(project)
-            }.toMutableList()
+            }.toMutableList(),
+            selected = selected  // 传递 selected 值
         )
     }
 }
@@ -886,7 +901,8 @@ data class ModuleDependency(
 @Serializable
 data class SerializableModuleDependency(
     val moduleName: String,
-    val packages: List<SerializablePackageDependency> = emptyList()
+    val packages: List<SerializablePackageDependency> = emptyList(),
+    val selected: Boolean = false
 ) {
     fun toModuleDependency(project: Project): ModuleDependency {
         return ModuleDependency(
@@ -918,7 +934,8 @@ data class SerializableMavenDependency(
     val groupId: String,
     val artifactId: String,
     val version: String,
-    val packages: List<SerializablePackageDependency> = emptyList()
+    val packages: List<SerializablePackageDependency> = emptyList(),
+    val selected: Boolean = false
 ){
     fun toMavenDependency(project: Project): MavenDependency {
         return MavenDependency(
@@ -946,7 +963,8 @@ data class PackageDependency(
 @Serializable
 data class SerializablePackageDependency(
     val packageName: String,
-    val files: List<SerializableProjectFile> = emptyList()
+    val files: List<SerializableProjectFile> = emptyList(),
+    val selected: Boolean = false
 ) {
     fun toPackageDependency(project: Project): PackageDependency {
         return PackageDependency(
@@ -1047,7 +1065,8 @@ data class SerializableProjectFile(
     val filePath: String = "",
     val ifMavenFile: Boolean = false,
     val classes: List<SerializableProjectClass>? = null,
-    val whole: Boolean = false
+    val whole: Boolean = false,
+    val selected: Boolean = false
 ) {
     fun toProjectFile(project: Project): ProjectFile {
         val vFile: VirtualFile
@@ -1093,13 +1112,15 @@ data class ProjectClass(
     val psiClass: PsiClass,               // 现在保证不能为空
     val isAtomicClass: Boolean = PsiUtils.isAtomicClass(psiClass),
     val methods: MutableList<ProjectMethod>,
-    var whole: Boolean
+    var whole: Boolean,
+    var selected: Boolean = false         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectClass {
         return SerializableProjectClass(
             className = className,
             methods = methods.map { it.toSerializable() },
-            whole = whole
+            whole = whole,
+            selected = selected           // 传递 selected 值
         )
     }
 
@@ -1165,7 +1186,8 @@ data class ProjectClass(
 data class SerializableProjectClass(
     val className: String = "",
     val methods: List<SerializableProjectMethod> = emptyList(),
-    val whole: Boolean = false
+    val whole: Boolean = false,
+    val selected: Boolean = false
 ) {
     fun toProjectClass(psiFile: PsiFile): ProjectClass {
         // 在 psiFile 里查找同名的 PsiClass
@@ -1185,7 +1207,8 @@ data class SerializableProjectClass(
             className = className,
             psiClass = foundPsiClass,
             methods = realMethods,
-            whole = whole
+            whole = whole,
+            selected = selected           // 传递 selected 值
         )
     }
 }
@@ -1196,12 +1219,14 @@ data class SerializableProjectClass(
 data class ProjectMethod(
     val methodName: String,
     val parameterTypes: List<String> = emptyList(),
-    val psiMethod: PsiMethod             // 现在保证不能为空
+    val psiMethod: PsiMethod,            // 现在保证不能为空
+    var selected: Boolean = false        // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectMethod {
         return SerializableProjectMethod(
             methodName = methodName,
-            parameterTypes = parameterTypes
+            parameterTypes = parameterTypes,
+            selected = selected          // 传递 selected 值
         )
     }
 }
@@ -1209,7 +1234,8 @@ data class ProjectMethod(
 @Serializable
 data class SerializableProjectMethod(
     val methodName: String = "",
-    val parameterTypes: List<String> = emptyList()
+    val parameterTypes: List<String> = emptyList(),
+    val selected: Boolean = false
 ) {
     /**
      * 反序列化：在给定的 PsiClass 中找对应的方法
@@ -1226,7 +1252,8 @@ data class SerializableProjectMethod(
         return ProjectMethod(
             methodName = methodName,
             parameterTypes = parameterTypes,
-            psiMethod = foundPsiMethod
+            psiMethod = foundPsiMethod,
+            selected = selected           // 传递 selected 值
         )
     }
 }

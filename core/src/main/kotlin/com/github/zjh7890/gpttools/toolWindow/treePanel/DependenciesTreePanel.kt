@@ -402,6 +402,12 @@ class CheckboxTreeNode(val text: String) : DefaultMutableTreeNode(text) {
 
 class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
     private val checkbox = JCheckBox()
+    private val panel = JPanel(BorderLayout())
+
+    init {
+        panel.isOpaque = false
+        checkbox.isOpaque = false
+    }
 
     override fun getTreeCellRendererComponent(
         tree: JTree,
@@ -415,25 +421,13 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
         val defaultComponent = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
 
         if (value is CheckboxTreeNode) {
-            // 检查是否是 Root Classes 下的节点或其子节点
-            var parent = value.parent as? DefaultMutableTreeNode
-            while (parent != null) {
-                if (parent.userObject == "Root Classes") {
-                    checkbox.isSelected = value.isChecked
-                    checkbox.text = value.text
-                    checkbox.isOpaque = false
-                    return checkbox
-                }
-                parent = parent.parent as? DefaultMutableTreeNode
-            }
+            // 设置 checkbox 状态
+            checkbox.isSelected = value.isChecked
 
-            // 如果不是 Root Classes 节点，检查是否是类节点
             val userObj = value.userObject
             if (userObj is ProjectClass) {
-                val psiClass = userObj.psiClass
                 // 判断是否是数据类
                 if (userObj.isAtomicClass) {
-                    // 如果是数据类，使用特殊图标
                     this.icon = com.intellij.icons.AllIcons.Nodes.Record
                 } else {
                     this.icon = com.intellij.icons.AllIcons.Nodes.Class
@@ -444,12 +438,17 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
                 this.icon = com.intellij.icons.AllIcons.Nodes.Method
                 this.text = userObj.psiMethod.name
             }
+
+            // 使用面板组合 checkbox 和默认渲染组件
+            panel.removeAll()
+            panel.add(checkbox, BorderLayout.WEST)
+            panel.add(defaultComponent, BorderLayout.CENTER)
+            return panel
         }
 
         return defaultComponent
     }
 }
-
 
 class RemoveSelectedNodesAction(
     private val dependenciesPanel: DependenciesTreePanel

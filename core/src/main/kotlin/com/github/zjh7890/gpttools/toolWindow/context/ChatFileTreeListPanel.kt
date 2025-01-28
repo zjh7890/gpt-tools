@@ -3,7 +3,6 @@
 package com.github.zjh7890.gpttools.toolWindow.context
 
 import com.github.zjh7890.gpttools.services.ChatSession
-import com.github.zjh7890.gpttools.toolWindow.treePanel.CheckboxTreeNode
 import com.github.zjh7890.gpttools.toolWindow.treePanel.DependenciesTreePanel
 import com.intellij.openapi.project.Project
 import com.intellij.util.ui.JBUI
