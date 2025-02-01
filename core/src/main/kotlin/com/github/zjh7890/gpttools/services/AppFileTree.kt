@@ -54,64 +54,56 @@ data class AppFileTree(
         )
     }
 
-    /**
-     * 将指定文件加入到 AppFileTree
-     * - 若是本地文件，则按照 module -> package -> file 进行挂载
-     * - 若是外部依赖 (.m2/repository/... )，则解析 groupId:artifactId:version 并挂载到 mavenDependencies
-     * - 仅完成结构挂载，不做额外解析（如类、方法）
-     */
     fun addFile(file: VirtualFile, project: Project, whole: Boolean = false) {
         // 1. 找到或创建当前 Project 对应的 projectFileTree
         val pft = findOrCreateProjectFileTree(this, project)
 
-        // 2. 判断本地 or 外部依赖
+        // 2. 本地 or 外部依赖
         val projectPath = project.basePath ?: ""
         val isExternal = !file.path.startsWith(projectPath)
 
-        // 3. 找到对应的 packageDependency 和创建 ProjectFile
-        val (packageDep, projectFile) = if (!isExternal) {
-            // ------- 本地文件 -------
-            // (1) 获取 moduleDependency
+        if (!isExternal) {
+            // 本地文件:
             val moduleName = getModuleName(file, project)
             val moduleDep = findOrCreateModule(pft.modules, moduleName)
 
-            // (2) 获取 packageDependency
-            val psiFile = PsiManager.getInstance(project).findFile(file)
-            val packageName = getPackageName(psiFile)
-            val packageDep = findOrCreatePackage(moduleDep.packages, packageName)
+            // 使用新方法获取扁平化路径
+            val flattenedPath = getFlattenedLocalDirPath(file, project, moduleName)
+            val packageDep = findOrCreatePackage(moduleDep.packages, flattenedPath)
 
-            // (3) 找 / 创建 ProjectFile
+            // 接下来跟原来一样找或建 ProjectFile
             val projFile = findOrCreateProjectFile(packageDep.files, file, project, isMaven = false, whole = whole)
-            packageDep to projFile
+
+            if (whole) {
+                // 如果 whole=true,就显式添加文件中的所有类
+                val psiFile = PsiManager.getInstance(project).findFile(file)
+                if (psiFile != null) {
+                    val allPsiClasses = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                    for (cls in allPsiClasses) {
+                        addClass(cls, project, whole = true)
+                    }
+                }
+            }
         } else {
-            // ------- 外部依赖文件 -------
-            // (1) 解析 maven groupId/artifactId/version
+            // 外部依赖文件:
             val mavenInfo = extractMavenInfo(file.path) ?: return
             val mavenDep = findOrCreateMavenDependency(
-                pft.mavenDependencies,
-                mavenInfo.groupId,
-                mavenInfo.artifactId,
-                mavenInfo.version
+                pft.mavenDependencies, mavenInfo.groupId, mavenInfo.artifactId, mavenInfo.version
             )
 
-            // (2) 获取 packageDependency
-            val psiFile = PsiManager.getInstance(project).findFile(file)
-            val packageName = getPackageName(psiFile)
-            val packageDep = findOrCreatePackage(mavenDep.packages, packageName)
+            // 用新方法获取 jar 内部扁平路径
+            val flattenedPath = getFlattenedMavenDirPath(file)
+            val packageDep = findOrCreatePackage(mavenDep.packages, flattenedPath)
 
-            // (3) 找 / 创建 ProjectFile
             val projFile = findOrCreateProjectFile(packageDep.files, file, project, isMaven = true, whole = whole)
-            packageDep to projFile
-        }
 
-        // 4. 如果是 whole=true，显式添加文件中的所有类
-        if (whole) {
-            val psiFile = PsiManager.getInstance(project).findFile(file)
-            if (psiFile != null) {
-                val allPsiClasses = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
-                for (cls in allPsiClasses) {
-                    // 递归添加类及其方法，同样标记为 whole=true
-                    addClass(cls, project, whole = true)
+            if (whole) {
+                val psiFile = PsiManager.getInstance(project).findFile(file)
+                if (psiFile != null) {
+                    val allPsiClasses = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java)
+                    for (cls in allPsiClasses) {
+                        addClass(cls, project, whole = true)
+                    }
                 }
             }
         }
@@ -471,18 +463,55 @@ data class AppFileTree(
         val relPath = file.path.removePrefix(basePath).removePrefix("/")
         return relPath.split("/").firstOrNull() ?: "UnknownModule"
     }
+    private fun getFlattenedLocalDirPath(
+        file: VirtualFile,
+        project: Project,
+        topLevelModuleName: String
+    ): String {
+        /**
+         * 思路:
+         * 1. 拿到 file 的绝对路径，如 /path/to/yourProject/core/src/main/kotlin/com/...
+         * 2. 去掉 project.basePath  (假设 /path/to/yourProject)
+         * 3. 再把顶层模块名保留，如 "core"，后面的目录合并成一条 "src/main/kotlin/com/github/xxx"
+         * 4. 该合并结果将存在于 PackageDependency.packageName
+         */
+        val basePath = project.basePath?.removeSuffix("/") ?: ""
+        val absPath = file.path
 
-    /**
-     * 猜测包名。若是 Java 文件则可直接用其 packageName，否则返回 (default package)。
-     * 可视需要抽用 DependencyUtils 的其他逻辑。
-     */
-    private fun getPackageName(psiFile: PsiFile?): String {
-        return if (psiFile is PsiJavaFile) {
-            psiFile.packageName.ifBlank { "(default package)" }
-        } else {
-            "(default package)"
+        // 移除项目基路径
+        var relative = absPath.removePrefix(basePath).removePrefix("/")
+        // 如果包含了顶层模块名（如 "core"），先把 "core/" 去除，保留为 packageName 的前缀
+        // 例: relative = "core/src/main/kotlin/..."
+        if (relative.startsWith("$topLevelModuleName/")) {
+            // 去掉 "core/" 只保留后面部分
+            relative = relative.removePrefix("$topLevelModuleName/")
         }
+        // 此时 relative 形如 "src/main/kotlin/com/github/xxx"
+        // 作为一个扁平路径，就直接返回
+        return relative
     }
+
+    private fun getFlattenedMavenDirPath(
+        file: VirtualFile
+    ): String {
+        /**
+         * 思路:
+         * 1. 对于外部依赖 jar 路径，如
+         *    "/Users/xxx/.m2/repository/groupId/artifactId/version/artifactId-version.jar!/META-INF/..."
+         * 2. 找到 jar 内部部分，即 jar!/ 后面的 "META-INF/..."
+         * 3. 原样当作一个扁平路径存进 PackageDependency.packageName
+         */
+        val fullPath = file.path
+        val jarSeparator = "!/"
+        val idx = fullPath.indexOf(jarSeparator)
+        if (idx != -1 && idx + jarSeparator.length < fullPath.length) {
+            val insideJar = fullPath.substring(idx + jarSeparator.length)  // 形如 "META-INF/..."
+            return insideJar
+        }
+        // 如果出错，就给个fallback
+        return "(unknown-internal-path)"
+    }
+
 
     companion object {
 
@@ -596,6 +625,8 @@ data class AppFileTree(
             return newPft
         }
 
+
+
         fun findOrCreateModule(modules: MutableList<ModuleDependency>, moduleName: String): ModuleDependency {
             return modules.find { it.moduleName == moduleName } ?: ModuleDependency(moduleName).also {
                 modules.add(it)
@@ -693,40 +724,48 @@ data class AppFileTree(
         }
 
         /**
-         * 将原先 generateDependenciesText 和 collectFileContents 的逻辑合并到一个函数中
+         * 将原先 generateDependenciesTextCombined 的逻辑改为"只生成 selected=true 的节点"。
          */
         fun generateDependenciesTextCombined(
             appFileTree: AppFileTree
         ): String {
-            // 针对每个 ProjectFileTree 生成文本，再用 joinToString 拼装
-            return appFileTree.projectFileTrees.joinToString("\n\n") { projectFileTree ->
-                // 1) 整理 “本地 module” 的文件
+            // 对 projectFileTrees 做过滤，仅处理 selected = true 的项目
+            val filteredProjects = appFileTree.projectFileTrees.filter { it.selected }
+
+            // 对每个 ProjectFileTree 生成文本，然后用 "\n\n" 拼接
+            return filteredProjects.joinToString("\n\n") { projectFileTree ->
+                // ---- 1) 处理本地 modules ----
                 val moduleFilesContents = projectFileTree.modules
+                    .filter { it.selected }                    // 只处理选中的 module
                     .flatMap { it.packages }
+                    .filter { it.selected }                    // 只处理选中的 package
                     .flatMap { it.files }
+                    .filter { it.selected }                    // 只处理选中的 file
                     .mapNotNull { projectFile ->
-                        handleSingleProjectFile(projectFile, projectFileTree.project)
+                        handleSingleProjectFileFiltered(projectFile, projectFileTree.project)
                     }
 
-                // 2) 整理 “mavenDependencies” 中的文件
+                // ---- 2) 处理 Maven Dependencies ----
                 val mavenFilesContents = projectFileTree.mavenDependencies
+                    .filter { it.selected }                    // 只处理选中的 mavenDependency
                     .flatMap { it.packages }
+                    .filter { it.selected }
                     .flatMap { it.files }
+                    .filter { it.selected }
                     .mapNotNull { projectFile ->
-                        handleSingleProjectFile(projectFile, projectFileTree.project)
+                        handleSingleProjectFileFiltered(projectFile, projectFileTree.project)
                     }
 
-                // 合并两个来源的内容
-                val joinedFileContents = (moduleFilesContents + mavenFilesContents).joinToString("\n\n")
-                joinedFileContents
+                // 合并并拼成最后的字符串
+                (moduleFilesContents + mavenFilesContents).joinToString("\n\n")
             }
         }
 
         /**
-         * 单独提取一个函数，处理单个 ProjectFile 的逻辑
-         * 返回要拼接的字符串，若不需要则返回 null
+         * 处理单个 ProjectFile，但只生成"被选中的类/方法"内容。
+         * 返回要拼接的字符串，如无内容则返回 null
          */
-        private fun handleSingleProjectFile(
+        private fun handleSingleProjectFileFiltered(
             projectFile: ProjectFile,
             project: Project
         ): String? {
@@ -734,64 +773,65 @@ data class AppFileTree(
             val absolutePath = virtualFile.path
 
             val relativePath = calculateRelativePath(absolutePath, project, projectFile.ifMavenFile)
-            // 如果用户配置了 whole=true 则读取整文件内容
-            return if (projectFile.whole) {
-                return "${relativePath}\n" + FileUtil.readFileInfoForLLM(virtualFile)
-            } else {
-                // 收集需要处理的 PsiElement
-                val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
-                val elementsToProcess = mutableListOf<PsiElement>()
 
-                // 遍历用户指定的 Class/Method 信息
-                projectFile.classes.forEach { projectClass ->
-                    val psiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
+            // 如果文件是 whole=true，则无论其内部类/方法是否勾选，都表示"整文件"需要
+            if (projectFile.whole) {
+                return "$relativePath\n" + FileUtil.readFileInfoForLLM(virtualFile)
+            }
+
+            // 如果是部分文件(whole=false)，则只处理 selected=true 的类/方法
+            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
+            val elementsToProcess = mutableListOf<PsiElement>()
+
+            // 遍历用户指定的 Class/Method 信息
+            projectFile.classes
+                .filter { it.selected }                   // 只处理被选中的类
+                .forEach { projectClass ->
+                    // 根据是否 whole=true 判断要不要整类
+                    val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
                         if (projectClass.whole) {
-                            // 如果需要整类，则用 qualifiedName 精确匹配
+                            // 整类模式 -> 用 qualifiedName 精确匹配
                             it.qualifiedName == projectClass.className
                         } else {
-                            // 否则只匹配类名
+                            // 否则只用类名
                             it.name == projectClass.className
                         }
                     } ?: return@forEach
 
                     if (projectClass.whole) {
-                        // 整类内容
-                        elementsToProcess.add(psiClass)
+                        // 若这个类标记为whole=true，就把整个 PsiClass 内容都加进来
+                        elementsToProcess.add(foundPsiClass)
                     } else {
-                        // 若只需要其中某些方法
-                        projectClass.methods.forEach { projectMethod ->
-                            val matchedMethod = psiClass
-                                .findMethodsByName(projectMethod.methodName, false)
-                                .find { method ->
-                                    val paramTypes = method.parameterList.parameters.map { it.type.canonicalText }
-                                    paramTypes == projectMethod.parameterTypes
-                                } ?: return@forEach
-
-                            elementsToProcess.add(matchedMethod)
-                        }
+                        // 否则只处理 selected=true 的方法
+                        projectClass.methods
+                            .filter { it.selected }
+                            .forEach { projectMethod ->
+                                val matchedMethod = foundPsiClass
+                                    .findMethodsByName(projectMethod.methodName, false)
+                                    .find { m ->
+                                        val paramTypes = m.parameterList.parameters.map { p -> p.type.canonicalText }
+                                        paramTypes == projectMethod.parameterTypes
+                                    }
+                                if (matchedMethod != null) {
+                                    elementsToProcess.add(matchedMethod)
+                                }
+                            }
                     }
                 }
 
-                // 将收集到的 PsiElement 调用 depsInSingleFile 生成内容
-                if (elementsToProcess.isNotEmpty()) {
-                    val singleFileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
-                    if (!singleFileContent.isNullOrBlank()) {
-                        "${relativePath}\n" + FileUtil.wrapBorder(singleFileContent.trim())
-                    } else {
-                        null
-                    }
-                } else {
-                    null
+            if (elementsToProcess.isNotEmpty()) {
+                val singleFileContent = ElementsDepsInSingleFileAction.depsInSingleFile(elementsToProcess, project)
+                if (!singleFileContent.isNullOrBlank()) {
+                    return "$relativePath\n" + FileUtil.wrapBorder(singleFileContent.trim())
                 }
             }
+
+            // 如果本文件没有任何元素可处理(或内容为空)，则返回 null
+            return null
         }
 
         /**
-         * 计算文件的相对路径
-         * @param absolutePath 文件的绝对路径
-         * @param project 项目对象
-         * @param isMaven 是否是 Maven 依赖文件
-         * @return 相对路径（本地文件包含项目名称，jar包不包含）
+         * 保持原先的逻辑，根据本地项目文件或 Maven 路径计算"相对路径"。
          */
         private fun calculateRelativePath(
             absolutePath: String,
@@ -888,7 +928,8 @@ data class SerializableProjectFileTree(
 // [Module Name]
 data class ModuleDependency(
     val moduleName: String,
-    val packages: MutableList<PackageDependency> = mutableListOf()
+    val packages: MutableList<PackageDependency> = mutableListOf(),
+    var selected: Boolean = false         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableModuleDependency {
         return SerializableModuleDependency(
@@ -900,7 +941,7 @@ data class ModuleDependency(
 
 @Serializable
 data class SerializableModuleDependency(
-    val moduleName: String,
+    val moduleName: String = "",
     val packages: List<SerializablePackageDependency> = emptyList(),
     val selected: Boolean = false
 ) {
@@ -917,7 +958,8 @@ data class MavenDependency(
     val groupId: String,
     val artifactId: String,
     val version: String,
-    val packages: MutableList<PackageDependency> = mutableListOf()
+    val packages: MutableList<PackageDependency> = mutableListOf(),
+    var selected: Boolean = false         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableMavenDependency {
         return SerializableMavenDependency(
@@ -931,9 +973,9 @@ data class MavenDependency(
 
 @Serializable
 data class SerializableMavenDependency(
-    val groupId: String,
-    val artifactId: String,
-    val version: String,
+    val groupId: String = "",
+    val artifactId: String = "",
+    val version: String = "",
     val packages: List<SerializablePackageDependency> = emptyList(),
     val selected: Boolean = false
 ){
@@ -950,7 +992,8 @@ data class SerializableMavenDependency(
 // [Package Name]
 data class PackageDependency(
     val packageName: String,
-    val files: MutableList<ProjectFile> = mutableListOf()
+    val files: MutableList<ProjectFile> = mutableListOf(),
+    var selected: Boolean = false         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializablePackageDependency {
         return SerializablePackageDependency(
@@ -962,7 +1005,7 @@ data class PackageDependency(
 
 @Serializable
 data class SerializablePackageDependency(
-    val packageName: String,
+    val packageName: String = "",
     val files: List<SerializableProjectFile> = emptyList(),
     val selected: Boolean = false
 ) {
@@ -983,7 +1026,8 @@ data class ProjectFile(
     val ifMavenFile: Boolean = false,
     val psiFile: PsiFile?,
     val classes: MutableList<ProjectClass> = mutableListOf(),
-    var whole: Boolean = false
+    var whole: Boolean = false,
+    var selected: Boolean = false         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectFile {
         return SerializableProjectFile(

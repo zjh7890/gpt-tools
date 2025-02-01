@@ -14,8 +14,11 @@ import com.intellij.util.xmlb.XmlSerializerUtil
     storages = [Storage("LLMSettingsState.xml")]
 )
 class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
-    var settings: MutableList<LLMSetting> = mutableListOf(
-    )
+    var settings: MutableList<LLMSetting> = mutableListOf()
+    
+    // 新增字段
+    var defaultModelName: String? = null
+    var formatCopyModelName: String? = null
 
     // 添加监听器列表
     private val listeners = mutableListOf<SettingsChangeListener>()
@@ -53,7 +56,6 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
                     azureApiKey = "",
                     azureModel = "",
                     stream = true,
-                    isDefault = true,
                     provider = Provider.OpenAILike
                 )
             )
@@ -78,7 +80,6 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
                     azureApiKey = "",
                     azureModel = "",
                     stream = true,
-                    isDefault = true,
                     provider = Provider.OpenAILike
                 )
             )
@@ -94,10 +95,20 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
 
     /**
      * 获取默认的配置项
-     * @return 默认的 [LLMSetting]，如果没有设置默认项则返回第一项，列表为空时返回 null
+     * @return 默认的 [LLMSetting],如果没有设置默认项则返回第一项,列表为空时返回 null
      */
     fun getDefaultSetting(): LLMSetting? {
-        return settings.find { it.isDefault } ?: settings.firstOrNull()
+        return settings.find { it.name == defaultModelName } 
+            ?: settings.firstOrNull()
+    }
+
+    /**
+     * 获取格式化复制功能使用的配置项
+     * @return 用于格式化复制的 [LLMSetting],如果没有设置则返回默认项,列表为空时返回 null
+     */
+    fun getFormatCopySetting(): LLMSetting? {
+        return settings.find { it.name == formatCopyModelName }
+            ?: getDefaultSetting()
     }
     
     companion object {
@@ -131,11 +142,6 @@ class LLMSettingsState : PersistentStateComponent<LLMSettingsState> {
                 azureModel = defaultSetting.azureModel
             )
         }
-    }
-
-    enum class ResponseType {
-        SSE,
-        JSON
     }
 
     // 定义监听器接口

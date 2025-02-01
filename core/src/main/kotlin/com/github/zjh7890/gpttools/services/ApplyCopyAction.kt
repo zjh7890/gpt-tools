@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.services
 
+import com.github.zjh7890.gpttools.agent.FormatCopyAgent
 import com.github.zjh7890.gpttools.agent.GenerateDiffAgent
 import com.github.zjh7890.gpttools.settings.llmSetting.LLMSettingsState
 import com.github.zjh7890.gpttools.toolWindow.chat.AutoDevInputSection
@@ -53,14 +54,10 @@ class ApplyCopyAction(
                     progressBar.isVisible = true
                     progressBar.isIndeterminate = true
 
-                    ApplicationManager.getApplication().invokeAndWait {
-                        contentPanel?.addMessageBoth(ChatRole.assistant, FileUtil.wrapBorder(message))
-                    }
-
                     val projectStructure = DirectoryUtil.getDirectoryContents(project)
-                    GenerateDiffAgent.apply(
+                    FormatCopyAgent.apply(
                         project,
-                        LLMSettingsState.toLlmConfig(inputSection.getSelectedSetting()),
+                        LLMSettingsState.toLlmConfig(LLMSettingsState.getInstance().getFormatCopySetting()),
                         projectStructure,
                         message,
                         chatCodingService.sessionManager.getCurrentSession(),

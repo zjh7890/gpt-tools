@@ -107,14 +107,14 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
         })
         layoutPanel.isOpaque = false
         // 获取 ShireSettingsState 实例
-        val LLMSettingsState = LLMSettingsState.getInstance()
+        val llmSettingsState = LLMSettingsState.getInstance()
         layoutPanel.isOpaque = false
         // 将自身添加为设置变化的监听器
-        LLMSettingsState.addSettingsChangeListener(this)
+        llmSettingsState.addSettingsChangeListener(this)
         // 获取 ShireSettings 列表
-        val settingsList = LLMSettingsState.getFillSettings()
+        val settingsList = llmSettingsState.getFillSettings()
         // 查找默认的配置项（isDefault 为 true）
-        val defaultSetting = settingsList.find { it.isDefault } ?: settingsList.firstOrNull()
+        val defaultSetting = llmSettingsState.getDefaultSetting()
         // 创建 ComboBox 的模型
         val comboBoxModel = MutableCollectionComboBoxModel(settingsList, defaultSetting)
         // 初始化 ComboBox
@@ -210,7 +210,8 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
     val focusableComponent: JComponent get() = input
     override fun onSettingsChanged() {
         SwingUtilities.invokeLater {
-            val settingsList = LLMSettingsState.getInstance().getFillSettings()
+            val llmSettingsState = LLMSettingsState.getInstance()
+            val settingsList = llmSettingsState.getFillSettings()
             // 获取当前选中的模型
             val currentSelection = configComboBox.selectedItem as? LLMSetting
             // 检查当前选中的模型是否仍然存在于新的设置列表中
@@ -218,7 +219,7 @@ class AutoDevInputSection(private val project: Project, val disposable: Disposab
                 currentSelection // 保持当前选中项
             } else {
                 // 如果当前选中项被删除，选择默认项
-                settingsList.find { it.isDefault } ?: settingsList.firstOrNull()
+                llmSettingsState.getDefaultSetting()
             }
             // 创建新的 ComboBoxModel，并设置选定项
             val comboBoxModel = MutableCollectionComboBoxModel(settingsList, newSelection)

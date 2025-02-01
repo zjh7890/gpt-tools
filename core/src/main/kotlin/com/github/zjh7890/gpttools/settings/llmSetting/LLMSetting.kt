@@ -11,7 +11,6 @@ data class LLMSetting(
     var azureApiKey: String = "",
     var azureModel: String = "",
     var stream: Boolean = true,
-    var isDefault: Boolean = false,
     // 新增 provider 字段
     var provider: Provider = Provider.OpenAILike
 )

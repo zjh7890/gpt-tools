@@ -24,10 +24,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import java.awt.BorderLayout
-import java.awt.CardLayout
-import java.awt.Component
-import java.awt.Dimension
+import java.awt.*
 import java.awt.event.ItemEvent
 import javax.swing.*
 import javax.swing.event.DocumentEvent
@@ -68,6 +65,14 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
 
     // 当前选中的配置项组件
     private var selectedConfiguration: ShireConfigItemComponent? = null
+    
+    // 新增下拉框成员变量
+    private val defaultModelComboBox = JComboBox<LLMSetting>().apply {
+        renderer = createComboBoxRenderer()
+    }
+    private val formatCopyModelComboBox = JComboBox<LLMSetting>().apply {
+        renderer = createComboBoxRenderer()
+    }
 
     init {
         // 创建工具栏装饰器
@@ -111,8 +116,34 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
         // 使用 LeftRightComponent 组合左侧列表和右侧详细面板
         val combinedPanel = LeftRightComponent(listPanel, detailPanel).mainPanel
 
+        
+
+        // 创建下拉框面板
+        val comboBoxPanel = JPanel(FlowLayout(FlowLayout.LEFT)).apply {
+            add(JLabel("Default Model:"))
+            add(defaultModelComboBox)
+            add(Box.createHorizontalStrut(10))
+            add(JLabel("Format Copy Model:")) 
+            add(formatCopyModelComboBox)
+        }
+
+        // 创建包含下拉框和原有面板的主面板
+        val mainWrapperPanel = JPanel(BorderLayout()).apply {
+            add(comboBoxPanel, BorderLayout.NORTH)
+            add(combinedPanel, BorderLayout.CENTER)
+        }
+
+        // 监听列表变化,更新下拉框选项
+        settingsList.addListSelectionListener { e ->
+            if (!e.valueIsAdjusting) {
+                // 更新下拉框选项
+                updateComboBoxes()
+                updateDetailPanel(settingsList.selectedValue)
+            }
+        }
+
         // 初始化主选项卡
-        mainPanel = combinedPanel
+        mainPanel = mainWrapperPanel
     }
 
     override fun reset(settings: LLMSettingsState) {
@@ -133,6 +164,15 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
     }
 
     override fun isModified(settings: LLMSettingsState): Boolean {
+        val currentDefaultModelName = (defaultModelComboBox.selectedItem as? LLMSetting)?.name
+        val currentFormatCopyModelName = (formatCopyModelComboBox.selectedItem as? LLMSetting)?.name
+
+        // 比较下拉框选中值与 settings 中保存的值
+        if (currentDefaultModelName != settings.defaultModelName ||
+            currentFormatCopyModelName != settings.formatCopyModelName) {
+            return true
+        }
+
         if (listModel.size != settings.getFillSettings().size) return true
         for (i in 0 until listModel.size) {
             val current = listModel.getElementAt(i)
@@ -145,8 +185,7 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
                 current.azureModel != original.azureModel ||
                 current.azureEndpoint != original.azureEndpoint ||
                 current.azureApiKey != original.azureApiKey ||
-                current.stream != original.stream ||
-                current.isDefault != original.isDefault
+                current.stream != original.stream
             ) {
                 return true
             }
@@ -155,6 +194,10 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
     }
 
     override fun apply(settings: LLMSettingsState) {
+        // 保存下拉框选中的值
+        settings.defaultModelName = (defaultModelComboBox.selectedItem as? LLMSetting)?.name
+        settings.formatCopyModelName = (formatCopyModelComboBox.selectedItem as? LLMSetting)?.name
+
         // 清空现有设置并应用列表中的配置项
         val newSettings = mutableListOf<LLMSetting>()
         for (i in 0 until listModel.size) {
@@ -162,6 +205,23 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
         }
         settings.settings = newSettings
         LLMSettingsState.getInstance().notifySettingsChanged()
+    }
+
+    // 创建下拉框渲染器的辅助方法
+    private fun createComboBoxRenderer() = object : DefaultListCellRenderer() {
+        override fun getListCellRendererComponent(
+            list: JList<*>,
+            value: Any?,
+            index: Int,
+            isSelected: Boolean,
+            cellHasFocus: Boolean
+        ): Component {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+            if (value is LLMSetting) {
+                text = value.name
+            }
+            return this
+        }
     }
 
     override fun getComponent(): JComponent {
@@ -257,7 +317,6 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
         if (selectedSetting != null) {
             val copiedSetting = selectedSetting.copy() // 假设 ShireSetting 是 data class
             // 默认属性不复制
-            copiedSetting.isDefault = false
             listModel.addElement(copiedSetting)
             settingsList.selectedIndex = settingsList.model.size - 1
         } else {
@@ -318,21 +377,30 @@ class LLMSettingUi : ConfigurableUi<LLMSettingsState> {
         detailPanel.repaint()
     }
 
-    /**
-     * 取消其他所有配置的默认状态。
-     * @param currentConfig 当前被设置为默认的配置
-     */
-    fun unsetOtherDefaults(currentConfig: ShireConfigItemComponent) {
-        // Iterate over all settings in the listModel
+    // 更新下拉框选项的方法
+    private fun updateComboBoxes() {
+        val st = LLMSettingsState.getInstance()
+        
+        defaultModelComboBox.removeAllItems()
+        formatCopyModelComboBox.removeAllItems()
+        
+        // 添加空选项
+        defaultModelComboBox.addItem(null)
+        formatCopyModelComboBox.addItem(null)
+        
+        // 添加所有配置项
         for (i in 0 until listModel.size) {
             val setting = listModel.getElementAt(i)
-            // If the setting is not the current one, and is default, unset it
-            if (setting != currentConfig.setting && setting.isDefault) {
-                setting.isDefault = false
-            }
+            defaultModelComboBox.addItem(setting)
+            formatCopyModelComboBox.addItem(setting)
         }
-        // Refresh the list to update rendering
-        settingsList.repaint()
+
+        // 选中已保存的选项
+        val defaultSetting = listModel.elements().toList().find { it.name == st.defaultModelName }
+        val formatCopySetting = listModel.elements().toList().find { it.name == st.formatCopyModelName }
+        
+        defaultModelComboBox.selectedItem = defaultSetting
+        formatCopyModelComboBox.selectedItem = formatCopySetting
     }
 }
 
@@ -341,7 +409,6 @@ class ShireConfigItemComponent(
     LLMSettingUi: LLMSettingUi,
 ) {
     private val panel: JPanel
-    private val defaultCheckBox = JBCheckBox("默认配置")
     private val nameField = JBTextField(setting.name)
     private val providerComboBox = JComboBox(Provider.values()).apply {
         minimumSize = Dimension(130, minimumSize.height)
@@ -402,7 +469,6 @@ class ShireConfigItemComponent(
             .addComponent(uniqueFieldsPanel)
             .addLabeledComponent(JLabel("Temperature:"), temperatureField)
             .addComponent(streamCheckBox)
-            .addComponent(defaultCheckBox)
             // 添加 Test Connection 按钮和结果显示
             .addComponent(testConnectionButton)
             .addComponent(testResultField)
@@ -424,16 +490,6 @@ class ShireConfigItemComponent(
 
         // 设置各字段的监听器
         setDocumentListeners()
-
-        // 设置默认配置复选框
-        defaultCheckBox.isSelected = setting.isDefault
-        defaultCheckBox.addItemListener { event ->
-            setting.isDefault = event.stateChange == ItemEvent.SELECTED
-            if (setting.isDefault) {
-                // 如果被设置为默认，取消其他配置的默认状态
-                LLMSettingUi.unsetOtherDefaults(this)
-            }
-        }
 
         // 初始化字段值
 
@@ -521,24 +577,8 @@ class ShireConfigItemComponent(
         // 设置公共字段
         setting.temperature = temperatureField.text.toDoubleOrNull() ?: 0.0
         setting.stream = streamCheckBox.isSelected
-        setting.isDefault = defaultCheckBox.isSelected
 
         return setting
-    }
-
-    /**
-     * 检查当前配置是否为默认配置
-     */
-    fun isDefault(): Boolean = setting.isDefault
-
-    /**
-     * 设置当前配置的默认状态
-     */
-    fun setDefault(isDefault: Boolean) {
-        if (defaultCheckBox.isSelected != isDefault) {
-            defaultCheckBox.isSelected = isDefault
-            setting.isDefault = isDefault
-        }
     }
 
     /**
@@ -569,7 +609,6 @@ class ShireConfigItemComponent(
         // 设置公共字段
         temperatureField.text = setting.temperature.toString()
         streamCheckBox.isSelected = setting.stream
-        defaultCheckBox.isSelected = setting.isDefault
 
         // 重置 Test Connection 结果
         testResultField.text = ""
