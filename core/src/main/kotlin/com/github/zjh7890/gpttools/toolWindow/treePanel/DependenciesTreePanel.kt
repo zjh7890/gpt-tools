@@ -126,7 +126,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
      * 更新依赖树
      */
     fun updateDependencies(appFileTree: AppFileTree) {
-        // 1. 若没有任何 projectFileTrees，视为没有依赖
+        // 1. 若没有任何 projectFileTrees,视为没有依赖
         if (appFileTree.projectFileTrees.isEmpty()) {
             remove(scrollPane)
             add(emptyPanel, BorderLayout.CENTER)
@@ -142,7 +142,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
         // 设置 root 的 userObject 和 checked
         root.userObject = appFileTree
-        root.isChecked = appFileTree.selected  // 与 AppFileTree 的 selected 同步
+        root.isChecked = appFileTree.selected
 
         addedDependencies.clear()
 
@@ -154,34 +154,48 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                 isChecked = projectFileTree.selected
             }
 
-            // ------------- (A) modules -------------
-            projectFileTree.modules.forEach { moduleDependency ->
-                val moduleNode = CheckboxTreeNode().apply {
-                    userObject = moduleDependency
-                    isChecked = moduleDependency.selected
+            // ------------- (A) Local Packages -------------
+            projectFileTree.localPackages.forEach { packageDependency ->
+                val packageNode = CheckboxTreeNode().apply {
+                    userObject = packageDependency
+                    isChecked = packageDependency.selected
                 }
 
-                // 遍历 packages
-                moduleDependency.packages.forEach { packageDependency ->
-                    val packageNode = CheckboxTreeNode().apply {
-                        userObject = packageDependency
-                        isChecked = packageDependency.selected
-                    }
+                // 文件节点处理的部分修改如下
+                packageDependency.files.forEach { file ->
+                    val classes = file.getCurrentClasses()
 
-                    packageDependency.files.forEach { file ->
-                        // 文件节点
+                    // 如果只有一个类且与文件名重名(去掉.kt/.java后缀),直接展示类节点
+                    if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
+                        val pClass = classes[0]
+                        val classNode = CheckboxTreeNode().apply {
+                            userObject = pClass
+                            isChecked = pClass.selected
+                        }
+                        addedDependencies.add(pClass.psiClass)
+
+                        // 方法节点
+                        pClass.getCurrentMethods().forEach { pm ->
+                            val methodNode = CheckboxTreeNode().apply {
+                                userObject = pm
+                                isChecked = pm.selected
+                            }
+                            classNode.add(methodNode)
+                        }
+                        packageNode.add(classNode)
+                    } else {
+                        // 原有的处理逻辑:创建文件节点,然后添加类节点
                         val fileNode = CheckboxTreeNode().apply {
                             userObject = file
                             isChecked = file.selected
                         }
 
                         // 类节点
-                        file.getCurrentClasses().forEach { pClass ->
+                        classes.forEach { pClass ->
                             val classNode = CheckboxTreeNode().apply {
                                 userObject = pClass
                                 isChecked = pClass.selected
                             }
-                            // 记录
                             addedDependencies.add(pClass.psiClass)
 
                             // 方法节点
@@ -195,81 +209,66 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                             fileNode.add(classNode)
                         }
 
-                        // 如果文件节点有内容，就加进去
-                        if (fileNode.childCount > 0) {
-                            packageNode.add(fileNode)
-                        }
-                    }
-
-                    // packageNode 有内容就加进去
-                    if (packageNode.childCount > 0) {
-                        moduleNode.add(packageNode)
+                        packageNode.add(fileNode)
                     }
                 }
-
-                // moduleNode 有内容就加进 projectNode
-                if (moduleNode.childCount > 0) {
-                    projectNode.add(moduleNode)
-                }
+                projectNode.add(packageNode)
             }
 
             // ------------- (B) Maven Dependencies -------------
-            val mavenRootNode = CheckboxTreeNode()
-
-            projectFileTree.mavenDependencies.forEach { mavenDep ->
-                val mavenDepNode = CheckboxTreeNode().apply {
-                    userObject = mavenDep
-                    isChecked = mavenDep.selected
+            if (projectFileTree.mavenDependencies.isNotEmpty()) {
+                val mavenRootNode = CheckboxTreeNode().apply {
+                    userObject = "Maven Dependencies"
                 }
 
-                mavenDep.packages.forEach { packageDependency ->
-                    val packageNode = CheckboxTreeNode().apply {
-                        userObject = packageDependency
-                        isChecked = packageDependency.selected
+                projectFileTree.mavenDependencies.forEach { mavenDep ->
+                    val mavenDepNode = CheckboxTreeNode().apply {
+                        userObject = mavenDep
+                        isChecked = mavenDep.selected
                     }
 
-                    packageDependency.files.forEach { file ->
-                        val fileNode = CheckboxTreeNode().apply {
-                            userObject = file
-                            isChecked = file.selected
+                    // 同样直接使用扁平路径
+                    mavenDep.packages.forEach { packageDependency ->
+                        val packageNode = CheckboxTreeNode().apply {
+                            userObject = packageDependency
+                            isChecked = packageDependency.selected
                         }
 
-                        file.getCurrentClasses().forEach { pClass ->
-                            val classNode = CheckboxTreeNode().apply {
-                                userObject = pClass
-                                isChecked = pClass.selected
+                        packageDependency.files.forEach { file ->
+                            val fileNode = CheckboxTreeNode().apply {
+                                userObject = file
+                                isChecked = file.selected
                             }
-                            addedDependencies.add(pClass.psiClass)
 
-                            pClass.getCurrentMethods().forEach { pm ->
-                                val methodNode = CheckboxTreeNode().apply {
-                                    userObject = pm
-                                    isChecked = pm.selected
+                            file.getCurrentClasses().forEach { pClass ->
+                                val classNode = CheckboxTreeNode().apply {
+                                    userObject = pClass
+                                    isChecked = pClass.selected
                                 }
-                                classNode.add(methodNode)
-                            }
-                            fileNode.add(classNode)
-                        }
+                                addedDependencies.add(pClass.psiClass)
 
-                        if (fileNode.childCount > 0) {
+                                pClass.getCurrentMethods().forEach { pm ->
+                                    val methodNode = CheckboxTreeNode().apply {
+                                        userObject = pm
+                                        isChecked = pm.selected
+                                    }
+                                    classNode.add(methodNode)
+                                }
+                                fileNode.add(classNode)
+                            }
+
                             packageNode.add(fileNode)
                         }
-                    }
-                    if (packageNode.childCount > 0) {
+
                         mavenDepNode.add(packageNode)
                     }
-                }
 
-                if (mavenDepNode.childCount > 0) {
                     mavenRootNode.add(mavenDepNode)
                 }
-            }
 
-            if (mavenRootNode.childCount > 0) {
                 projectNode.add(mavenRootNode)
             }
 
-            // 最后，把该 projectNode 放到根节点
             root.add(projectNode)
         }
 
@@ -320,26 +319,24 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
             sb.append("- Dependencies\n")
             appFileTree.projectFileTrees.forEach { projectFileTree ->
                 sb.append("  - Project: ${projectFileTree.project.name}\n")
-                projectFileTree.modules.forEach { moduleDependency ->
-                    sb.append("    - Module: ${moduleDependency.moduleName}\n")
-                    moduleDependency.packages.forEach { packageDependency ->
-                        sb.append("      - Package: ${packageDependency.packageName}\n")
-                        packageDependency.files.forEach { file ->
-                            val usedClasses = file.classes
-                            usedClasses.forEach { projectClass ->
-                                val className = projectClass.psiClass.name
-                                sb.append("        - Class: $className\n")
-                                projectClass.getCurrentMethods().forEach { projectMethod ->
-                                    val methodName = projectMethod.psiMethod.name
-                                    sb.append("          - Method: $methodName\n")
-                                }
+
+                // 1) Local Packages
+                projectFileTree.localPackages.forEach { packageDependency ->
+                    sb.append("    - Package: ${packageDependency.packageName}\n")
+                    packageDependency.files.forEach { file ->
+                        val usedClasses = file.classes
+                        usedClasses.forEach { projectClass ->
+                            val className = projectClass.psiClass.name
+                            sb.append("      - Class: $className\n")
+                            projectClass.getCurrentMethods().forEach { projectMethod ->
+                                val methodName = projectMethod.psiMethod.name
+                                sb.append("        - Method: $methodName\n")
                             }
                         }
                     }
                 }
 
-                // ------------------- 2) Maven Dependencies -------------------
-                // 如果有 mavenDependencies，就统一放在 "Maven Dependencies" 下
+                // 2) Maven Dependencies
                 if (projectFileTree.mavenDependencies.isNotEmpty()) {
                     sb.append("    - Maven Dependencies\n")
                     projectFileTree.mavenDependencies.forEach { mavenDep ->
@@ -348,21 +345,19 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
                         mavenDep.packages.forEach { packageDependency ->
                             sb.append("        - Package: ${packageDependency.packageName}\n")
-
                             packageDependency.files.forEach { file ->
                                 val usedClasses = file.classes
                                 usedClasses.forEach { projectClass ->
                                     val className = projectClass.psiClass.name
                                     sb.append("          - Class: $className\n")
-
                                     projectClass.getCurrentMethods().forEach { projectMethod ->
                                         val methodName = projectMethod.psiMethod.name
                                         sb.append("            - Method: $methodName\n")
                                     }
                                 }
                             }
-                }
-            }
+                        }
+                    }
                 }
             }
 
@@ -508,7 +503,7 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
                 }
                 is ProjectFile -> {
                     icon = com.intellij.icons.AllIcons.FileTypes.Any_type
-                    text = userObj.filePath
+                    text = userObj.virtualFile.name
                 }
                 is PackageDependency -> {
                     icon = com.intellij.icons.AllIcons.Nodes.Package

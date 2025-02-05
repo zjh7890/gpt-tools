@@ -216,15 +216,15 @@ intellijPlatform {
     }
 
     pluginVerification {
-        ides {
-            val (type, version) = prop("ideaVersion").toTypeWithVersion()
-            ide(type, version)
-//            recommended()
-            select {
-                sinceBuild = prop("pluginSinceBuild")
-                untilBuild = prop("pluginUntilBuild")
-            }
-        }
+//        ides {
+//            val (type, version) = prop("ideaVersion").toTypeWithVersion()
+//            ide(type, version)
+////            recommended()
+//            select {
+//                sinceBuild = prop("pluginSinceBuild")
+//                untilBuild = prop("pluginUntilBuild")
+//            }
+//        }
     }
 }
 //
