@@ -1,5 +1,6 @@
 package com.github.zjh7890.gpttools.services
 
+import com.github.zjh7890.gpttools.toolWindow.treePanel.CheckState
 import com.github.zjh7890.gpttools.toolWindow.treePanel.ClassDependencyInfo
 import com.github.zjh7890.gpttools.toolWindow.treePanel.MavenDependencyId
 import com.github.zjh7890.gpttools.utils.FileUtil
@@ -45,12 +46,12 @@ import kotlinx.serialization.Serializable
  */
 data class AppFileTree(
     val projectFileTrees: MutableList<ProjectFileTree> = mutableListOf(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toSerializable(): SerializableAppFileTree {
         return SerializableAppFileTree(
             projectTrees = projectFileTrees.map { it.toSerializable() },
-            selected = selected
+            state = state
         )
     }
 
@@ -147,8 +148,7 @@ data class AppFileTree(
                 className = className,
                 psiClass = psiClass,
                 methods = mutableListOf(),
-                whole = whole,
-                selected = true // 新建时设置 selected = true
+                whole = whole
             )
             projectFile.classes.add(newCls)
             newCls
@@ -220,8 +220,7 @@ data class AppFileTree(
                 className = className,
                 psiClass = psiClass,
                 methods = mutableListOf(),
-                whole = false,
-                selected = true // 新建时设置 selected = true
+                whole = false
             )
             projectFile.classes.add(newCls)
             newCls
@@ -237,8 +236,7 @@ data class AppFileTree(
                 ProjectMethod(
                     methodName = psiMethod.name,
                     parameterTypes = paramTypes,
-                    psiMethod = psiMethod,
-                    selected = true // 新建时设置 selected = true
+                    psiMethod = psiMethod
                 )
             )
         }
@@ -322,8 +320,7 @@ data class AppFileTree(
                             className = c.name ?: "",
                             psiClass = c,
                             methods = mutableListOf(),
-                            whole = true,
-                            selected = true // 新建时设置 selected = true
+                            whole = true
                         )
                     )
                 }
@@ -381,8 +378,7 @@ data class AppFileTree(
                             className = psiClass.name ?: "",
                             psiClass = psiClass,
                             methods = mutableListOf(),
-                            whole = true,
-                            selected = true // 新建时设置 selected = true
+                            whole = true
                         )
                     )
                 }
@@ -418,8 +414,7 @@ data class AppFileTree(
                         ProjectMethod(
                             methodName = m.name,
                             parameterTypes = m.parameterList.parameters.map { it.type.canonicalText },
-                            psiMethod = m,
-                            selected = true // 新建时设置 selected = true
+                            psiMethod = m
                         )
                     )
                 }
@@ -463,8 +458,7 @@ data class AppFileTree(
                     ProjectFileTree(
                         project = project,
                         localPackages = mutableListOf(),
-                        mavenDependencies = mutableListOf(),
-                        selected = true // 新建时设置 selected = true
+                        mavenDependencies = mutableListOf()
                     )
                 }
 
@@ -499,8 +493,7 @@ data class AppFileTree(
             }
 
             return AppFileTree(
-                projectFileTrees = projectFileTreeMap.values.toMutableList(),
-                selected = true // 新建时设置 selected = true
+                projectFileTrees = projectFileTreeMap.values.toMutableList()
             )
         }
 
@@ -571,8 +564,7 @@ data class AppFileTree(
             val newPft = ProjectFileTree(
                 project = project,
                 localPackages = mutableListOf(),
-                mavenDependencies = mutableListOf(),
-                selected = true // 新建时设置 selected = true
+                mavenDependencies = mutableListOf()
             )
             appFileTree.projectFileTrees.add(newPft)
             return newPft
@@ -584,24 +576,38 @@ data class AppFileTree(
             artifactId: String,
             version: String
         ): MavenDependency {
-            return mavenDeps.find {
-                it.groupId == groupId && it.artifactId == artifactId && it.version == version
-            } ?: MavenDependency(
-                groupId = groupId,
-                artifactId = artifactId,
-                version = version
-            ).also {
-                mavenDeps.add(it)
+            mavenDeps.find {
+                it.groupId.equals(groupId, ignoreCase = true) &&
+                        it.artifactId.equals(artifactId, ignoreCase = true) &&
+                        it.version.equals(version, ignoreCase = true)
+            }?.let { return it }
+
+            val newDep = MavenDependency(groupId = groupId, artifactId = artifactId, version = version)
+            // 构造比较字符串，例如 "com.example:my-lib:1.0.0"
+            val newKey = "$groupId:$artifactId:$version"
+            val index = mavenDeps.binarySearch {
+                val key = "${it.groupId}:${it.artifactId}:${it.version}"
+                key.compareTo(newKey, ignoreCase = true)
             }
+            val insertionIndex = if (index < 0) -index - 1 else index
+            mavenDeps.add(insertionIndex, newDep)
+            return newDep
         }
 
         fun findOrCreatePackage(
             packages: MutableList<PackageDependency>,
             packageName: String
         ): PackageDependency {
-            return packages.find { it.packageName == packageName } ?: PackageDependency(packageName).also {
-                packages.add(it)
+            // 先尝试根据忽略大小写比较查找是否已存在该 package
+            packages.find { it.packageName.equals(packageName, ignoreCase = true) }?.let {
+                return it
             }
+            val newPackage = PackageDependency(packageName)
+            // 使用二分查找确定插入位置，按 packageName 忽略大小写排序
+            val index = packages.binarySearch { it.packageName.compareTo(packageName, ignoreCase = true) }
+            val insertionIndex = if (index < 0) -index - 1 else index
+            packages.add(insertionIndex, newPackage)
+            return newPackage
         }
 
         fun findOrCreateProjectFile(
@@ -611,30 +617,29 @@ data class AppFileTree(
             isMaven: Boolean = false,
             whole: Boolean = false
         ): ProjectFile {
-            // 计算 filePath
             val basePath = project.basePath?.removeSuffix("/") ?: ""
             val absolutePath = vFile.path
             val relativePath = if (!isMaven) {
-                // 本地项目文件
                 absolutePath.removePrefix(basePath).removePrefix("/")
             } else {
-                // 如果是 Maven 文件，可能要直接存绝对路径
-                // 或者你也可以存 jarPath + className
                 absolutePath
             }
+            files.find { it.filePath == relativePath }?.let { return it }
 
-            return files.find { it.filePath == relativePath } ?: run {
-                val psiFile = PsiManager.getInstance(project).findFile(vFile)
-                val newFile = ProjectFile(
-                    filePath = relativePath,
-                    virtualFile = vFile,
-                    psiFile = psiFile,
-                    classes = mutableListOf(),
-                    whole = whole
-                )
-                files.add(newFile)
-                newFile
-            }
+            val psiFile = PsiManager.getInstance(project).findFile(vFile)
+            val newFile = ProjectFile(
+                filePath = relativePath,
+                virtualFile = vFile,
+                psiFile = psiFile,
+                classes = mutableListOf(),
+                whole = whole
+            )
+            // 按文件名（vFile.name）忽略大小写排序，使用二分查找确定插入位置
+            val fileName = vFile.name
+            val index = files.binarySearch { it.virtualFile.name.compareTo(fileName, ignoreCase = true) }
+            val insertionIndex = if (index < 0) -index - 1 else index
+            files.add(insertionIndex, newFile)
+            return newFile
         }
 
         /**
@@ -669,42 +674,40 @@ data class AppFileTree(
         }
 
         /**
-         * 将原先 generateDependenciesTextCombined 的逻辑改为"只生成 selected=true 的节点"。
+         * 生成依赖文本，只生成 state 为 SELECTED 的节点
          */
         fun generateDependenciesTextCombined(appFileTree: AppFileTree): String {
-            // 对 projectFileTrees 做过滤,仅处理 selected = true 的项目
-            val filteredProjects = appFileTree.projectFileTrees.filter { it.selected }
+            // 只处理状态为 SELECTED 的 ProjectFileTree 节点
+            val filteredProjects = appFileTree.projectFileTrees.filter { it.state == CheckState.SELECTED }
 
-            // 对每个 ProjectFileTree 生成文本,然后用 "\n\n" 拼接
             return filteredProjects.joinToString("\n\n") { projectFileTree ->
                 // ---- 1) 处理本地文件 ----
                 val localFilesContents = projectFileTree.localPackages
-                    .filter { it.selected }                    // 只处理选中的 package
+                    .filter { it.state == CheckState.SELECTED }  // 只处理选中的 package
                     .flatMap { it.files }
-                    .filter { it.selected }                    // 只处理选中的 file
+                    .filter { it.state == CheckState.SELECTED }  // 只处理选中的 file
                     .mapNotNull { projectFile ->
                         handleSingleProjectFileFiltered(projectFile, projectFileTree.project)
                     }
 
                 // ---- 2) 处理 Maven Dependencies ----
                 val mavenFilesContents = projectFileTree.mavenDependencies
-                    .filter { it.selected }                    // 只处理选中的 mavenDependency
+                    .filter { it.state == CheckState.SELECTED }  // 只处理选中的 MavenDependency
                     .flatMap { it.packages }
-                    .filter { it.selected }
+                    .filter { it.state == CheckState.SELECTED }
                     .flatMap { it.files }
-                    .filter { it.selected }
+                    .filter { it.state == CheckState.SELECTED }
                     .mapNotNull { projectFile ->
                         handleSingleProjectFileFiltered(projectFile, projectFileTree.project)
                     }
 
-                // 合并并拼成最后的字符串
+                // 合并后用 "\n\n" 拼接成最终字符串
                 (localFilesContents + mavenFilesContents).joinToString("\n\n")
             }
         }
 
         /**
-         * 处理单个 ProjectFile，但只生成"被选中的类/方法"内容。
-         * 返回要拼接的字符串，如无内容则返回 null
+         * 处理单个 ProjectFile，仅生成其内部 state 为 SELECTED 的类/方法内容
          */
         private fun handleSingleProjectFileFiltered(
             projectFile: ProjectFile,
@@ -715,37 +718,35 @@ data class AppFileTree(
 
             val relativePath = calculateRelativePath(absolutePath, project, projectFile.ifMavenFile)
 
-            // 如果文件是 whole=true，则无论其内部类/方法是否勾选，都表示"整文件"需要
+            // 如果文件是 whole，则无论内部如何，都返回整个文件内容
             if (projectFile.whole) {
                 return "$relativePath\n" + FileUtil.readFileInfoForLLM(virtualFile)
             }
 
-            // 如果是部分文件(whole=false)，则只处理 selected=true 的类/方法
+            // 否则仅处理部分文件，提取 state 为 SELECTED 的类/方法
             val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
             val elementsToProcess = mutableListOf<PsiElement>()
 
-            // 遍历用户指定的 Class/Method 信息
+            // 遍历文件中记录的所有 ProjectClass，仅处理状态为 SELECTED 的类
             projectFile.classes
-                .filter { it.selected }                   // 只处理被选中的类
+                .filter { it.state == CheckState.SELECTED }
                 .forEach { projectClass ->
-                    // 根据是否 whole=true 判断要不要整类
+                    // 查找文件中的对应 PsiClass（如果是 whole，则匹配 qualifiedName，否则匹配类名）
                     val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
                         if (projectClass.whole) {
-                            // 整类模式 -> 用 qualifiedName 精确匹配
                             it.qualifiedName == projectClass.className
                         } else {
-                            // 否则只用类名
                             it.name == projectClass.className
                         }
                     } ?: return@forEach
 
                     if (projectClass.whole) {
-                        // 若这个类标记为whole=true，就把整个 PsiClass 内容都加进来
+                        // whole 模式下，直接将整个 PsiClass 加入处理列表
                         elementsToProcess.add(foundPsiClass)
                     } else {
-                        // 否则只处理 selected=true 的方法
+                        // 否则只处理该类中状态为 SELECTED 的方法
                         projectClass.methods
-                            .filter { it.selected }
+                            .filter { it.state == CheckState.SELECTED }
                             .forEach { projectMethod ->
                                 val matchedMethod = foundPsiClass
                                     .findMethodsByName(projectMethod.methodName, false)
@@ -767,7 +768,7 @@ data class AppFileTree(
                 }
             }
 
-            // 如果本文件没有任何元素可处理(或内容为空)，则返回 null
+            // 如果没有任何可处理的元素，则返回 null
             return null
         }
 
@@ -801,7 +802,7 @@ data class AppFileTree(
 @Serializable
 data class SerializableAppFileTree(
     val projectTrees: List<SerializableProjectFileTree> = emptyList(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     /**
      * 反序列化 -> 立即遍历所有文件/类/方法，找出对应 PSI 实例
@@ -809,7 +810,7 @@ data class SerializableAppFileTree(
      */
     fun toAppFileTree(): AppFileTree {
         val realProjectFileTrees = projectTrees.map { it.toProjectFileTree() }.toMutableList()
-        return AppFileTree(projectFileTrees = realProjectFileTrees, selected = selected)
+        return AppFileTree(projectFileTrees = realProjectFileTrees, state = state)
     }
 }
 
@@ -817,14 +818,14 @@ data class ProjectFileTree(
     val project: Project,
     val localPackages: MutableList<PackageDependency> = mutableListOf(), // 替换原来的 modules
     val mavenDependencies: MutableList<MavenDependency> = mutableListOf(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toSerializable(): SerializableProjectFileTree {
         return SerializableProjectFileTree(
             projectName = project.name,
             localPackages = localPackages.map { it.toSerializable() },  // 修改这里
             mavenDependencies = mavenDependencies.map { it.toSerializable() },
-            selected = selected
+            state = state
         )
     }
 }
@@ -834,7 +835,7 @@ data class SerializableProjectFileTree(
     val projectName: String = "",
     val localPackages: List<SerializablePackageDependency> = emptyList(), // 替换原来的 modules
     val mavenDependencies: List<SerializableMavenDependency> = emptyList(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toProjectFileTree(): ProjectFileTree {
         val project = ProjectManager.getInstance().openProjects
@@ -845,7 +846,7 @@ data class SerializableProjectFileTree(
             project = project,
             localPackages = localPackages.map { it.toPackageDependency(project) }.toMutableList(), // 修改这里
             mavenDependencies = mavenDependencies.map { it.toMavenDependency(project) }.toMutableList(),
-            selected = selected
+            state = state
         )
     }
 }
@@ -854,7 +855,7 @@ data class SerializableProjectFileTree(
 data class ModuleDependency(
     val moduleName: String,
     val packages: MutableList<PackageDependency> = mutableListOf(),
-    var selected: Boolean = true         // 添加 selected 字段
+    var state: CheckState = CheckState.SELECTED         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableModuleDependency {
         return SerializableModuleDependency(
@@ -868,7 +869,7 @@ data class ModuleDependency(
 data class SerializableModuleDependency(
     val moduleName: String = "",
     val packages: List<SerializablePackageDependency> = emptyList(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toModuleDependency(project: Project): ModuleDependency {
         return ModuleDependency(
@@ -884,7 +885,7 @@ data class MavenDependency(
     val artifactId: String,
     val version: String,
     val packages: MutableList<PackageDependency> = mutableListOf(),
-    var selected: Boolean = true         // 添加 selected 字段
+    var state: CheckState = CheckState.SELECTED         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableMavenDependency {
         return SerializableMavenDependency(
@@ -902,7 +903,7 @@ data class SerializableMavenDependency(
     val artifactId: String = "",
     val version: String = "",
     val packages: List<SerializablePackageDependency> = emptyList(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ){
     fun toMavenDependency(project: Project): MavenDependency {
         return MavenDependency(
@@ -918,7 +919,7 @@ data class SerializableMavenDependency(
 data class PackageDependency(
     val packageName: String,
     val files: MutableList<ProjectFile> = mutableListOf(),
-    var selected: Boolean = true         // 添加 selected 字段
+    var state: CheckState = CheckState.SELECTED         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializablePackageDependency {
         return SerializablePackageDependency(
@@ -932,7 +933,7 @@ data class PackageDependency(
 data class SerializablePackageDependency(
     val packageName: String = "",
     val files: List<SerializableProjectFile> = emptyList(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toPackageDependency(project: Project): PackageDependency {
         return PackageDependency(
@@ -952,7 +953,7 @@ data class ProjectFile(
     val psiFile: PsiFile?,
     val classes: MutableList<ProjectClass> = mutableListOf(),
     var whole: Boolean = false,
-    var selected: Boolean = true         // 添加 selected 字段
+    var state: CheckState = CheckState.SELECTED         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectFile {
         return SerializableProjectFile(
@@ -1035,7 +1036,7 @@ data class SerializableProjectFile(
     val ifMavenFile: Boolean = false,
     val classes: List<SerializableProjectClass>? = null,
     val whole: Boolean = false,
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toProjectFile(project: Project): ProjectFile {
         val vFile: VirtualFile
@@ -1082,14 +1083,14 @@ data class ProjectClass(
     val isAtomicClass: Boolean = PsiUtils.isAtomicClass(psiClass),
     val methods: MutableList<ProjectMethod>,
     var whole: Boolean,
-    var selected: Boolean = true         // 添加 selected 字段
+    var state: CheckState = CheckState.SELECTED         // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectClass {
         return SerializableProjectClass(
             className = className,
             methods = methods.map { it.toSerializable() },
             whole = whole,
-            selected = selected           // 传递 selected 值
+            state = state           // 传递 selected 值
         )
     }
 
@@ -1156,7 +1157,7 @@ data class SerializableProjectClass(
     val className: String = "",
     val methods: List<SerializableProjectMethod> = emptyList(),
     val whole: Boolean = false,
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     fun toProjectClass(psiFile: PsiFile): ProjectClass {
         // 在 psiFile 里查找同名的 PsiClass
@@ -1177,7 +1178,7 @@ data class SerializableProjectClass(
             psiClass = foundPsiClass,
             methods = realMethods,
             whole = whole,
-            selected = selected           // 传递 selected 值
+            state = state           // 传递 selected 值
         )
     }
 }
@@ -1189,13 +1190,13 @@ data class ProjectMethod(
     val methodName: String,
     val parameterTypes: List<String> = emptyList(),
     val psiMethod: PsiMethod,            // 现在保证不能为空
-    var selected: Boolean = true        // 添加 selected 字段
+    var state: CheckState = CheckState.SELECTED        // 添加 selected 字段
 ) {
     fun toSerializable(): SerializableProjectMethod {
         return SerializableProjectMethod(
             methodName = methodName,
             parameterTypes = parameterTypes,
-            selected = selected          // 传递 selected 值
+            state = state          // 传递 selected 值
         )
     }
 }
@@ -1204,7 +1205,7 @@ data class ProjectMethod(
 data class SerializableProjectMethod(
     val methodName: String = "",
     val parameterTypes: List<String> = emptyList(),
-    var selected: Boolean = true
+    var state: CheckState = CheckState.SELECTED
 ) {
     /**
      * 反序列化：在给定的 PsiClass 中找对应的方法
@@ -1222,7 +1223,7 @@ data class SerializableProjectMethod(
             methodName = methodName,
             parameterTypes = parameterTypes,
             psiMethod = foundPsiMethod,
-            selected = selected           // 传递 selected 值
+            state = state           // 传递 selected 值
         )
     }
 }

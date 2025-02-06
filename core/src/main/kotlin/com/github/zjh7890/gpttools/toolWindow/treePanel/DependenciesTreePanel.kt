@@ -16,6 +16,7 @@ import com.intellij.ui.treeStructure.Tree
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
+import java.awt.Graphics
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
@@ -26,8 +27,8 @@ import javax.swing.tree.TreePath
 
 class DependenciesTreePanel(val project: Project) : JPanel() {
 
-    // 注意：这里把 root 也改为 CheckboxTreeNode
-    val root = CheckboxTreeNode()
+    // 注意：这里把 root 也改为 TriStateTreeNode
+    val root = TriStateTreeNode()
     val tree = Tree(root)
 
     private val addedDependencies = mutableSetOf<PsiClass>()
@@ -49,7 +50,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
         // 初始化树相关组件
         tree.isRootVisible = true
         tree.showsRootHandles = true
-        tree.cellRenderer = CheckboxTreeCellRenderer()  // 渲染带 checkbox 的
+        tree.cellRenderer = TriStateCheckboxTreeCellRenderer()  // 渲染带 checkbox 的
 
         val actionGroup = DefaultActionGroup().apply {
             add(RemoveSelectedNodesAction(this@DependenciesTreePanel))
@@ -79,13 +80,13 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
             override fun mouseClicked(e: MouseEvent) {
                 val path = tree.getPathForLocation(e.x, e.y)
                 if (path != null) {
-                    val node = path.lastPathComponent as? CheckboxTreeNode
+                    val node = path.lastPathComponent as? TriStateTreeNode
                     if (node != null) {
                         val row = tree.getRowForLocation(e.x, e.y)
                         val bounds = tree.getRowBounds(row)
                         // 如果点击在 checkbox 的前面区域，则切换勾选状态
                         if (e.x < bounds.x + 20) {
-                            node.isChecked = !node.isChecked
+                            node.toggleState()
                             tree.repaint()
                             e.consume()
                             return
@@ -95,7 +96,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
                 // 如果是双击，则执行打开文件 / 跳转到方法的逻辑
                 if (e.clickCount == 2) {
-                    val node = tree.selectionPath?.lastPathComponent as? CheckboxTreeNode
+                    val node = tree.selectionPath?.lastPathComponent as? TriStateTreeNode
                     val userObject = node?.userObject
                     when (userObject) {
                         is ProjectClass -> {
@@ -122,11 +123,8 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
         })
     }
 
-    /**
-     * 更新依赖树
-     */
     fun updateDependencies(appFileTree: AppFileTree) {
-        // 1. 若没有任何 projectFileTrees,视为没有依赖
+        // 1. 若没有任何 projectFileTrees，视为没有依赖
         if (appFileTree.projectFileTrees.isEmpty()) {
             remove(scrollPane)
             add(emptyPanel, BorderLayout.CENTER)
@@ -140,69 +138,68 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
         add(scrollPane, BorderLayout.CENTER)
         root.removeAllChildren()
 
-        // 设置 root 的 userObject 和 checked
+        // 设置 root 的 userObject 和 state
         root.userObject = appFileTree
-        root.isChecked = appFileTree.selected
+        root.state = appFileTree.state
 
         addedDependencies.clear()
 
         // ------------------ 构建所有层级节点 ------------------
         appFileTree.projectFileTrees.forEach { projectFileTree ->
             // 1) project 节点
-            val projectNode = CheckboxTreeNode().apply {
+            val projectNode = TriStateTreeNode().apply {
                 userObject = projectFileTree
-                isChecked = projectFileTree.selected
+                state = projectFileTree.state
             }
 
             // ------------- (A) Local Packages -------------
             projectFileTree.localPackages.forEach { packageDependency ->
-                val packageNode = CheckboxTreeNode().apply {
+                val packageNode = TriStateTreeNode().apply {
                     userObject = packageDependency
-                    isChecked = packageDependency.selected
+                    state = packageDependency.state
                 }
 
-                // 文件节点处理的部分修改如下
                 packageDependency.files.forEach { file ->
                     val classes = file.getCurrentClasses()
 
-                    // 如果只有一个类且与文件名重名(去掉.kt/.java后缀),直接展示类节点
+                    // 如果只有一个类且与文件名重名（去掉.kt/.java后缀），直接展示类节点
                     if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
                         val pClass = classes[0]
-                        val classNode = CheckboxTreeNode().apply {
+                        val classNode = TriStateTreeNode().apply {
                             userObject = pClass
-                            isChecked = pClass.selected
+                            state = pClass.state
                         }
                         addedDependencies.add(pClass.psiClass)
 
                         // 方法节点
                         pClass.getCurrentMethods().forEach { pm ->
-                            val methodNode = CheckboxTreeNode().apply {
+                            val methodNode = TriStateTreeNode().apply {
                                 userObject = pm
-                                isChecked = pm.selected
+                                state = pm.state
                             }
                             classNode.add(methodNode)
                         }
                         packageNode.add(classNode)
                     } else {
-                        // 原有的处理逻辑:创建文件节点,然后添加类节点
-                        val fileNode = CheckboxTreeNode().apply {
+                        // 原有的处理逻辑：创建文件节点，然后添加类节点
+                        val fileNode = TriStateTreeNode().apply {
                             userObject = file
-                            isChecked = file.selected
+                            state = file.state
                         }
 
                         // 类节点
                         classes.forEach { pClass ->
-                            val classNode = CheckboxTreeNode().apply {
+                            val classNode = TriStateTreeNode().apply {
                                 userObject = pClass
-                                isChecked = pClass.selected
+                                state = pClass.state
                             }
                             addedDependencies.add(pClass.psiClass)
 
                             // 方法节点
                             pClass.getCurrentMethods().forEach { pm ->
-                                val methodNode = CheckboxTreeNode().apply {
+                                val methodNode = TriStateTreeNode().apply {
                                     userObject = pm
-                                    isChecked = pm.selected
+                                    state = pm.state
                                 }
                                 classNode.add(methodNode)
                             }
@@ -217,47 +214,72 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
             // ------------- (B) Maven Dependencies -------------
             if (projectFileTree.mavenDependencies.isNotEmpty()) {
-                val mavenRootNode = CheckboxTreeNode().apply {
+                val mavenRootNode = TriStateTreeNode().apply {
                     userObject = "Maven Dependencies"
                 }
 
                 projectFileTree.mavenDependencies.forEach { mavenDep ->
-                    val mavenDepNode = CheckboxTreeNode().apply {
+                    val mavenDepNode = TriStateTreeNode().apply {
                         userObject = mavenDep
-                        isChecked = mavenDep.selected
+                        state = mavenDep.state
                     }
 
-                    // 同样直接使用扁平路径
+                    // 使用扁平路径构建结构
                     mavenDep.packages.forEach { packageDependency ->
-                        val packageNode = CheckboxTreeNode().apply {
+                        val packageNode = TriStateTreeNode().apply {
                             userObject = packageDependency
-                            isChecked = packageDependency.selected
+                            state = packageDependency.state
                         }
 
                         packageDependency.files.forEach { file ->
-                            val fileNode = CheckboxTreeNode().apply {
-                                userObject = file
-                                isChecked = file.selected
-                            }
+                            val classes = file.getCurrentClasses()
 
-                            file.getCurrentClasses().forEach { pClass ->
-                                val classNode = CheckboxTreeNode().apply {
+                            // 如果只有一个类且与文件名重名（去掉.class后缀），直接展示类节点
+                            if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
+                                val pClass = classes[0]
+                                val classNode = TriStateTreeNode().apply {
                                     userObject = pClass
-                                    isChecked = pClass.selected
+                                    state = pClass.state
                                 }
                                 addedDependencies.add(pClass.psiClass)
 
+                                // 方法节点
                                 pClass.getCurrentMethods().forEach { pm ->
-                                    val methodNode = CheckboxTreeNode().apply {
+                                    val methodNode = TriStateTreeNode().apply {
                                         userObject = pm
-                                        isChecked = pm.selected
+                                        state = pm.state
                                     }
                                     classNode.add(methodNode)
                                 }
-                                fileNode.add(classNode)
-                            }
+                                packageNode.add(classNode)
+                            } else {
+                                // 原有的处理逻辑：创建文件节点，然后添加类节点
+                                val fileNode = TriStateTreeNode().apply {
+                                    userObject = file
+                                    state = file.state
+                                }
 
-                            packageNode.add(fileNode)
+                                // 类节点
+                                classes.forEach { pClass ->
+                                    val classNode = TriStateTreeNode().apply {
+                                        userObject = pClass
+                                        state = pClass.state
+                                    }
+                                    addedDependencies.add(pClass.psiClass)
+
+                                    // 方法节点
+                                    pClass.getCurrentMethods().forEach { pm ->
+                                        val methodNode = TriStateTreeNode().apply {
+                                            userObject = pm
+                                            state = pm.state
+                                        }
+                                        classNode.add(methodNode)
+                                    }
+                                    fileNode.add(classNode)
+                                }
+
+                                packageNode.add(fileNode)
+                            }
                         }
 
                         mavenDepNode.add(packageNode)
@@ -272,7 +294,7 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
             root.add(projectNode)
         }
 
-        // 刷新并展开
+        // 刷新树并展开
         (tree.model as DefaultTreeModel).reload(root)
         expandDefaultNodes()
         revalidate()
@@ -313,10 +335,10 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
     companion object {
         fun toMarkdownString(appFileTree: AppFileTree): String {
             if (appFileTree.projectFileTrees.isEmpty()) {
-                return "- Dependencies\n  (no dependencies)\n"
+                return "- Related Project Map\n  (no dependencies)\n"
             }
             val sb = StringBuilder()
-            sb.append("- Dependencies\n")
+            sb.append("- Related Project Map\n")
             appFileTree.projectFileTrees.forEach { projectFileTree ->
                 sb.append("  - Project: ${projectFileTree.project.name}\n")
 
@@ -366,6 +388,11 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
     }
 }
 
+// 1. 定义三态状态枚举
+enum class CheckState {
+    SELECTED, UNSELECTED, INDETERMINATE
+}
+
 data class MavenDependencyId(
     val groupId: String,
     val artifactId: String,
@@ -387,114 +414,147 @@ class ClassDependencyInfo(var isAtomicClass: Boolean = false) {
     }
 }
 
-class CheckboxTreeNode() : DefaultMutableTreeNode() {
-    var isChecked: Boolean
-        get() {
-            return when (val obj = userObject) {
-                is AppFileTree -> obj.selected
-                is ProjectFileTree -> obj.selected
-                is ModuleDependency -> obj.selected
-                is MavenDependency -> obj.selected
-                is PackageDependency -> obj.selected
-                is ProjectFile -> obj.selected
-                is ProjectClass -> obj.selected
-                is ProjectMethod -> obj.selected
-                // 如果只是普通字符串之类的，就忽略
-                else -> {
-                    false
-                }
-            }
-        }
-        set(value) {
-            if (isChecked != value) {
-                // 同步给 userObject (如果它具有 selected 字段)
-                syncSelectedToUserObject(value)
-                // 更新所有子节点
-                updateChildrenState()
-                // 更新父节点
-                updateParentState()
-            }
-        }
+// 2. 定义 TriStateTreeNode，支持三态并同步到用户对象
+class TriStateTreeNode(userObject: Any? = null) : DefaultMutableTreeNode(userObject) {
+    var state: CheckState = CheckState.SELECTED
 
-    /**
-     * 将当前节点的 isChecked -> userObject.selected
-     */
-    private fun syncSelectedToUserObject(value: Boolean) {
+    fun updateState(value: CheckState) {
+        if (state != value) {
+            state = value
+            syncToUserObject()
+            updateChildrenState(value)
+            updateParentState()
+        }
+    }
+
+    // 原来的切换逻辑（旧版可能用 isChecked 进行布尔反转）
+    fun toggleState() {
+        val newState = when (state) {
+            CheckState.INDETERMINATE -> CheckState.SELECTED
+            CheckState.SELECTED -> CheckState.UNSELECTED
+            CheckState.UNSELECTED -> CheckState.SELECTED
+        }
+        updateState(newState)
+    }
+
+    // 同步状态到 userObject，原来是设置 selected 属性
+    private fun syncToUserObject() {
         when (val obj = userObject) {
-            is AppFileTree -> obj.selected = value
-            is ProjectFileTree -> obj.selected = value
-            is ModuleDependency -> obj.selected = value
-            is MavenDependency -> obj.selected = value
-            is PackageDependency -> obj.selected = value
-            is ProjectFile -> obj.selected = value
-            is ProjectClass -> obj.selected = value
-            is ProjectMethod -> obj.selected = value
-            // 如果只是普通字符串之类的，就忽略
+            is AppFileTree -> obj.state = state
+            is ProjectFileTree -> obj.state = state
+            is ModuleDependency -> obj.state = state
+            is MavenDependency -> obj.state = state
+            is PackageDependency -> obj.state = state
+            is ProjectFile -> obj.state = state
+            is ProjectClass -> obj.state = state
+            is ProjectMethod -> obj.state = state
         }
     }
 
-    private fun updateChildrenState() {
-        children().asSequence().forEach { child ->
-            if (child is CheckboxTreeNode) {
-                // 这里直接设置内部字段，避免继续递归调用 setter
-                child.isChecked = isChecked
-                // 也要同步给 userObject
-                child.syncSelectedToUserObject(isChecked)
-                // 递归更新它的孩子
-                child.updateChildrenState()
+    // 向下同步：若当前节点不是 INDETERMINATE，则所有子节点跟随当前状态
+    private fun updateChildrenState(value: CheckState) {
+        if (state == CheckState.INDETERMINATE) return
+        for (i in 0 until childCount) {
+            val child = getChildAt(i) as? TriStateTreeNode ?: continue
+            child.state = value
+            child.updateChildrenState(value)
+        }
+    }
+
+    // 向上传递：根据所有兄弟节点状态确定父节点状态
+    private fun updateParentState() {
+        val parentNode = parent as? TriStateTreeNode ?: return
+        var selectedCount = 0
+        var unselectedCount = 0
+        for (i in 0 until parentNode.childCount) {
+            val child = parentNode.getChildAt(i) as? TriStateTreeNode ?: continue
+            when (child.state) {
+                CheckState.SELECTED -> selectedCount++
+                CheckState.UNSELECTED -> unselectedCount++
+                CheckState.INDETERMINATE -> { }
             }
         }
+        parentNode.state = when {
+            selectedCount == parentNode.childCount -> CheckState.SELECTED
+            unselectedCount == parentNode.childCount -> CheckState.UNSELECTED
+            else -> CheckState.INDETERMINATE
+        }
+        parentNode.updateParentState()
     }
 
-    private fun updateParentState() {
-        val parent = parent as? CheckboxTreeNode ?: return
-        // 如果所有兄弟节点都已选中，则父节点也选中，否则不选
-        val allChildrenChecked = parent.children().asSequence().all {
-            (it as? CheckboxTreeNode)?.isChecked == true
+    override fun toString(): String {
+        return userObject?.toString() ?: ""
+    }
+}
+
+class TriStateCheckBox : JCheckBox() {
+    var triState: CheckState = CheckState.UNSELECTED
+        set(value) {
+            field = value
+            repaint()
         }
-        if (parent.isChecked != allChildrenChecked) {
-            parent.isChecked = allChildrenChecked
-            parent.syncSelectedToUserObject(allChildrenChecked)
-            parent.updateParentState()
+
+    override fun paintComponent(g: Graphics) {
+        // 绘制 JCheckBox 的默认效果
+        super.paintComponent(g)
+        // 当状态为 INDETERMINATE 时，在复选框内部绘制一条横条
+        if (triState == CheckState.INDETERMINATE) {
+            val iconSize = 16
+            val x = 2
+            val y = (height - 3) / 2
+            g.color = Color.BLACK
+            g.fillRect(x, y, iconSize - 4, 3)
         }
     }
 }
 
-// -----------------------------------------------------------------------
-// CheckboxTreeCellRenderer：保持不变或做简单个性化处理
-// -----------------------------------------------------------------------
-class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
-    private val checkbox = JCheckBox()
+/**
+ * 自定义渲染器，既实现三态复选框显示，又保留原来根据 userObject 类型设置图标和文本的逻辑。
+ */
+class TriStateCheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
+    private val triStateCheckBox = TriStateCheckBox()
     private val panel = JPanel(BorderLayout())
 
     init {
         panel.isOpaque = false
-        checkbox.isOpaque = false
+        triStateCheckBox.isOpaque = false
     }
 
     override fun getTreeCellRendererComponent(
         tree: JTree,
         value: Any?,
-        selected: Boolean,
+        sel: Boolean,
         expanded: Boolean,
         leaf: Boolean,
         row: Int,
         hasFocus: Boolean
     ): Component {
         val defaultComponent = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
+        // 如果节点是我们自定义的 TriStateTreeNode，则进行处理
+        if (value is TriStateTreeNode) {
+            // 根据当前节点的状态更新复选框
+            when (value.state) {
+                CheckState.SELECTED -> {
+                    triStateCheckBox.isSelected = true
+                    triStateCheckBox.triState = CheckState.SELECTED
+                }
+                CheckState.UNSELECTED -> {
+                    triStateCheckBox.isSelected = false
+                    triStateCheckBox.triState = CheckState.UNSELECTED
+                }
+                CheckState.INDETERMINATE -> {
+                    triStateCheckBox.isSelected = false
+                    triStateCheckBox.triState = CheckState.INDETERMINATE
+                }
+            }
 
-        if (value is CheckboxTreeNode) {
-            // 将节点的 isChecked 显示到 checkbox
-            checkbox.isSelected = value.isChecked
-
-            // 根据不同的 userObject 类型设置不同的图标和文本
+            // 原有逻辑：根据 userObject 类型设置默认组件的 icon 和 text
             when (val userObj = value.userObject) {
                 is ProjectClass -> {
-                    icon = if (userObj.isAtomicClass) {
+                    icon = if (userObj.isAtomicClass)
                         com.intellij.icons.AllIcons.Nodes.Record
-                    } else {
+                    else
                         com.intellij.icons.AllIcons.Nodes.Class
-                    }
                     text = userObj.psiClass.name
                 }
                 is ProjectMethod -> {
@@ -526,14 +586,13 @@ class CheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
                     text = "Dependencies"
                 }
                 else -> {
-                    // 对于其他类型，使用默认的文本显示
                     text = value.userObject.toString()
                 }
             }
 
-            // 用 panel 拼装
+            // 用 panel 拼装：左侧放复选框，右侧放默认组件（显示图标和文本）
             panel.removeAll()
-            panel.add(checkbox, BorderLayout.WEST)
+            panel.add(triStateCheckBox, BorderLayout.WEST)
             panel.add(defaultComponent, BorderLayout.CENTER)
             return panel
         }
@@ -556,7 +615,7 @@ class RemoveSelectedNodesAction(
         val selectedObjects = mutableListOf<Any>()
 
         for (path in selectionPaths) {
-            val node = path.lastPathComponent as? CheckboxTreeNode ?: continue
+            val node = path.lastPathComponent as? TriStateTreeNode ?: continue
             val userObject = node.userObject
             // 根据前面设计，如果 userObject 是 ProjectMethod、ProjectClass、ProjectFile、VirtualFile 等，收集起来
             when (userObject) {

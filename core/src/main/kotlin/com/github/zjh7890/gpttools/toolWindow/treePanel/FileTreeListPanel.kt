@@ -51,12 +51,12 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             override fun mouseClicked(e: MouseEvent) {
                 val path = tree.getPathForLocation(e.x, e.y)
                 if (path != null) {
-                    val node = path.lastPathComponent as? CheckboxTreeNode
+                    val node = path.lastPathComponent as? TriStateTreeNode
                     if (node != null) {
                         val row = tree.getRowForLocation(e.x, e.y)
                         val bounds = tree.getRowBounds(row)
                         if (e.x < bounds.x + 20) {
-                            node.isChecked = !node.isChecked
+                            node.toggleState()
                             tree.repaint()
                             e.consume()
                             return
@@ -119,9 +119,9 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             analyzeDataClass(psiClass, classGraph)
         } else {
             // 找到对应的类节点
-            var classNode: CheckboxTreeNode? = null
+            var classNode: TriStateTreeNode? = null
             for (i in 0 until rootClassNode.childCount) {
-                val node = rootClassNode.getChildAt(i) as? CheckboxTreeNode
+                val node = rootClassNode.getChildAt(i) as? TriStateTreeNode
                 if ((node?.userObject?.toString() ?: "") == psiClass.name) {
                     classNode = node
                     break
@@ -129,17 +129,17 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
             }
 
             if (classNode != null) {
-                // 如果整个类被选中，分析所有方法
-                if (classNode.isChecked) {
+                // 如果整个类节点状态为 SELECTED，则分析该类所有方法
+                if (classNode.state == CheckState.SELECTED) {
                     val methodsToAnalyze = psiClass.methods.toList()
                     for (m in methodsToAnalyze) {
                         analyzeMethodDependencies(m, psiClass, classGraph)
                     }
                 } else {
-                    // 否则只分析被选中的方法
+                    // 否则只分析状态为 SELECTED 的方法节点
                     for (i in 0 until classNode.childCount) {
-                        val methodNode = classNode.getChildAt(i) as? CheckboxTreeNode
-                        if (methodNode?.isChecked == true) {
+                        val methodNode = classNode.getChildAt(i) as? TriStateTreeNode
+                        if (methodNode?.state == CheckState.SELECTED) {
                             val methodName = (methodNode.userObject as? ProjectMethod)?.psiMethod?.name
                             val method = psiClass.methods.find { it.name == methodName }
                             if (method != null) {
@@ -155,14 +155,20 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
     fun addClass(psiClass: PsiClass, selected: Boolean) {
         if (!isClassInAddedClasses(psiClass)) {
             val expandedPaths = getExpandedPaths()
-            val node = CheckboxTreeNode()
-            node.isChecked = selected // 根据需要设置初始选中状态
+            val node = TriStateTreeNode().apply {
+                // 设置状态，true 对应 SELECTED，false 对应 UNSELECTED
+                state = if (selected) CheckState.SELECTED else CheckState.UNSELECTED
+                // 保存类名，后续可用于查找
+                userObject = psiClass.name
+            }
 
             if (!PsiUtils.isAtomicClass(psiClass)) {
                 psiClass.methods.forEach { method ->
                     if (!ifGetterOrSetter(method) && !method.isStandardClassMethod()) {
-                        val methodNode = CheckboxTreeNode()
-                        methodNode.isChecked = selected // 根据需要设置初始选中状态
+                        val methodNode = TriStateTreeNode().apply {
+                            state = if (selected) CheckState.SELECTED else CheckState.UNSELECTED
+                            userObject = method.name
+                        }
                         node.add(methodNode)
                     }
                 }
@@ -179,14 +185,15 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         }
     }
 
+
     fun addMethod(psiClass: PsiClass, method: PsiMethod) {
         // 先添加类及其所有方法
         addClass(psiClass, false)
 
         // 找到对应的类节点
-        var classNode: CheckboxTreeNode? = null
+        var classNode: TriStateTreeNode? = null
         for (i in 0 until rootClassNode.childCount) {
-            val node = rootClassNode.getChildAt(i) as? CheckboxTreeNode
+            val node = rootClassNode.getChildAt(i) as? TriStateTreeNode
             if ((node?.userObject as? ProjectClass)?.psiClass?.name == psiClass.name) {
                 classNode = node
                 break
@@ -196,9 +203,9 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         if (classNode != null) {
             // 找到对应的方法节点并设置选中状态
             for (i in 0 until classNode.childCount) {
-                val node = classNode.getChildAt(i) as? CheckboxTreeNode
+                val node = classNode.getChildAt(i) as? TriStateTreeNode
                 if ((node?.userObject as? ProjectMethod)?.psiMethod?.name == method.name) {
-                    node.isChecked = true
+                    node.state = CheckState.SELECTED
                     break
                 }
             }
@@ -349,26 +356,27 @@ class FileTreeListPanel(private val project: Project) : JPanel() {
         val selectedClasses = mutableSetOf<PsiClass>() // 使用 Set 避免重复
 
         for (i in 0 until rootClassNode.childCount) {
-            val classNode = rootClassNode.getChildAt(i) as? CheckboxTreeNode ?: continue
-            val psiClass = addedClasses.find { it.name == (classNode.userObject as? ProjectClass)?.psiClass?.name } ?: continue
+            val classNode = rootClassNode.getChildAt(i) as? TriStateTreeNode ?: continue
+            // 此处假设 classNode.userObject 存储的是类名
+            val className = classNode.userObject?.toString() ?: continue
+            val psiClass = addedClasses.find { it.name == className } ?: continue
 
-            // 如果类节点被选中，直接添加类
-            if (classNode.isChecked) {
+            // 如果整个类节点的状态为 SELECTED，则直接添加
+            if (classNode.state == CheckState.SELECTED) {
                 selectedClasses.add(psiClass)
                 continue
             }
 
-            // 检查是否有方法被选中
+            // 否则检查类节点下是否有方法节点状态为 SELECTED
             var hasSelectedMethod = false
             for (j in 0 until classNode.childCount) {
-                val methodNode = classNode.getChildAt(j) as? CheckboxTreeNode
-                if (methodNode?.isChecked == true) {
+                val methodNode = classNode.getChildAt(j) as? TriStateTreeNode
+                if (methodNode?.state == CheckState.SELECTED) {
                     hasSelectedMethod = true
                     break
                 }
             }
 
-            // 如果有方法被选中，添加对应的类
             if (hasSelectedMethod) {
                 selectedClasses.add(psiClass)
             }

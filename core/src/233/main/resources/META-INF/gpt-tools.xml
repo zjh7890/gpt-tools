@@ -168,5 +168,12 @@
                           anchor="first"/>
             <add-to-group group-id="Vcs.Log.ContextMenu" relative-to-action="Vcs.ShowDiffWithLocal" anchor="first"/>
         </action>
+
+        <action id="com.github.zjh7890.gpttools.actions.ShowTriStateTreeAction"
+                class="com.github.zjh7890.gpttools.actions.ShowTriStateTreeAction"
+                text="Show Tri-State Tree"
+                description="显示三态复选框树">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>
