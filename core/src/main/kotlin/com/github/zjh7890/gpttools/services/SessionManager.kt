@@ -186,12 +186,15 @@ class SessionManager(private val project: Project) : Disposable {
      * 通知所有项目的 fileTreePanel 更新文件树
      */
     private fun notifyAllFileTreePanels(session: ChatSession) {
-        val openProjects = ProjectManager.getInstance().openProjects
-        openProjects.forEach { proj ->
-            val panel = LLMChatToolWindowFactory.getPanel(proj)?.chatFileTreeListPanel
-            panel?.updateFileTree(session)
-            panel?.dependenciesTreePanel?.updateUI()
-        }
+//        val openProjects = ProjectManager.getInstance().openProjects
+//        openProjects.forEach { proj ->
+//            val panel = LLMChatToolWindowFactory.getPanel(proj)?.chatFileTreeListPanel
+//            panel?.updateFileTree(session)
+//            panel?.dependenciesTreePanel?.updateUI()
+//        }
+        val panel = LLMChatToolWindowFactory.getPanel(project)?.chatFileTreeListPanel
+        panel?.updateFileTree(session)
+        panel?.dependenciesTreePanel?.updateUI()
     }
 
     /**

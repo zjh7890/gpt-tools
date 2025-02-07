@@ -720,7 +720,7 @@ data class AppFileTree(
 
             // 检查文件扩展名
             val fileExtension = virtualFile.extension?.lowercase() ?: ""
-            if (fileExtension !in setOf("java", "kt", "scala")) {
+            if (fileExtension !in setOf("java")) {
                 return "$relativePath\n" + FileUtil.readFileInfoForLLM(virtualFile)
             }
 
