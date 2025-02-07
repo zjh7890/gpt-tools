@@ -678,25 +678,25 @@ data class AppFileTree(
          */
         fun generateDependenciesTextCombined(appFileTree: AppFileTree): String {
             // 只处理状态为 SELECTED 的 ProjectFileTree 节点
-            val filteredProjects = appFileTree.projectFileTrees.filter { it.state == CheckState.SELECTED }
+            val filteredProjects = appFileTree.projectFileTrees.filter { it.state != CheckState.UNSELECTED }
 
             return filteredProjects.joinToString("\n\n") { projectFileTree ->
                 // ---- 1) 处理本地文件 ----
                 val localFilesContents = projectFileTree.localPackages
-                    .filter { it.state == CheckState.SELECTED }  // 只处理选中的 package
+                    .filter { it.state != CheckState.UNSELECTED }  // 只处理选中的 package
                     .flatMap { it.files }
-                    .filter { it.state == CheckState.SELECTED }  // 只处理选中的 file
+                    .filter { it.state != CheckState.UNSELECTED }  // 只处理选中的 file
                     .mapNotNull { projectFile ->
                         handleSingleProjectFileFiltered(projectFile, projectFileTree.project)
                     }
 
                 // ---- 2) 处理 Maven Dependencies ----
                 val mavenFilesContents = projectFileTree.mavenDependencies
-                    .filter { it.state == CheckState.SELECTED }  // 只处理选中的 MavenDependency
+                    .filter { it.state != CheckState.UNSELECTED }  // 只处理选中的 MavenDependency
                     .flatMap { it.packages }
-                    .filter { it.state == CheckState.SELECTED }
+                    .filter { it.state != CheckState.UNSELECTED }
                     .flatMap { it.files }
-                    .filter { it.state == CheckState.SELECTED }
+                    .filter { it.state != CheckState.UNSELECTED }
                     .mapNotNull { projectFile ->
                         handleSingleProjectFileFiltered(projectFile, projectFileTree.project)
                     }
@@ -718,8 +718,9 @@ data class AppFileTree(
 
             val relativePath = calculateRelativePath(absolutePath, project, projectFile.ifMavenFile)
 
-            // 如果文件是 whole，则无论内部如何，都返回整个文件内容
-            if (projectFile.whole) {
+            // 检查文件扩展名
+            val fileExtension = virtualFile.extension?.lowercase() ?: ""
+            if (fileExtension !in setOf("java", "kt", "scala")) {
                 return "$relativePath\n" + FileUtil.readFileInfoForLLM(virtualFile)
             }
 
@@ -729,36 +730,24 @@ data class AppFileTree(
 
             // 遍历文件中记录的所有 ProjectClass，仅处理状态为 SELECTED 的类
             projectFile.classes
-                .filter { it.state == CheckState.SELECTED }
+                .filter { it.state != CheckState.UNSELECTED }
                 .forEach { projectClass ->
                     // 查找文件中的对应 PsiClass（如果是 whole，则匹配 qualifiedName，否则匹配类名）
-                    val foundPsiClass = PsiTreeUtil.findChildrenOfType(psiFile, PsiClass::class.java).find {
-                        if (projectClass.whole) {
-                            it.qualifiedName == projectClass.className
-                        } else {
-                            it.name == projectClass.className
-                        }
-                    } ?: return@forEach
-
-                    if (projectClass.whole) {
-                        // whole 模式下，直接将整个 PsiClass 加入处理列表
-                        elementsToProcess.add(foundPsiClass)
-                    } else {
-                        // 否则只处理该类中状态为 SELECTED 的方法
-                        projectClass.methods
-                            .filter { it.state == CheckState.SELECTED }
-                            .forEach { projectMethod ->
-                                val matchedMethod = foundPsiClass
-                                    .findMethodsByName(projectMethod.methodName, false)
-                                    .find { m ->
-                                        val paramTypes = m.parameterList.parameters.map { p -> p.type.canonicalText }
-                                        paramTypes == projectMethod.parameterTypes
-                                    }
-                                if (matchedMethod != null) {
-                                    elementsToProcess.add(matchedMethod)
+                    val foundPsiClass = projectClass.psiClass
+                    // 否则只处理该类中状态为 SELECTED 的方法
+                    projectClass.methods
+                        .filter { it.state == CheckState.SELECTED }
+                        .forEach { projectMethod ->
+                            val matchedMethod = foundPsiClass
+                                .findMethodsByName(projectMethod.methodName, false)
+                                .find { m ->
+                                    val paramTypes = m.parameterList.parameters.map { p -> p.type.canonicalText }
+                                    paramTypes == projectMethod.parameterTypes
                                 }
+                            if (matchedMethod != null) {
+                                elementsToProcess.add(matchedMethod)
                             }
-                    }
+                        }
                 }
 
             if (elementsToProcess.isNotEmpty()) {
@@ -963,25 +952,6 @@ data class ProjectFile(
         )
     }
 
-    // 获取当前有效的 Classes
-    fun getCurrentClasses(): List<ProjectClass> {
-        return if (whole) {
-            // 如果是 whole，返回文件中所有类
-            psiFile.let {
-                PsiTreeUtil.findChildrenOfType(it, PsiClass::class.java).map { psiClass ->
-                    ProjectClass(
-                        className = psiClass.name ?: "",
-                        psiClass = psiClass,
-                        methods = mutableListOf(),
-                        whole = true
-                    )
-                }
-            }
-        } else {
-            // 否则返回指定的类列表
-            classes
-        }
-    }
 
     fun removeClasses(classesToRemove: List<ProjectClass>) {
         if (whole) {
@@ -1049,11 +1019,7 @@ data class SerializableProjectFile(
 
         val psiFile = PsiManager.getInstance(project).findFile(vFile)
 
-        // 如果是 whole，就不需要转换具体的类
-        val realClasses = if (whole) {
-            mutableListOf()
-        } else {
-            // 只有当文件是 Java/Kotlin/Scala 等支持类的文件时才处理类
+        val realClasses = // 只有当文件是 Java/Kotlin/Scala 等支持类的文件时才处理类
             when {
                 psiFile is PsiJavaFile ||
                         psiFile?.fileType?.name?.contains("KOTLIN") == true ||
@@ -1062,7 +1028,6 @@ data class SerializableProjectFile(
                 }
                 else -> mutableListOf()
             }
-        }
 
         return ProjectFile(
             filePath = filePath,
@@ -1092,25 +1057,6 @@ data class ProjectClass(
             whole = whole,
             state = state           // 传递 selected 值
         )
-    }
-
-    fun getCurrentMethods(): List<ProjectMethod> {
-        if (isAtomicClass) {
-            return emptyList()
-        }
-        return if (whole) {
-            // 如果是 whole，返回类中所有方法
-            psiClass.methods.map { method ->
-                ProjectMethod(
-                    methodName = method.name,
-                    parameterTypes = method.parameterList.parameters.map { it.type.canonicalText },
-                    psiMethod = method
-                )
-            }
-        } else {
-            // 否则返回指定的方法列表
-            methods
-        }
     }
 
     fun removeMethods(methodsToRemove: List<ProjectMethod>) {

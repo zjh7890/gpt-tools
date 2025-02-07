@@ -140,7 +140,6 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
         // 设置 root 的 userObject 和 state
         root.userObject = appFileTree
-        root.state = appFileTree.state
 
         addedDependencies.clear()
 
@@ -149,33 +148,29 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
             // 1) project 节点
             val projectNode = TriStateTreeNode().apply {
                 userObject = projectFileTree
-                state = projectFileTree.state
             }
 
             // ------------- (A) Local Packages -------------
             projectFileTree.localPackages.forEach { packageDependency ->
                 val packageNode = TriStateTreeNode().apply {
                     userObject = packageDependency
-                    state = packageDependency.state
                 }
 
                 packageDependency.files.forEach { file ->
-                    val classes = file.getCurrentClasses()
+                    val classes = file.classes
 
                     // 如果只有一个类且与文件名重名（去掉.kt/.java后缀），直接展示类节点
                     if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
                         val pClass = classes[0]
                         val classNode = TriStateTreeNode().apply {
                             userObject = pClass
-                            state = pClass.state
                         }
                         addedDependencies.add(pClass.psiClass)
 
                         // 方法节点
-                        pClass.getCurrentMethods().forEach { pm ->
+                        pClass.methods.forEach { pm ->
                             val methodNode = TriStateTreeNode().apply {
                                 userObject = pm
-                                state = pm.state
                             }
                             classNode.add(methodNode)
                         }
@@ -184,22 +179,19 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                         // 原有的处理逻辑：创建文件节点，然后添加类节点
                         val fileNode = TriStateTreeNode().apply {
                             userObject = file
-                            state = file.state
                         }
 
                         // 类节点
                         classes.forEach { pClass ->
                             val classNode = TriStateTreeNode().apply {
                                 userObject = pClass
-                                state = pClass.state
                             }
                             addedDependencies.add(pClass.psiClass)
 
                             // 方法节点
-                            pClass.getCurrentMethods().forEach { pm ->
+                            pClass.methods.forEach { pm ->
                                 val methodNode = TriStateTreeNode().apply {
                                     userObject = pm
-                                    state = pm.state
                                 }
                                 classNode.add(methodNode)
                             }
@@ -214,40 +206,32 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
             // ------------- (B) Maven Dependencies -------------
             if (projectFileTree.mavenDependencies.isNotEmpty()) {
-                val mavenRootNode = TriStateTreeNode().apply {
-                    userObject = "Maven Dependencies"
-                }
-
                 projectFileTree.mavenDependencies.forEach { mavenDep ->
                     val mavenDepNode = TriStateTreeNode().apply {
                         userObject = mavenDep
-                        state = mavenDep.state
                     }
 
                     // 使用扁平路径构建结构
                     mavenDep.packages.forEach { packageDependency ->
                         val packageNode = TriStateTreeNode().apply {
                             userObject = packageDependency
-                            state = packageDependency.state
                         }
 
                         packageDependency.files.forEach { file ->
-                            val classes = file.getCurrentClasses()
+                            val classes = file.classes
 
                             // 如果只有一个类且与文件名重名（去掉.class后缀），直接展示类节点
                             if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
                                 val pClass = classes[0]
                                 val classNode = TriStateTreeNode().apply {
                                     userObject = pClass
-                                    state = pClass.state
                                 }
                                 addedDependencies.add(pClass.psiClass)
 
                                 // 方法节点
-                                pClass.getCurrentMethods().forEach { pm ->
+                                pClass.methods.forEach { pm ->
                                     val methodNode = TriStateTreeNode().apply {
                                         userObject = pm
-                                        state = pm.state
                                     }
                                     classNode.add(methodNode)
                                 }
@@ -256,22 +240,19 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                                 // 原有的处理逻辑：创建文件节点，然后添加类节点
                                 val fileNode = TriStateTreeNode().apply {
                                     userObject = file
-                                    state = file.state
                                 }
 
                                 // 类节点
                                 classes.forEach { pClass ->
                                     val classNode = TriStateTreeNode().apply {
                                         userObject = pClass
-                                        state = pClass.state
                                     }
                                     addedDependencies.add(pClass.psiClass)
 
                                     // 方法节点
-                                    pClass.getCurrentMethods().forEach { pm ->
+                                    pClass.methods.forEach { pm ->
                                         val methodNode = TriStateTreeNode().apply {
                                             userObject = pm
-                                            state = pm.state
                                         }
                                         classNode.add(methodNode)
                                     }
@@ -285,10 +266,8 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                         mavenDepNode.add(packageNode)
                     }
 
-                    mavenRootNode.add(mavenDepNode)
+                    projectNode.add(mavenDepNode)
                 }
-
-                projectNode.add(mavenRootNode)
             }
 
             root.add(projectNode)
@@ -335,24 +314,33 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
     companion object {
         fun toMarkdownString(appFileTree: AppFileTree): String {
             if (appFileTree.projectFileTrees.isEmpty()) {
-                return "- Related Project Map\n  (no dependencies)\n"
+                return "(no dependencies)"
             }
             val sb = StringBuilder()
-            sb.append("- Related Project Map\n")
             appFileTree.projectFileTrees.forEach { projectFileTree ->
-                sb.append("  - Project: ${projectFileTree.project.name}\n")
+                sb.append("- Project: ${projectFileTree.project.name}\n")
 
                 // 1) Local Packages
                 projectFileTree.localPackages.forEach { packageDependency ->
-                    sb.append("    - Package: ${packageDependency.packageName}\n")
+                    sb.append("  - Package: ${packageDependency.packageName}\n")
                     packageDependency.files.forEach { file ->
-                        val usedClasses = file.classes
-                        usedClasses.forEach { projectClass ->
-                            val className = projectClass.psiClass.name
-                            sb.append("      - Class: $className\n")
-                            projectClass.getCurrentMethods().forEach { projectMethod ->
-                                val methodName = projectMethod.psiMethod.name
-                                sb.append("        - Method: $methodName\n")
+                        // 使用 file.classes 以复用 updateDependencies 中的逻辑
+                        val classes = file.classes
+                        if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
+                            // 直接展示类节点
+                            val pClass = classes[0]
+                            sb.append("    - Class: ${pClass.psiClass.name}\n")
+                            pClass.methods.forEach { pm ->
+                                sb.append("      - Method: ${pm.psiMethod.name}\n")
+                            }
+                        } else {
+                            // 展示文件节点，再展示文件下的类节点
+                            sb.append("    - File: ${file.virtualFile.name}\n")
+                            classes.forEach { pClass ->
+                                sb.append("      - Class: ${pClass.psiClass.name}\n")
+                                pClass.methods.forEach { pm ->
+                                    sb.append("        - Method: ${pm.psiMethod.name}\n")
+                                }
                             }
                         }
                     }
@@ -360,21 +348,27 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
 
                 // 2) Maven Dependencies
                 if (projectFileTree.mavenDependencies.isNotEmpty()) {
-                    sb.append("    - Maven Dependencies\n")
+                    sb.append("  - Maven Dependencies\n")
                     projectFileTree.mavenDependencies.forEach { mavenDep ->
                         val gav = "${mavenDep.groupId}:${mavenDep.artifactId}:${mavenDep.version}"
-                        sb.append("      - $gav\n")
-
+                        sb.append("    - $gav\n")
                         mavenDep.packages.forEach { packageDependency ->
-                            sb.append("        - Package: ${packageDependency.packageName}\n")
+                            sb.append("      - Package: ${packageDependency.packageName}\n")
                             packageDependency.files.forEach { file ->
-                                val usedClasses = file.classes
-                                usedClasses.forEach { projectClass ->
-                                    val className = projectClass.psiClass.name
-                                    sb.append("          - Class: $className\n")
-                                    projectClass.getCurrentMethods().forEach { projectMethod ->
-                                        val methodName = projectMethod.psiMethod.name
-                                        sb.append("            - Method: $methodName\n")
+                                val classes = file.classes
+                                if (classes.size == 1 && classes[0].psiClass.name == file.virtualFile.nameWithoutExtension) {
+                                    val pClass = classes[0]
+                                    sb.append("        - Class: ${pClass.psiClass.name}\n")
+                                    pClass.methods.forEach { pm ->
+                                        sb.append("          - Method: ${pm.psiMethod.name}\n")
+                                    }
+                                } else {
+                                    sb.append("        - File: ${file.virtualFile.name}\n")
+                                    classes.forEach { pClass ->
+                                        sb.append("          - Class: ${pClass.psiClass.name}\n")
+                                        pClass.methods.forEach { pm ->
+                                            sb.append("            - Method: ${pm.psiMethod.name}\n")
+                                        }
                                     }
                                 }
                             }
@@ -382,7 +376,6 @@ class DependenciesTreePanel(val project: Project) : JPanel() {
                     }
                 }
             }
-
             return sb.toString()
         }
     }
@@ -416,12 +409,9 @@ class ClassDependencyInfo(var isAtomicClass: Boolean = false) {
 
 // 2. 定义 TriStateTreeNode，支持三态并同步到用户对象
 class TriStateTreeNode(userObject: Any? = null) : DefaultMutableTreeNode(userObject) {
-    var state: CheckState = CheckState.SELECTED
-
     fun updateState(value: CheckState) {
-        if (state != value) {
-            state = value
-            syncToUserObject()
+        if (userObjectState() != value) {
+            syncToUserObject(value)
             updateChildrenState(value)
             updateParentState()
         }
@@ -429,7 +419,7 @@ class TriStateTreeNode(userObject: Any? = null) : DefaultMutableTreeNode(userObj
 
     // 原来的切换逻辑（旧版可能用 isChecked 进行布尔反转）
     fun toggleState() {
-        val newState = when (state) {
+        val newState = when (userObjectState()) {
             CheckState.INDETERMINATE -> CheckState.SELECTED
             CheckState.SELECTED -> CheckState.UNSELECTED
             CheckState.UNSELECTED -> CheckState.SELECTED
@@ -438,7 +428,21 @@ class TriStateTreeNode(userObject: Any? = null) : DefaultMutableTreeNode(userObj
     }
 
     // 同步状态到 userObject，原来是设置 selected 属性
-    private fun syncToUserObject() {
+    fun userObjectState(): CheckState {
+        return when (val obj = userObject) {
+            is AppFileTree -> obj.state
+            is ProjectFileTree -> obj.state
+            is ModuleDependency -> obj.state
+            is MavenDependency -> obj.state
+            is PackageDependency -> obj.state
+            is ProjectFile -> obj.state
+            is ProjectClass -> obj.state
+            is ProjectMethod -> obj.state
+            else -> {CheckState.UNSELECTED}
+        }
+    }
+
+    fun syncToUserObject(state: CheckState) {
         when (val obj = userObject) {
             is AppFileTree -> obj.state = state
             is ProjectFileTree -> obj.state = state
@@ -453,10 +457,10 @@ class TriStateTreeNode(userObject: Any? = null) : DefaultMutableTreeNode(userObj
 
     // 向下同步：若当前节点不是 INDETERMINATE，则所有子节点跟随当前状态
     private fun updateChildrenState(value: CheckState) {
-        if (state == CheckState.INDETERMINATE) return
+        if (userObjectState() == CheckState.INDETERMINATE) return
         for (i in 0 until childCount) {
             val child = getChildAt(i) as? TriStateTreeNode ?: continue
-            child.state = value
+            child.syncToUserObject(value)
             child.updateChildrenState(value)
         }
     }
@@ -468,17 +472,17 @@ class TriStateTreeNode(userObject: Any? = null) : DefaultMutableTreeNode(userObj
         var unselectedCount = 0
         for (i in 0 until parentNode.childCount) {
             val child = parentNode.getChildAt(i) as? TriStateTreeNode ?: continue
-            when (child.state) {
+            when (child.userObjectState()) {
                 CheckState.SELECTED -> selectedCount++
                 CheckState.UNSELECTED -> unselectedCount++
                 CheckState.INDETERMINATE -> { }
             }
         }
-        parentNode.state = when {
+        parentNode.syncToUserObject(when {
             selectedCount == parentNode.childCount -> CheckState.SELECTED
             unselectedCount == parentNode.childCount -> CheckState.UNSELECTED
             else -> CheckState.INDETERMINATE
-        }
+        })
         parentNode.updateParentState()
     }
 
@@ -533,7 +537,7 @@ class TriStateCheckboxTreeCellRenderer : DefaultTreeCellRenderer() {
         // 如果节点是我们自定义的 TriStateTreeNode，则进行处理
         if (value is TriStateTreeNode) {
             // 根据当前节点的状态更新复选框
-            when (value.state) {
+            when (value.userObjectState()) {
                 CheckState.SELECTED -> {
                     triStateCheckBox.isSelected = true
                     triStateCheckBox.triState = CheckState.SELECTED
