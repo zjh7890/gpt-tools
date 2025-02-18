@@ -5,13 +5,12 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.*
+import io.ktor.utils.io.charsets.*
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 
 object FileUtil {
     /**
@@ -22,8 +21,8 @@ object FileUtil {
     fun readResourceFile(filePath: String): String {
         val classLoader = this::class.java.classLoader
         return classLoader.getResourceAsStream(filePath)?.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                reader.readText()
+            BufferedReader(InputStreamReader(inputStream, StandardCharsets.UTF_8)).use { reader ->
+                reader.readText().replace("\r\n", "\n")
             }
         } ?: "未找到文件默认内容"
     }
